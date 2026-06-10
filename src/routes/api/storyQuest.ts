@@ -83,7 +83,8 @@ const routes = async (fastify: FastifyInstance) => {
                 "character_list": rewardResult?.character_list || [],
                 "joined_character_id_list": rewardResult?.joined_character_id_list || [],
                 "equipment_list": rewardResult?.equipment_list || [],
-                "items": rewardResult?.items || {}
+                "items": rewardResult?.items || {},
+                "presigned_quest_category": []
             } : [],
             
         })

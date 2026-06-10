@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { generateDataHeaders, getServerTime, getServerDate } from "../../utils";
-import { getAccountPlayers, getPlayerSync, dailyResetPlayerDataSync, collectPlayerDataPooledExpSync } from "../../data/wdfpData";
+import { getAccountPlayers, getPlayerSync, dailyResetPlayerDataSync, collectPlayerDataPooledExpSync, updatePlayerSync } from "../../data/wdfpData";
 import { getClientSerializedData } from "../../data/utils";
 
 interface CnLoadBody {
@@ -99,6 +99,11 @@ const routes = async (fastify: FastifyInstance) => {
         const now = getServerDate();
         dailyResetPlayerDataSync(player, now);
         collectPlayerDataPooledExpSync(player, now);
+
+        // 若自定义时间与 lastLogin 不同步，强制对齐（防止客户端弹"日期变了"）
+        if (now.toDateString() !== player.lastLoginTime.toDateString()) {
+            updatePlayerSync({ id: player.id, lastLoginTime: now });
+        }
 
         const clientData = getClientSerializedData(playerId, { viewerId: accountId }) as any;
         if (clientData === null) {

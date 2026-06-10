@@ -367,7 +367,8 @@ const routes = async (fastify: FastifyInstance) => {
                     ...scoreRewardsResult.items,
                     ...(rushEventRewardsResult?.items ?? {})
                 },
-                "rush_event": rushEventData
+                "rush_event": rushEventData,
+                "presigned_quest_category": []
             }
         })
     })

@@ -1,9 +1,9 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { clientSerializeDate } from "../../data/utils";
-import { getAccountPlayers, getPlayerSync, getPlayerTriggeredTutorialsSync, getSession, insertDefaultPlayerCharacterSync, insertPlayerTriggeredTutorialSync, updatePlayerSync } from "../../data/wdfpData";
+import { getAccountPlayers, getPlayerSync, getPlayerTriggeredTutorialsSync, getSession, insertPlayerTriggeredTutorialSync, updatePlayerSync, insertMailSync, insertReceiveHistorySync, MailType } from "../../data/wdfpData";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { getGachaSync } from "../../lib/assets";
 import { randomPoolItem, rewardPlayerGachaDrawResultSync } from "../../lib/gacha";
+import { givePlayerCharacterSync } from "../../lib/character";
 import { randomInt } from "crypto";
 import { GachaCharacterDraw } from "../../lib/types";
 
@@ -52,10 +52,12 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No players bound to account."
         })
 
-        // mark tutorial as having been completed
+        // Mark tutorial as having been completed (skip already triggered)
+        const existing = getPlayerTriggeredTutorialsSync(playerId)
         for (const tutorialId of tutorialIds) {
-            // TODO: add checking for if the tutorial is already triggered.
-            insertPlayerTriggeredTutorialSync(playerId, tutorialId)
+            if (!existing.find((v: number) => v === tutorialId)) {
+                insertPlayerTriggeredTutorialSync(playerId, tutorialId)
+            }
         }
 
         reply.header("content-type", "application/x-msgpack")
@@ -141,6 +143,7 @@ const routes = async (fastify: FastifyInstance) => {
 
             // reward pull
             const rewardResult = rewardPlayerGachaDrawResultSync(playerId, gachaData, drawResult)
+            insertReceiveHistorySync(playerId, { type: MailType.CHARACTER, type_id: randomCharacterId, number: 1 })
 
             const newFreeVmoney = player.freeVmoney - gachaData.singleCost
             updatePlayerSync({
@@ -183,11 +186,26 @@ const routes = async (fastify: FastifyInstance) => {
                 id: playerId,
                 freeVmoney: newVMoney
             })
+            insertReceiveHistorySync(playerId, { type: MailType.FREE_VMONEY, type_id: null, number: 1500 })
 
-            // give free character
-            const serializedDate = clientSerializeDate(new Date())
+            // give free character directly (required for tutorial popup)
+            const giveResult = givePlayerCharacterSync(playerId, freeTutorialCharacterId)
+            const characterList = giveResult !== null ? [giveResult.character] : []
+            insertReceiveHistorySync(playerId, { type: MailType.CHARACTER, type_id: freeTutorialCharacterId, number: 1 })
 
-            insertDefaultPlayerCharacterSync(playerId, freeTutorialCharacterId)
+            // also send a mail with tutorial gift (gacha ticket, etc.)
+            insertMailSync(playerId, {
+                reason_id: 0,
+                subject: null,
+                description: null,
+                type: MailType.FREE_VMONEY,
+                type_id: null,
+                number: 500,
+                receive_time: '0000-00-00 00:00:00',
+                create_time: new Date().toISOString().replace('T', ' ').substring(0, 19),
+                reward_period_limited: 0,
+                reward_limit_time: null,
+            })
 
             reply.status(200).send({
                 "data_headers": headers,
@@ -196,29 +214,7 @@ const routes = async (fastify: FastifyInstance) => {
                     "user_info": {
                         "free_vmoney": newVMoney
                     },
-                    "character_list": [
-                        {
-                            "viewer_id": viewerId,
-                            "character_id": freeTutorialCharacterId,
-                            "entry_count": 1,
-                            "exp": 0,
-                            "exp_total": 0,
-                            "bond_token_list": [
-                                {
-                                    "mana_board_index": 1,
-                                    "status": 0
-                                },
-                                {
-                                    "mana_board_index": 2,
-                                    "status": 0
-                                }
-                            ],
-                            "mana_board_index": 1,
-                            "create_time": serializedDate,
-                            "update_time": serializedDate,
-                            "join_time": serializedDate
-                        }
-                    ],
+                    "character_list": characterList,
                     "encyclopedia_info": {
                         [`1${freeTutorialCharacterId}01`]: {
                             "read": false

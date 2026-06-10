@@ -3,7 +3,7 @@ import { getDateFromServerTime, getServerTime, getServerDate } from "../utils"
 import { ClientPlayerData, DailyChallengePointListEntry, MergedPlayerData, PartyCategory, Player, PlayerBoxGacha, PlayerCharacter, PlayerCharacterBondToken, PlayerDrawnQuest, PlayerEquipment, PlayerGachaCampaign, PlayerGachaInfo, PlayerMultiSpecialExchangeCampaign, PlayerParty, PlayerPartyGroup, PlayerQuestProgress, PlayerRushEvent, PlayerRushEventPlayedParty, PlayerStartDashExchangeCampaign, RushEventBattleType, UserBoxGacha, UserCharacter, UserCharacterBondTokenStatus, UserEquipment, UserGachaCampaign, UserPartyGroup, UserPartyGroupTeam, UserQuestProgress, UserRushEvent, UserRushEventPlayedParty, UserRushEventPlayedPartyList, UserTutorial } from "./types"
 
 import { availableAssetVersion } from "../routes/api/asset"
-import { deserializePlayerRushEventPlayedParty, deserializeRushEvent, getPlayerActiveMissionsSync, getPlayerBoxGachasSync, getPlayerCharactersManaNodesSync, getPlayerCharactersSync, getPlayerClearedRegularMissionListSync, getPlayerDailyChallengePointListSync, getPlayerDrawnQuestsSync, getPlayerEquipmentListSync, getPlayerGachaCampaignListSync, getPlayerGachaInfoListSync, getPlayerItemsSync, getPlayerMultiSpecialExchangeCampaignsSync, getPlayerOptionsSync, getPlayerPartyGroupListSync, getPlayerPeriodicRewardPointsSync, getPlayerQuestProgressSync, getPlayerRushEventListClearedFoldersSync, getPlayerRushEventListPlayedPartiesSync, getPlayerRushEventListSync, getPlayerStartDashExchangeCampaignsSync, getPlayerSync, getPlayerTriggeredTutorialsSync, serializePlayerRushEventPlayedParty } from "./wdfpData"
+import { deserializePlayerRushEventPlayedParty, deserializeRushEvent, getPlayerActiveMissionsSync, getPlayerBoxGachasSync, getPlayerCharactersManaNodesSync, getPlayerCharactersSync, getPlayerClearedRegularMissionListSync, getPlayerDailyChallengePointListSync, getPlayerDrawnQuestsSync, getPlayerEquipmentListSync, getPlayerGachaCampaignListSync, getPlayerGachaInfoListSync, getPlayerItemsSync, getPlayerMailCountSync, getPlayerMultiSpecialExchangeCampaignsSync, getPlayerOptionsSync, getPlayerPartyGroupListSync, getPlayerPeriodicRewardPointsSync, getPlayerQuestProgressSync, getPlayerRushEventListClearedFoldersSync, getPlayerRushEventListPlayedPartiesSync, getPlayerRushEventListSync, getPlayerStartDashExchangeCampaignsSync, getPlayerSync, getPlayerTriggeredTutorialsSync, serializePlayerRushEventPlayedParty } from "./wdfpData"
 import { kIdToBusinessCode, businessCodeToKId } from "./codeMap"
 
 export interface SerializePlayerDataOptions {
@@ -331,7 +331,7 @@ export function serializePlayerData(
                 "odds_id": drawnQuest.oddsId
             }
         }),
-        "mail_arrived": false,
+        "mail_arrived": getPlayerMailCountSync(toSerialize.player.id, true) > 0,
         "user_periodic_reward_point_list": toSerialize.periodicRewardPointList,
         "all_active_mission_list": toSerialize.allActiveMissionList,
         "cleared_collect_item_event_mission_list": [],
@@ -459,7 +459,7 @@ export function getDefaultPlayerData(): Omit<Player, 'id'> {
         bondToken: 0,
         expPool: 0,
         expPooledTime: now,
-        leaderCharacterId: 2,
+        leaderCharacterId: 1,
         partySlot: 1,
         degreeId: 1,
         birth: 19900101,

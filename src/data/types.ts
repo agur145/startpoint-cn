@@ -9,6 +9,8 @@ export interface RawAccount {
     reg_time: string
     last_login_time: string
     status: string
+    username: string | null
+    password_hash: string | null
 }
 
 export interface Account {
@@ -21,13 +23,16 @@ export interface Account {
     regTime: Date
     lastLoginTime: Date
     status: string
+    username?: string | null
+    passwordHash?: string | null
 }
 
 // zat session
 export enum SessionType {
     ZAT,
     ZRT,
-    VIEWER
+    VIEWER,
+    LOGIN
 }
 
 export interface RawSession {
@@ -470,6 +475,7 @@ export interface RawPlayer {
     enable_auto_3x: number
     tutorial_step: number | null
     tutorial_skip_flag: number | null
+    time_offset: number | null
 }
 
 export interface Player {
@@ -499,6 +505,7 @@ export interface Player {
     enableAuto3x: boolean
     tutorialStep: number | null
     tutorialSkipFlag: boolean | null
+    timeOffset?: number | null
 }
 
 // client types

@@ -1,0 +1,53 @@
+/**
+ * History API — receive.
+ * Returns reward claim history for the past 7 days (last 500 entries).
+ */
+import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { getSession, getAccountPlayers, getReceiveHistorySync } from "../../data/wdfpData";
+import { generateDataHeaders } from "../../utils";
+
+const routes = async (fastify: FastifyInstance) => {
+    fastify.post("/receive", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as any
+        const viewerId = body.viewer_id
+        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+            error: "Bad Request",
+            message: "Invalid request body."
+        })
+
+        const session = await getSession(viewerId.toString())
+        if (!session) return reply.status(400).send({
+            error: "Bad Request",
+            message: "Invalid viewer id."
+        })
+
+        const playerIds = await getAccountPlayers(session.accountId)
+        const playerId = playerIds[0]
+        if (isNaN(playerId)) return reply.status(400).send({
+            error: "Bad Request",
+            message: "No player bound to account."
+        })
+
+        const records = getReceiveHistorySync(playerId, 7, 500)
+        const history = records.map(r => ({
+            create_time: r.create_time,
+            description: null,
+            number: r.number,
+            reason_id: r.reason_id,
+            subject: null,
+            type: r.type,
+            type_id: r.type_id,
+        }))
+
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            data_headers: generateDataHeaders({ viewer_id: viewerId }),
+            data: {
+                history,
+                total_count: records.length,
+            }
+        })
+    })
+}
+
+export default routes

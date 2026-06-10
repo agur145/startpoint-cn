@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getAccountPlayers, getPlayerGachaCampaignSync, getPlayerGachaInfoListSync, getPlayerGachaInfoSync, getPlayerItemSync, getPlayerSync, getSession, insertPlayerGachaCampaignSync, insertPlayerGachaInfoSync, updatePlayerGachaCampaignSync, updatePlayerGachaInfoSync, updatePlayerItemSync, updatePlayerSync } from "../../data/wdfpData";
+import { getAccountPlayers, getPlayerGachaCampaignSync, getPlayerGachaInfoListSync, getPlayerGachaInfoSync, getPlayerItemSync, getPlayerSync, getSession, insertPlayerGachaCampaignSync, insertPlayerGachaInfoSync, insertReceiveHistorySync, MailType, updatePlayerGachaCampaignSync, updatePlayerGachaInfoSync, updatePlayerItemSync, updatePlayerSync } from "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
 import { drawGachaSync, rewardPlayerGachaDrawResultSync } from "../../lib/gacha";
 import { getGachaCampaignIdSync, getGachaSync } from "../../lib/assets";
@@ -100,6 +100,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         // reward equipment
         const giveResult = givePlayerEquipmentSync(playerId, equipmentId, 1)
+        insertReceiveHistorySync(playerId, { type: MailType.EQUIPMENT, type_id: equipmentId, number: 1 })
 
         // update gacha info
         updatePlayerGachaInfoSync(playerId, {
@@ -175,6 +176,7 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Bad Request",
             "message": "Could not give player character."
         })
+        insertReceiveHistorySync(playerId, { type: MailType.CHARACTER, type_id: characterId, number: 1 })
 
         // update gacha info
         updatePlayerGachaInfoSync(playerId, {
@@ -217,10 +219,13 @@ const routes = async (fastify: FastifyInstance) => {
         const paymentType = body.payment_type
         const numberOfExec = body.number_of_exec
         const type = body.type
-        if (isNaN(viewerId) || isNaN(gachaId) || isNaN(paymentType) || isNaN(numberOfExec) || isNaN(type)) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid request body."
-        })
+        if (isNaN(viewerId) || isNaN(gachaId) || isNaN(paymentType) || isNaN(numberOfExec) || isNaN(type)) {
+            console.log(`[GACHA] Invalid body: v=${viewerId} g=${gachaId} pt=${paymentType} n=${numberOfExec} t=${type}`);
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Invalid request body."
+            })
+        }
 
         const viewerIdSession = await getSession(viewerId.toString())
         if (!viewerIdSession) return reply.status(400).send({
@@ -239,10 +244,13 @@ const routes = async (fastify: FastifyInstance) => {
 
         // get the gacha
         const gachaData = getGachaSync(gachaId)
-        if (gachaData === null) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Gacha doesn't exist."
-        })
+        if (gachaData === null) {
+            console.log(`[GACHA] Gacha not found: gachaId=${gachaId}`);
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Gacha doesn't exist."
+            })
+        }
         const isCharacterGacha = gachaData.type == GachaType.CHARACTER
 
         // get player gacha data
@@ -348,18 +356,30 @@ const routes = async (fastify: FastifyInstance) => {
             }
         }
 
-        if (pullCount === 0) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid payment type."
-        })
+        if (pullCount === 0) {
+            console.log(`[GACHA] Invalid payment: gachaId=${gachaId} paymentType=${paymentType} type=${type}`);
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Invalid payment type."
+            })
+        }
 
-        if ((0 > playerFreeVmoney) || (0 > playerPaidVmoney)) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Not enough beads."
-        })
+        if ((0 > playerFreeVmoney) || (0 > playerPaidVmoney)) {
+            console.log(`[GACHA] Not enough beads: gachaId=${gachaId} free=${playerFreeVmoney} paid=${playerPaidVmoney} cost=${gachaData.singleCost}`);
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Not enough beads."
+            })
+        }
 
         const drawResult = drawGachaSync(gachaData, pullCount)
         const rewardResult = rewardPlayerGachaDrawResultSync(playerId, gachaData, drawResult)
+
+        // Log each drawn item in history
+        const historyType = isCharacterGacha ? MailType.CHARACTER : MailType.EQUIPMENT
+        for (const [itemId, count] of drawResult) {
+            insertReceiveHistorySync(playerId, { type: historyType, type_id: itemId, number: count })
+        }
 
         const newGachaExchangePoint = (playerGachaData.gachaExchangePoint ?? 0) + pullCount
         if (insertPlayerGachaData) {

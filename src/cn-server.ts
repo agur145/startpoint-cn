@@ -3,6 +3,8 @@ import { ContentTypeParserDoneFunction } from "fastify/types/content-type-parser
 import { pack, unpack } from "msgpackr";
 import fastifyStatic from "@fastify/static";
 import path from "path";
+import { getServerTime } from "./utils";
+import { restoreTimeOffset } from "./data/activeAccount";
 
 import versionCheckPlugin from "./routes/cn/versionCheck";
 import leitingAuthPlugin from "./routes/cn/leitingAuth";
@@ -35,12 +37,18 @@ import paymentApiPlugin from "./routes/api/payment";
 import newsApiPlugin from "./routes/api/news";
 import raidEventApiPlugin from "./routes/api/raidEvent";
 import rushEventApiPlugin from "./routes/api/rushEvent";
+import profileApiPlugin from "./routes/api/profile";
+import historyApiPlugin from "./routes/api/history";
+import comicApiPlugin from "./routes/api/comic";
 
 const fastify = Fastify({
     logger: {
         level: "info"
     }
 });
+
+// Restore saved time offset from previous session
+restoreTimeOffset();
 
 fastify.addHook("onSend", (_, reply, payload, done) => {
     try {
@@ -65,7 +73,11 @@ fastify.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: "st
         try {
             done(null, unpack(Buffer.from(body, "base64")));
         } catch {
-            jsonParser(_request, body, done);
+            try {
+                done(null, Object.fromEntries(new URLSearchParams(body)));
+            } catch {
+                jsonParser(_request, body, done);
+            }
         }
     }
 );
@@ -81,7 +93,7 @@ fastify.register(cnAssetPlugin, { prefix: `${apiPrefix}/asset` });
 function stubMsgpackReply(reply: any, data: any) {
     reply.header("content-type", "application/x-msgpack");
     reply.status(200).send({
-        data_headers: { force_update: false, asset_update: false, short_udid: 0, viewer_id: 0, servertime: Math.floor(Date.now() / 1000), result_code: 1 },
+        data_headers: { force_update: false, asset_update: false, short_udid: 0, viewer_id: 0, servertime: getServerTime(), result_code: 1 },
         data
     });
 }
@@ -100,6 +112,11 @@ fastify.post(`${apiPrefix}/tool/check_social_link_enable`, async (_request, repl
     stubMsgpackReply(reply, { enable: false });
 });
 
+// Gift code exchange (礼包码兑换): enable button in menu, exchange not implemented
+fastify.post(`${apiPrefix}/tool/check_enable_gift`, async (_request, reply) => {
+    stubMsgpackReply(reply, { enable_gift: true });
+});
+
 fastify.post(`${apiPrefix}/tool/contact_active`, async (_request, reply) => {
     stubMsgpackReply(reply, { enable_customer_service: false });
 });
@@ -110,6 +127,16 @@ fastify.post(`${apiPrefix}/tool/custom_notify`, async (_request, reply) => {
 
 fastify.post(`${apiPrefix}/channels/channel_leiting_pay/query_unfinish_order`, async (_request, reply) => {
     stubMsgpackReply(reply, { order_id: "" });
+});
+
+// PassCard (修行之道): get current pass card data
+fastify.post(`${apiPrefix}/Pass_card/get_pass_card`, async (_request, reply) => {
+    stubMsgpackReply(reply, { point: 0, is_buy: false, all_received_record: [] });
+});
+
+// PassCard: claim all available rewards
+fastify.post(`${apiPrefix}/Pass_card/receive_all`, async (_request, reply) => {
+    stubMsgpackReply(reply, { all_received_record: [] });
 });
 
 fastify.get("/debug", async (request, reply) => {
@@ -134,16 +161,7 @@ fastify.post("/crash", async (request, reply) => {
 
 fastify.register(cnToolPlugin, { prefix: `${apiPrefix}/tool` });
 fastify.register(reproduceApiPlugin, { prefix: `${apiPrefix}/reproduce` });
-fastify.post(`${apiPrefix}/tutorial/update_step`, async (request, reply) => {
-    const body = request.body as any;
-    const step = body?.step || body?.step_count || 1;
-    stubMsgpackReply(reply, { step, start_time: Math.floor(Date.now() / 1000), mail_arrived: false });
-});
-fastify.post(`${apiPrefix}/tutorial/finish_trigger`, async (request, reply) => {
-    const body = request.body as any;
-    const viewerId = body?.viewer_id;
-    stubMsgpackReply(reply, []);
-});
+fastify.register(tutorialApiPlugin, { prefix: `${apiPrefix}/tutorial` });
 fastify.register(gachaApiPlugin, { prefix: `${apiPrefix}/gacha` });
 fastify.register(partyApiPlugin, { prefix: `${apiPrefix}/party` });
 fastify.register(expodApiPlugin, { prefix: `${apiPrefix}/expod` });
@@ -166,6 +184,9 @@ fastify.register(paymentApiPlugin, { prefix: `${apiPrefix}/payment` });
 fastify.register(newsApiPlugin, { prefix: `${apiPrefix}/news` });
 fastify.register(raidEventApiPlugin, { prefix: `${apiPrefix}/event/raid` });
 fastify.register(rushEventApiPlugin, { prefix: `${apiPrefix}/event/rush` });
+fastify.register(profileApiPlugin, { prefix: `${apiPrefix}/profile` });
+fastify.register(historyApiPlugin, { prefix: `${apiPrefix}/history` });
+fastify.register(comicApiPlugin, { prefix: `${apiPrefix}/comic` });
 
 // Web management panel
 fastify.register(indexWebPlugin);

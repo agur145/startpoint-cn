@@ -17,7 +17,9 @@ export default function init(
         idp_id TEXT NOT NULL,
         reg_time DATE NOT NULL,
         last_login_time DATE NOT NULL,
-        status TEXT NOT NULL
+        status TEXT NOT NULL,
+        username TEXT UNIQUE,
+        password_hash TEXT
     )`).run()
 
     // create zat session table
@@ -58,6 +60,7 @@ export default function init(
         account_id INTEGER NOT NULL,
         tutorial_step INTEGER,
         tutorial_skip_flag INTEGER,
+        time_offset INTEGER DEFAULT NULL,
         FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE CASCADE
     )`).run();
 
@@ -73,6 +76,33 @@ export default function init(
         id INTEGER NOT NULL,
         player_id INTEGER NOT NULL,
         PRIMARY KEY (id, player_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run();
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_mails (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id INTEGER NOT NULL,
+        reason_id INTEGER NOT NULL DEFAULT 0,
+        subject TEXT,
+        description TEXT,
+        type INTEGER NOT NULL,
+        type_id INTEGER,
+        number INTEGER NOT NULL DEFAULT 1,
+        receive_time TEXT NOT NULL DEFAULT '0000-00-00 00:00:00',
+        create_time TEXT NOT NULL,
+        reward_period_limited INTEGER NOT NULL DEFAULT 0,
+        reward_limit_time TEXT,
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run();
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_receive_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id INTEGER NOT NULL,
+        type INTEGER NOT NULL,
+        type_id INTEGER,
+        number INTEGER NOT NULL DEFAULT 1,
+        reason_id INTEGER NOT NULL DEFAULT 0,
+        create_time TEXT NOT NULL,
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
 

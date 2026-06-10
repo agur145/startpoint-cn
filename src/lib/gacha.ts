@@ -14,25 +14,14 @@ import { BoxGachaBox, BoxGachaDrawResult, BoxGachaIdReward, BoxGachaRewardTier, 
 
 const characterGachaRankRates = {
     normal: [
-        75, // 5*
-        250,  // 4*
-        675 // 3*
-    ],
-    multiGuarantee: [
-        75, // 5*
-        925 // 4*
-    ]
-}
-const rateUpCharacterGachaRates = {
-    normal: [
         50, // 5*
-        250, // 4*,
-        700, // 3*
+        250, // 4*
+        700 // 3*
     ],
     multiGuarantee: [
         50, // 5*
         950 // 4*
-    ],
+    ]
 }
 
 const equipmentGachaRankRates = {
@@ -104,8 +93,7 @@ export function drawGachaSync(
     drawAmount: number
 ): GachaDrawResult {
     const isCharacterGacha = gacha.type === GachaType.CHARACTER
-    const isRateUp = isCharacterGacha ? (gacha as CharacterGacha).movieName !== "normal" : false
-    const rankRates = isCharacterGacha ? (isRateUp ? rateUpCharacterGachaRates : characterGachaRankRates) : equipmentGachaRankRates
+    const rankRates = isCharacterGacha ? characterGachaRankRates : equipmentGachaRankRates
 
     const pulls: Map<number, number> = new Map()
 

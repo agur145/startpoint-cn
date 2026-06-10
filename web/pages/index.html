@@ -33,6 +33,14 @@
                 </svg>
                 Players
             </a>
+            <a href="/mail"
+                class="px-5 py-3 flex gap-3 items-center rounded-full hover:bg-surface-container-high text-on-surface text-lg transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
+                    class="fill-on-surface">
+                    <path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160Zm320-280L160-640v400h640v-400L480-440Zm0-80 320-200H160l320 200ZM160-640v-80 480-400Z" />
+                </svg>
+                Send Mail
+            </a>
             <a href="https://github.com/Duosion/starpoint"
                 class="px-5 py-3 flex gap-3 items-center rounded-full hover:bg-surface-container-high text-on-surface text-lg transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
@@ -43,25 +51,76 @@
                 Source Code
             </a>
         </nav>
-        <article class="w-full">
-            <form
-                class="flex flex-col items-center justify-center p-5 border border-outline-variant rounded-3xl w-full gap-5"
-                method="get" action="/web_api/server/time">
+        <article class="w-full flex flex-col gap-5">
+            <!-- Account Management -->
+            <section class="flex flex-col p-5 border border-outline-variant rounded-3xl w-full gap-3">
+                <h3 class="text-xl text-on-background font-semibold">Account Switch</h3>
+                {{activeInfo}}
+                <form method="post" action="/api/server/deactivate">
+                    <button type="submit" class="text-sm text-on-surface-variant underline">取消绑定（恢复每登创建新号）</button>
+                </form>
+                <form method="post" action="/api/server/newAccount">
+                    <button type="submit"
+                        class="text-base bg-primary text-on-primary h-[40px] px-[24px] rounded-full flex items-center justify-center relative before:transition-opacity before:absolute before:w-full before:h-full before:left-0 before:top-0 before:rounded-full before:opacity-0 before:hover:bg-on-primary before:hover:opacity-[0.12] transition-opacity">
+                        新建存档
+                    </button>
+                </form>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-left border-b border-outline-variant">
+                                <th class="p-2">ID</th>
+                                <th class="p-2">昵称</th>
+                                <th class="p-2">Player</th>
+                                <th class="p-2">状态</th>
+                                <th class="p-2">注册</th>
+                                <th class="p-2">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{accountRows}}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Time Setting -->
+            <div class="flex flex-col items-center justify-center p-5 border border-outline-variant rounded-3xl w-full gap-5">
                 <h3 class="text-xl text-on-background font-semibold">Change the server's time to visit past and future content.</h3>
                 <h3 class="text-lg text-on-surface-variant">Time is in UTC, not your local time zone.</h3>
-                <input id="time" name="time" type="datetime-local" value="{{currentServerTime}}" class="bg-surface-container rounded-2xl border border-outline-variant p-3" required />
+                <p id="timeStatus" class="text-sm text-on-surface-variant"></p>
+                <input id="timeInput" type="datetime-local" value="{{currentServerTime}}" class="bg-surface-container rounded-2xl border border-outline-variant p-3" />
                 <div class="flex gap-5 justify-center">
-                    <button type="submit"
+                    <button onclick="setTime()"
                         class="text-base bg-primary text-on-primary h-[40px] px-[24px] rounded-full flex items-center justify-center relative before:transition-opacity before:absolute before:w-full before:h-full before:left-0 before:top-0 before:rounded-full before:opacity-0 before:hover:bg-on-primary before:hover:opacity-[0.12] transition-opacity">
                         Set Time
                     </button>
-                    <a
-                        href="/web_api/server/resetTime"
+                    <button onclick="resetTime()"
                         class="text-base border border-outline-variant text-on-surface h-[40px] px-[24px] rounded-full flex items-center justify-center relative before:transition-opacity before:absolute before:w-full before:h-full before:left-0 before:top-0 before:rounded-full before:opacity-0 before:hover:bg-on-surface before:hover:opacity-[0.12] transition-opacity">
                         Reset
-                    </a>
+                    </button>
                 </div>
-            </form>
+            </div>
+            <script>
+            async function setTime() {
+                const t = document.getElementById('timeInput').value;
+                const r = await fetch('/api/server/time?time=' + encodeURIComponent(t));
+                const d = await r.json();
+                document.getElementById('timeStatus').textContent = 
+                    r.ok ? '已设置为 ' + d.date + (d.isCustom ? ' (自定义)' : '') : '错误: ' + d.message;
+            }
+            async function resetTime() {
+                const r = await fetch('/api/server/resetTime');
+                const d = await r.json();
+                document.getElementById('timeStatus').textContent = 
+                    r.ok ? '已重置为系统时间 ' + d.date : '错误';
+                document.getElementById('timeInput').value = d.date.substring(0, 16);
+            }
+            fetch('/api/server/currentTime').then(r=>r.json()).then(d=>{
+                document.getElementById('timeStatus').textContent = 
+                    '当前服务器时间: ' + d.date + (d.isCustom ? ' (自定义)' : ' (系统时间)');
+            });
+            </script>
         </article>
     </div>
 </body>

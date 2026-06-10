@@ -1,19 +1,25 @@
 import { randomInt } from "crypto"
 import { FastifyRequest } from "fastify"
 
-// The server's current date.
-let serverTime: Date | null = null;
+// The server's current time offset (real time + offset = simulated time)
+let timeOffset: number | null = null;  // milliseconds, null = use system time
+console.log(`[TIME] startup offset=${timeOffset ?? 'null(system)'}`);
 
 /**
  * Returns the current server time as a unix epoch.
+ * Without argument: returns simulated current time.
+ * With argument: converts the given Date to epoch (ignoring offset for serialization).
  * 
- * @param date An optional date; The date to get the time of.
+ * @param date An optional date to convert to epoch.
  * @returns The unix epoch.
  */
 export function getServerTime(
-    date: Date = new Date()
+    date?: Date
 ): number {
-    return Math.floor((serverTime ?? date).getTime() / 1000) //1710116388//
+    if (date !== undefined) {
+        return Math.floor(date.getTime() / 1000);
+    }
+    return Math.floor((Date.now() + (timeOffset ?? 0)) / 1000);
 }
 
 /**
@@ -22,11 +28,32 @@ export function getServerTime(
  * @returns The current server time as a date.
  */
 export function getServerDate(): Date {
-    return serverTime ?? new Date()
+    return timeOffset !== null ? new Date(Date.now() + timeOffset) : new Date();
 }
 
+/**
+ * Sets a custom server time from an absolute date.
+ * The offset (target - real time) is computed and stored.
+ * Set to null to reset to system time.
+ */
 export function setServerTime(date: Date | null) {
-    serverTime = date;
+    timeOffset = date ? date.getTime() - Date.now() : null;
+    console.log(`[TIME] setServerTime → ${date?.toISOString() || 'null(system)'} offset=${timeOffset}`);
+}
+
+/**
+ * Sets the time offset directly (used on startup restore).
+ */
+export function setServerTimeOffset(offset: number | null) {
+    timeOffset = offset;
+    console.log(`[TIME] startup restore offset=${offset ?? 'null(system)'}`);
+}
+
+/**
+ * Returns the raw time offset (used for persistence).
+ */
+export function getTimeOffset(): number | null {
+    return timeOffset;
 }
 
 /**
@@ -89,14 +116,18 @@ export function generateDataHeaders(
         asset_update: false,
         short_udid: 0,
         viewer_id: 0,
-        servertime: getServerTime(), //1651514014,//getServerTime(),
+        servertime: 0,
         result_code: 1
     }
     const headers: Record<string, any> = {}
 
     for (const field of fields) {
         const customValue = customValues[field]
-        const defaultValue = defaultHeaders[field]
+        let defaultValue = defaultHeaders[field]
+        // servertime evaluated fresh each request (uses simulated time if set)
+        if (field === 'servertime') {
+            defaultValue = getServerTime();
+        }
         headers[field] = customValue === undefined ? defaultValue : customValue
     }
 
