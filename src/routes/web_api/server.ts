@@ -1,7 +1,8 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getServerTime, getServerDate, setServerTime, getTimeOffset } from "../../utils";
-import { getAllAccountsSync, getAccountPlayersSync, getPlayerSync, getPlayerCharactersSync, deletePlayerSync, deleteAccountSync, updatePlayerSync, insertDefaultPlayerSync } from "../../data/wdfpData";
-import { getActivePlayerId, setActivePlayerId, getSelectedAccountId, setSelectedAccountId, saveTimeOffset } from "../../data/activeAccount";
+import { getAllAccountsSync, getAccountPlayersSync, getPlayerSync, getPlayerCharactersSync, deletePlayerSync, deleteAccountSync, updatePlayerSync, insertDefaultPlayerSync, replacePlayerDataSync } from "../../data/wdfpData";
+import { getClientSerializedData, deserializePlayerData } from "../../data/utils";
+import { getActivePlayerId, setActivePlayerId, getSelectedAccountId, setSelectedAccountId, saveTimeOffset, saveAccountDefaultPlayer } from "../../data/activeAccount";
 
 interface TimeQuery {
     time: string | undefined
@@ -80,26 +81,35 @@ const routes = async (fastify: FastifyInstance) => {
     fastify.post("/activateSave", async (request: FastifyRequest, reply: FastifyReply) => {
         const { playerId } = (request.query || {}) as any
         const pid = parseInt(playerId)
-        if (isNaN(pid)) return reply.redirect('/')
+        if (isNaN(pid)) return reply.redirect('/player')
         setActivePlayerId(pid)
-        return reply.redirect('/')
+        // Also persist as this account's default player
+        const allAccounts = getAllAccountsSync()
+        for (const a of allAccounts) {
+            if (getAccountPlayersSync(a.id).includes(pid)) {
+                saveAccountDefaultPlayer(a.id, pid)
+                break
+            }
+        }
+        return reply.redirect('/player')
     })
 
     // Create new empty save under the given account
     fastify.post("/newSave", async (request: FastifyRequest, reply: FastifyReply) => {
         const { accountId: aid } = (request.query || {}) as any
         const accId = parseInt(aid)
-        if (isNaN(accId)) return reply.redirect('/')
+        if (isNaN(accId)) return reply.redirect('/player')
         const player = insertDefaultPlayerSync(accId)
         setActivePlayerId(player.id)
-        return reply.redirect('/')
+        saveAccountDefaultPlayer(accId, player.id)
+        return reply.redirect('/player')
     })
 
     // Delete a save
     fastify.post("/deleteSave", async (request: FastifyRequest, reply: FastifyReply) => {
         const { playerId } = (request.query || {}) as any
         const pid = parseInt(playerId)
-        if (isNaN(pid)) return reply.redirect('/')
+        if (isNaN(pid)) return reply.redirect('/player')
         const allAccounts = getAllAccountsSync()
         let accountId = 0
         for (const a of allAccounts) {
@@ -113,7 +123,7 @@ const routes = async (fastify: FastifyInstance) => {
             deletePlayerSync(pid)
         }
         if (getActivePlayerId() === pid) setActivePlayerId(null)
-        return reply.redirect('/')
+        return reply.redirect('/player')
     })
 
     // Delete entire account + all saves + device binding
@@ -129,7 +139,7 @@ const routes = async (fastify: FastifyInstance) => {
         const db = require("../../data/wdfpData").getDb()
         db.prepare(`DELETE FROM device_bindings WHERE account_id = ?`).run(accountId)
         deleteAccountSync(accountId)
-        return reply.redirect('/')
+        return reply.redirect('/player')
     })
 
     // Rename a save
@@ -139,7 +149,30 @@ const routes = async (fastify: FastifyInstance) => {
         const name = body.name
         if (isNaN(playerId) || !name) return reply.status(400).send({ error: "Missing params" })
         updatePlayerSync({ id: playerId, name: String(name) })
-        return reply.redirect('/')
+        return reply.redirect('/player')
+    })
+
+    // Clone a save to another account
+    fastify.post("/cloneSave", async (request: FastifyRequest, reply: FastifyReply) => {
+        const { playerId: pid, accountId: aid } = (request.query || {}) as any
+        const playerId = parseInt(pid)
+        const accountId = parseInt(aid)
+        if (isNaN(playerId) || isNaN(accountId)) return reply.redirect('/player')
+
+        // Read source player data
+        const serialized = getClientSerializedData(playerId, { viewerId: 0 })
+        if (!serialized) return reply.redirect('/player')
+
+        // Create new empty save
+        const newPlayer = insertDefaultPlayerSync(accountId)
+        setActivePlayerId(newPlayer.id)
+
+        // Deserialize source data and merge into new save
+        const mergedData = deserializePlayerData(newPlayer.id, serialized)
+        replacePlayerDataSync(mergedData)
+
+        saveAccountDefaultPlayer(accountId, newPlayer.id)
+        return reply.redirect('/player')
     })
 }
 

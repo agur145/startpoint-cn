@@ -13,6 +13,7 @@ interface WebState {
     selectedAccountId: number | null;
     timeOffset: number | null;
     lastSetTime: string | null;
+    defaultPlayers: Record<number, number>;
 }
 
 function readState(): WebState {
@@ -24,10 +25,11 @@ function readState(): WebState {
                 selectedAccountId: raw.selectedAccountId ?? null,
                 timeOffset: raw.timeOffset ?? null,
                 lastSetTime: raw.lastSetTime ?? null,
+                defaultPlayers: raw.defaultPlayers ?? {},
             };
         }
     } catch { /* ignore corrupt file */ }
-    return { activePlayerId: null, selectedAccountId: null, timeOffset: null, lastSetTime: null };
+    return { activePlayerId: null, selectedAccountId: null, timeOffset: null, lastSetTime: null, defaultPlayers: {} };
 }
 
 function writeState(state: WebState): void {
@@ -91,4 +93,22 @@ export function restoreTimeOffset(): void {
         writeState(state);
         setServerTimeOffset(offset);
     }
+}
+
+/**
+ * Get the default player ID for a specific account.
+ * Falls back to null if no default is set.
+ */
+export function getAccountDefaultPlayer(accountId: number): number | null {
+    const state = readState();
+    return state.defaultPlayers[accountId] ?? null;
+}
+
+/**
+ * Save the default player ID for a specific account.
+ */
+export function saveAccountDefaultPlayer(accountId: number, playerId: number): void {
+    const state = readState();
+    state.defaultPlayers[accountId] = playerId;
+    writeState(state);
 }

@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { generateDataHeaders, getServerTime, getServerDate } from "../../utils";
 import { getAccountPlayers, getPlayerSync, dailyResetPlayerDataSync, collectPlayerDataPooledExpSync, updatePlayerSync } from "../../data/wdfpData";
 import { getClientSerializedData } from "../../data/utils";
+import { getAccountDefaultPlayer } from "../../data/activeAccount";
 
 interface CnLoadBody {
     device_id: number;
@@ -86,7 +87,8 @@ const routes = async (fastify: FastifyInstance) => {
         const accountId = body.viewer_id || body.keychain || 1;
 
         const playerIds = await getAccountPlayers(accountId);
-        const playerId = playerIds[0];
+        const preferredId = getAccountDefaultPlayer(accountId);
+        const playerId = (preferredId && playerIds.includes(preferredId)) ? preferredId : playerIds[0];
         if (!playerIds || !playerIds.length || !playerId) {
             return reply.status(400).send({ error: "Bad Request", message: "No player found" });
         }

@@ -40,6 +40,9 @@ const routes = async (fastify: FastifyInstance) => {
                     <form method="post" action="/api/server/selectAccount?accountId=${acc.id}" style="display:inline">
                         <button type="submit" class="text-xs bg-primary text-on-primary px-2 py-1 rounded-full">查看存档</button>
                     </form>
+                    <form method="post" action="/api/server/newSave?accountId=${acc.id}" style="display:inline">
+                        <button type="submit" class="text-xs bg-primary text-on-primary px-2 py-1 rounded-full">新建存档</button>
+                    </form>
                     <form method="post" action="/api/server/deleteAccount?id=${acc.id}" style="display:inline" onsubmit="return confirm('删除账号 ${acc.id} 及所有存档？')">
                         <button type="submit" class="text-xs text-error px-2 py-1 rounded-full border border-error">删除</button>
                     </form>
