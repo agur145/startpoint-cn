@@ -15,3 +15,4 @@ build
 .mitmproxy/mitmdump.exe
 .unzip-temp
 .cn-cdn.env
+web/public/comic/
