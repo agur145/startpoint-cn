@@ -10,6 +10,12 @@ export { getAccountFromIdpIdSync, getAccount, getAllAccountsSync, deleteAccountS
 import { getAccountSync } from "./domains/account";
 export { getPlayerTriggeredTutorialsSync, insertPlayerTriggeredTutorialSync, insertPlayerTriggeredTutorialsSync } from "./domains/tutorial";
 import { insertPlayerTriggeredTutorialsSync } from "./domains/tutorial";
+export { insertPlayerOptionSync, insertPlayerOptionsSync, getPlayerOptionsSync, updatePlayerOptionSync, updatePlayerOptionsSync } from "./domains/option";
+import { insertPlayerOptionsSync } from "./domains/option";
+export { getPlayerItemSync, getPlayerItemsSync, insertPlayerItemsSync, updatePlayerItemSync, givePlayerItemSync } from "./domains/item";
+import { insertPlayerItemsSync } from "./domains/item";
+export { getPlayerPeriodicRewardPointsSync, insertPlayerPeriodicRewardPointsListSync, getPlayerStartDashExchangeCampaignsSync, insertPlayerStartDashExchangeCampaignsSync, getPlayerMultiSpecialExchangeCampaignsSync, insertPlayerMultiSpecialExchangeCampaignsSync } from "./domains/campaign";
+import { insertPlayerPeriodicRewardPointsListSync, insertPlayerStartDashExchangeCampaignsSync, insertPlayerMultiSpecialExchangeCampaignsSync } from "./domains/campaign";
 
 const db = getDatabase(Database.WDFP_DATA)
 
@@ -1401,49 +1407,7 @@ export function updatePlayerPartyGroupSync(
 }
 
 /**
- * Gets the amount of a singular item that a player owns.
- * 
- * @param playerId The ID of the player.
- * @param itemId The ID of the item.
- * @returns The amount of the item that the player owns, or null, indicating no ownership.
- */
-export function getPlayerItemSync(
-    playerId: number,
-    itemId: number | string
-): number | null {
-    const rawItem = db.prepare(`
-    SELECT id, amount
-    FROM players_items
-    WHERE player_id = ? AND id = ?
-    `).get(playerId, Number(itemId)) as RawPlayerItem | undefined
-
-    return rawItem === undefined ? null : rawItem.amount
-}
-
 /**
- * Gets the items that a player owns.
- * 
- * @param playerId The ID of the player.
- * @returns A record where the index is the item's ID and the value is the item's amount.
- */
-export function getPlayerItemsSync(
-    playerId: number
-): Record<string, number> {
-
-    const rawItems = db.prepare(`
-    SELECT id, amount
-    FROM players_items
-    WHERE player_id = ?
-    `).all(playerId) as RawPlayerItem[]
-
-    const output: Record<string, number> = {}
-    for (const rawItem of rawItems) {
-        output[rawItem.id.toString()] = rawItem.amount
-    }
-
-    return output
-}
-
 /**
  * Inserts a singular item into the player's inventory.
  * 
@@ -1467,70 +1431,8 @@ function insertPlayerItemSync(
 }
 
 /**
- * Batch inserts a record of player items into a player's inventory.
- * 
- * @param playerId The ID of the player.
- * @param items The record of items.
- */
-function insertPlayerItemsSync(
-    playerId: number,
-    items: Record<string, number>
-) {
-    db.transaction(() => {
-        for (const [itemId, amount] of Object.entries(items)) {
-            insertPlayerItemSync(playerId, itemId, amount)
-        }
-    })()
-}
-
 /**
- * Updates a player's item's amount.
- * 
- * @param playerId The ID of the player.
- * @param itemId The item's ID.
- * @param amount The new amount the item should have.
- */
-export function updatePlayerItemSync(
-    playerId: number,
-    itemId: string | number,
-    amount: number
-) {
-    db.prepare(`
-    UPDATE players_items
-    SET amount = ?
-    WHERE player_id = ? AND id = ?
-    `).run(amount, playerId, Number(itemId))
-}
-
 /**
- * Gives a player giveAmount of an item.
- * 
- * @param playerId The ID of the player.
- * @param itemId The ID of the item.
- * @param giveAmount The amount of the item to give.
- * @returns The new total amount of the item that the player owns.
- */
-export function givePlayerItemSync(
-    playerId: number,
-    itemId: string | number,
-    giveAmount: number
-): number {
-    // check if the player owns the item
-    const ownedAmount = getPlayerItemSync(playerId, itemId)
-    if (ownedAmount === null) {
-        insertPlayerItemSync(playerId, itemId, giveAmount)
-        return giveAmount
-    } else {
-        const newAmount = ownedAmount + giveAmount
-        updatePlayerItemSync(
-            playerId,
-            itemId,
-            newAmount
-        )
-        return newAmount
-    }
-}
-
 /**
  * Converts a RawPlayerEquipment object into a PlayerEquipment object.
  * 
@@ -2187,58 +2089,8 @@ function insertPlayerDrawnQuestsSync(
 }
 
 /**
- * Gets a player's periodic reward point list.
- * 
- * @param playerId The ID of the player.
- * @returns A list of the player's periodic reward points
- */
-export function getPlayerPeriodicRewardPointsSync(
-    playerId: number
-): PlayerPeriodicRewardPoint[] {
-    return db.prepare(`
-    SELECT id, point
-    FROM players_periodic_reward_points
-    WHERE player_id = ?
-    `).all(playerId) as PlayerPeriodicRewardPoint[]
-}
-
 /**
- * Inserts a singular periodic reward point into a player's data.
- * 
- * @param playerId The ID of the player.
- * @param periodicReward The periodic reward point data to insert.
- */
-function insertPlayerPeriodicRewardPointsSync(
-    playerId: number,
-    periodicReward: PlayerPeriodicRewardPoint
-) {
-    db.prepare(`
-    INSERT INTO players_periodic_reward_points (id, point, player_id)
-    VALUES (?, ?, ?)
-    `).run(
-        periodicReward.id,
-        periodicReward.point,
-        playerId
-    )
-}
-
 /**
- * Batch inserts a =list of periodic reward points into a player's data.
- * 
- * @param playerId The ID of the player.
- * @param periodicRewards A list of periodic reward points data to insert.
- */
-function insertPlayerPeriodicRewardPointsListSync(
-    playerId: number,
-    periodicRewards: PlayerPeriodicRewardPoint[]
-) {
-    db.transaction(() => {
-        for (const periodicReward of periodicRewards) {
-            insertPlayerPeriodicRewardPointsSync(playerId, periodicReward)
-        }
-    })()
-}
-
 /**
  * Retrieves the missions that a player is currently completing.
  * 
@@ -2596,133 +2448,11 @@ export function updatePlayerBoxGachaDrawnRewardSync(
 }
 
 /**
- * Gets the progress of a player's start dash exchange campaigns.
- * 
- * @param playerId The player's ID.
- * @returns The status of the player's start dash exchange campaigns.
- */
-export function getPlayerStartDashExchangeCampaignsSync(
-    playerId: number
-): PlayerStartDashExchangeCampaign[] {
-    const rawCampaigns = db.prepare(`
-    SELECT campaign_id, gacha_id, term_index, status, period_start_time, period_end_time
-    FROM players_start_dash_exchange_campaigns
-    WHERE player_id = ?
-    `).all(playerId) as RawPlayerStartDashExchangeCampaign[]
-
-    return rawCampaigns.map(raw => {
-        return {
-            campaignId: raw.campaign_id,
-            gachaId: raw.gacha_id,
-            termIndex: raw.term_index,
-            status: raw.status,
-            periodStartTime: new Date(raw.period_start_time),
-            periodEndTime: new Date(raw.period_end_time)
-        }
-    })
-}
-
 /**
- * Inserts a singular player start dash exchange campaign into the database.
- * 
- * @param playerId The player's ID.
- * @param campaign The campaign's data.
- */
-function insertPlayerStartDashExchangeCampaignSync(
-    playerId: number,
-    campaign: PlayerStartDashExchangeCampaign
-) {
-    db.prepare(`
-    INSERT INTO players_start_dash_exchange_campaigns (campaign_id, gacha_id, term_index, status, period_start_time, period_end_time, player_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-        campaign.campaignId,
-        campaign.gachaId,
-        campaign.termIndex,
-        campaign.status,
-        campaign.periodStartTime.toISOString(),
-        campaign.periodEndTime.toISOString(),
-        playerId
-    )
-}
-
 /**
- * Batch inserts a list of start dash exchange campaigns into a player's data.
- * 
- * @param playerId The ID of the player.
- * @param campaigns The list of campaigns to insert.
- */
-function insertPlayerStartDashExchangeCampaignsSync(
-    playerId: number,
-    campaigns: PlayerStartDashExchangeCampaign[]
-) {
-    db.transaction(() => {
-        for (const campaign of campaigns) {
-            insertPlayerStartDashExchangeCampaignSync(playerId, campaign)
-        }
-    })()
-}
-
 /**
- * Gets the progress of a player's multi special exchange campaigns.
- * 
- * @param playerId The player's ID.
- * @returns The status of the player's multi special exchange campaigns.
- */
-export function getPlayerMultiSpecialExchangeCampaignsSync(
-    playerId: number
-): PlayerMultiSpecialExchangeCampaign[] {
-    const rawCampaigns = db.prepare(`
-    SELECT campaign_id, status
-    FROM players_multi_special_exchange_campaigns
-    WHERE player_id = ?
-    `).all(playerId) as RawPlayerMultiSpecialExchangeCampaign[]
-
-    return rawCampaigns.map(raw => {
-        return {
-            campaignId: raw.campaign_id,
-            status: raw.status
-        }
-    })
-}
-
 /**
- * Inserts a singular multi special exchange campaign into the database.
- * 
- * @param playerId The player's ID.
- * @param campaign The campaign's data.
- */
-function insertPlayerMultiSpecialExchangeCampaignSync(
-    playerId: number,
-    campaign: PlayerMultiSpecialExchangeCampaign
-) {
-    db.prepare(`
-    INSERT INTO players_multi_special_exchange_campaigns (campaign_id, status, player_id)
-    VALUES (?, ?, ?)
-    `).run(
-        campaign.campaignId,
-        campaign.status,
-        playerId
-    )
-}
-
 /**
- * Batch inserts a list of multi special exchange campaigns into a player's data.
- * 
- * @param playerId The ID of the player.
- * @param campaigns The list of campaigns to insert.
- */
-function insertPlayerMultiSpecialExchangeCampaignsSync(
-    playerId: number,
-    campaigns: PlayerMultiSpecialExchangeCampaign[]
-) {
-    db.transaction(() => {
-        for (const campaign of campaigns) {
-            insertPlayerMultiSpecialExchangeCampaignSync(playerId, campaign)
-        }
-    })()
-}
-
 /**
  * Deserializes a RawPlayerRushEvent into a PlayerRushEvent
  * 
@@ -3422,114 +3152,8 @@ export function updatePlayerRushEventPlayedPartySync(
 }
 
 /**
- * Inserts a player option into the database.
- * 
- * @param playerId The ID of the player.
- * @param key The key of the option.
- * @param value The value of the option
+ * Synchronously gets the first player bound to an account.
  */
-export function insertPlayerOptionSync(
-    playerId: number,
-    key: string,
-    value: boolean
-) {
-    db.prepare(`
-    INSERT INTO players_options (key, value, player_id)
-    VALUES (?, ?, ?)
-    `).run(
-        key,
-        serializeBoolean(value),
-        playerId
-    )
-}
-
-/**
- * Batch inserts a record of options into the database.
- * 
- * @param playerId The ID of the player that these options belong to.
- * @param options The record of options to insert.
- */
-export function insertPlayerOptionsSync(
-    playerId: number,
-    options: Record<string, boolean>
-) {
-    db.transaction(() => {
-        for (const [key, value] of Object.entries(options)) {
-            insertPlayerOptionSync(playerId, key, value)
-        }
-    })()
-}
-
-/**
- * Gets all of the options that a player has saved.
- * 
- * @param playerId The ID of the player.
- * @returns A record of options.
- */
-export function getPlayerOptionsSync(
-    playerId: number
-): Record<string, boolean> {
-    const rawOptions = db.prepare(`
-    SELECT key, value
-    FROM players_options
-    WHERE player_id = ?
-    `).all(playerId) as RawPlayerOption[]
-
-    const result: Record<string, boolean> = {}
-
-    for (const rawOption of rawOptions) {
-        result[rawOption.key] = deserializeBoolean(rawOption.value)
-    }
-
-    return result
-}
-
-/**
- * Updates the value of a player option.
- * 
- * @param playerId The ID of the player to update the option of.
- * @param key The key of the option to update.
- * @param value The new value.
- */
-export function updatePlayerOptionSync(
-    playerId: number,
-    key: string,
-    value: boolean
-) {
-    db.prepare(`
-    UPDATE players_options
-    SET value = ?
-    WHERE key = ? AND player_id = ?    
-    `).run(serializeBoolean(value), key, playerId)
-}
-
-/**
- * Batch updates a player's options.
- * 
- * @param playerId The ID of the player to update the options of.
- * @param options A record of options to update the values of.
- */
-export function updatePlayerOptionsSync(
-    playerId: number,
-    options: Record<string, boolean>
-) {
-    // get all of a player's options
-    const allOptions = getPlayerOptionsSync(playerId)
-
-    db.transaction(() => {
-        for (const [key, newValue] of Object.entries(options)) {
-            const existingValue = allOptions[key]
-            if (existingValue === undefined) {
-                // insert the value since it doesn't exist.
-                insertPlayerOptionSync(playerId, key, newValue)
-            } else if (newValue !== existingValue) {
-                // update the value since it's different than the existing value
-                updatePlayerOptionSync(playerId, key, newValue)
-            }
-        }
-    })()
-}
-
 export function getPlayerFromAccountIdSync(
     accountId: number
 ): Player | null {
