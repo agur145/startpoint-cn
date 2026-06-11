@@ -63,7 +63,7 @@ export function getTimeOffset(): number | null {
 export function getServerTimeForPlayer(playerId?: number): number {
     if (playerId) {
         try {
-            const { getPlayerTimeOffsetSync } = require("./data/wdfpData");
+            const { getPlayerTimeOffsetSync } = require("./data/activeAccount");
             const offset = getPlayerTimeOffsetSync(playerId);
             if (offset !== null) return Math.floor((Date.now() + offset) / 1000);
         } catch {}

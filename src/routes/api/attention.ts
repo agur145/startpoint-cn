@@ -2,6 +2,7 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getAccountPlayers, getPlayerSync, getSession } from "../../data/wdfpData";
+import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders } from "../../utils";
 
 interface CheckBody {
@@ -28,9 +29,8 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
-        const player = !isNaN(playerId) ? getPlayerSync(playerId) : null
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        const player = playerId !== null ? getPlayerSync(playerId) : null
 
         if (player === null) return reply.status(500).send({
             "error": "Internal Server Error",

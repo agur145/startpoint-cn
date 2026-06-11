@@ -3,7 +3,7 @@ import { readFileSync } from "fs";
 import path from "path";
 import { staticPagesDir } from ".";
 import { getAllPlayersSync, getPlayerSync, getPlayerCharactersSync, getPlayerItemsSync, getPlayerEquipmentListSync, getAllAccountsSync, getAccountPlayersSync, getPlayerQuestProgressSync, getPlayerDrawnQuestsSync } from "../../data/wdfpData";
-import { getActivePlayerId, getSelectedAccountId } from "../../data/activeAccount";
+import { getActivePlayerId, getSelectedAccountId, getAccountDefaultPlayer } from "../../data/activeAccount";
 
 function formatTime(offset: number | null): string {
     if (offset === null || offset === undefined) return "系统时间"
@@ -26,12 +26,9 @@ const routes = async (fastify: FastifyInstance) => {
         for (const acc of accounts) {
             const pids = getAccountPlayersSync(acc.id)
             const saveCount = pids.length
-            // Find active player name if it belongs to this account
-            let activeName = '-'
-            if (activePid && pids.includes(activePid)) {
-                const ap = getPlayerSync(activePid)
-                activeName = ap?.name || '-'
-            }
+            // Use per-account default player instead of global activePlayerId
+            const defaultPid = getAccountDefaultPlayer(acc.id)
+            const activeName = defaultPid ? (getPlayerSync(defaultPid)?.name || '-') : '-'
             accountRows += `<tr>
                 <td>${acc.id}</td>
                 <td>${saveCount}</td>

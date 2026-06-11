@@ -3,6 +3,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { deserializeClientDate } from "../../data/utils";
 import { getAccountPlayers, getPlayerItemSync, getPlayerSync, getSession, updatePlayerItemSync, updatePlayerSync } from "../../data/wdfpData";
+import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getBossCoinShopItemsSync, getEventShopItemsSync, getGenericShopItemsSync, getShopItemSync } from "../../lib/assets";
 import { CharacterReward, CharacterShopItemReward, CurrencyReward, CurrencyShopItemReward, EquipmentItemReward, EquipmentItemShopItemReward, Reward, RewardType, ShopItemRewardType, ShopItems, ShopItemUserCostType, ShopType } from "../../lib/types";
 import { generateDataHeaders, getServerDate, getServerTime } from "../../utils";
@@ -50,9 +51,8 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
-        const player = isNaN(playerId) ? null : getPlayerSync(playerId)
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        const player = playerId !== null ? getPlayerSync(playerId) : null
 
         if (player === null) return reply.status(500).send({
             "error": "Internal Server Error",
@@ -230,10 +230,9 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
 
-        if (isNaN(playerId)) return reply.status(500).send({
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No players bound to account."
         })

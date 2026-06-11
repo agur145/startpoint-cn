@@ -5,6 +5,7 @@ import { getAccountPlayers, getPlayerQuestProgressSync, getPlayerSingleQuestProg
 import { generateDataHeaders } from "../../utils";
 import { QuestCategory } from "../../lib/types";
 import { PlayerQuestProgress } from "../../data/types";
+import { resolvePlayerIdSync } from "../../data/activeAccount";
 
 interface ReceiveRewardBody {
     api_count: number,
@@ -90,10 +91,9 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
 
-        if (isNaN(playerId)) return reply.status(500).send({
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No player bound to account."
         })
@@ -131,10 +131,9 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player id
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
 
-        if (isNaN(playerId)) return reply.status(500).send({
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No player bound to account."
         })

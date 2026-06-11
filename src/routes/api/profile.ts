@@ -4,7 +4,8 @@
  */
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getSession, getPlayerSync, getPlayerCharactersSync, getPlayerPartyGroupListSync, updatePlayerSync } from "../../data/wdfpData";
-import { getAccountPlayers } from "../../data/wdfpData";
+import { resolvePlayerIdSync } from "../../data/activeAccount";
+// removed getAccountPlayers "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
 
 const routes = async (fastify: FastifyInstance) => {
@@ -22,9 +23,8 @@ const routes = async (fastify: FastifyInstance) => {
             message: "Invalid viewer id."
         })
 
-        const playerIds = await getAccountPlayers(session.accountId)
-        const playerId = playerIds[0]
-        if (isNaN(playerId)) return reply.status(400).send({
+        const playerId = resolvePlayerIdSync(session.accountId)!
+        if (playerId === null) return reply.status(400).send({
             error: "Bad Request",
             message: "No player bound to account."
         })
@@ -125,9 +125,8 @@ const routes = async (fastify: FastifyInstance) => {
             message: "Invalid viewer id."
         })
 
-        const playerIds = await getAccountPlayers(session.accountId)
-        const playerId = playerIds[0]
-        const player = !isNaN(playerId) ? getPlayerSync(playerId) : null
+        const playerId = resolvePlayerIdSync(session.accountId)!
+        const player = playerId !== null ? getPlayerSync(playerId) : null
         const degreeId = player?.degreeId || 1
 
         reply.header("content-type", "application/x-msgpack")
@@ -183,9 +182,8 @@ const routes = async (fastify: FastifyInstance) => {
             message: "Invalid viewer id."
         })
 
-        const playerIds = await getAccountPlayers(session.accountId)
-        const playerId = playerIds[0]
-        if (isNaN(playerId)) return reply.status(400).send({
+        const playerId = resolvePlayerIdSync(session.accountId)!
+        if (playerId === null) return reply.status(400).send({
             error: "Bad Request",
             message: "No player bound to account."
         })
@@ -215,9 +213,8 @@ const routes = async (fastify: FastifyInstance) => {
             message: "Invalid viewer id."
         })
 
-        const playerIds = await getAccountPlayers(session.accountId)
-        const playerId = playerIds[0]
-        if (isNaN(playerId)) return reply.status(400).send({
+        const playerId = resolvePlayerIdSync(session.accountId)!
+        if (playerId === null) return reply.status(400).send({
             error: "Bad Request",
             message: "No player bound to account."
         })

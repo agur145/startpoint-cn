@@ -2,6 +2,7 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getAccountPlayers, getPlayerBoxGachaDrawnRewardsSync, getPlayerBoxGachaSync, getPlayerItemSync, getPlayerSync, getSession, insertPlayerBoxGachaDrawnRewardSync, insertPlayerBoxGachaSync, playerOwnsEquipmentSync, updatePlayerBoxGachaDrawnRewardSync, updatePlayerBoxGachaSync, updatePlayerEquipmentSync, updatePlayerItemSync, updatePlayerPartyGroupSync } from "../../data/wdfpData";
+import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { getBoxGachaSync } from "../../lib/assets";
 import { drawBoxGachaSync, rewardPlayerBoxGachaResultSync } from "../../lib/gacha";
@@ -89,10 +90,9 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
 
-        if (isNaN(playerId)) return reply.status(500).send({
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No players bound to account."
         })
@@ -172,9 +172,8 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
-        const player = !isNaN(playerId) ? getPlayerSync(playerId) : null
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        const player = playerId !== null ? getPlayerSync(playerId) : null
 
         if (player === null) return reply.status(500).send({
             "error": "Internal Server Error",
@@ -346,9 +345,8 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
-        const player = !isNaN(playerId) ? getPlayerSync(playerId) : null
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        const player = playerId !== null ? getPlayerSync(playerId) : null
 
         if (player === null) return reply.status(500).send({
             "error": "Internal Server Error",

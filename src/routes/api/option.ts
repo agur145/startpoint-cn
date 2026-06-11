@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getAccountPlayers, getSession, updatePlayerOptionsSync } from "../../data/wdfpData";
+import { getSession, updatePlayerOptionsSync } from "../../data/wdfpData";
+import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders } from "../../utils";
 
 interface UpdateBody {
@@ -24,10 +25,9 @@ const updateRoute = async (request: FastifyRequest, reply: FastifyReply) => {
     })
 
     // get player
-    const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-    const playerId = playerIds[0]
+    const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
 
-    if (isNaN(playerId)) return reply.status(500).send({
+    if (playerId === null) return reply.status(500).send({
         "error": "Internal Server Error",
         "message": "No player bound to account."
     })

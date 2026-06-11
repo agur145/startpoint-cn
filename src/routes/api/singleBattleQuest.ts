@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { deletePlayerRushEventPlayedPartyListSync, getAccountPlayers, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, getPlayerSingleQuestProgressSync, getPlayerSync, getSession, insertPlayerQuestProgressSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerQuestProgressSync, updatePlayerRushEventSync, updatePlayerSync } from "../../data/wdfpData";
+import { deletePlayerRushEventPlayedPartyListSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, getPlayerSingleQuestProgressSync, getPlayerSync, getSession, insertPlayerQuestProgressSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerQuestProgressSync, updatePlayerRushEventSync, updatePlayerSync } from "../../data/wdfpData";
 import { getQuestFromCategorySync, getRushEventFolderClearRewards } from "../../lib/assets";
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
@@ -7,6 +7,7 @@ import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } f
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { rushEventFolderMaxRounds } from "./rushEvent";
 import { RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
+import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 
 interface StartBody {
@@ -113,9 +114,8 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
-        const playerData = !isNaN(playerId) ? getPlayerSync(playerId) : null
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        const playerData = playerId !== null ? getPlayerSync(playerId) : null
 
         if (playerData === null) return reply.status(500).send({
             "error": "Internal Server Error",
@@ -393,10 +393,9 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
 
-        if (isNaN(playerId)) return reply.status(500).send({
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No player bound to account."
         })
@@ -440,10 +439,9 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
 
-        if (isNaN(playerId)) return reply.status(500).send({
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No player bound to account."
         })
@@ -510,9 +508,8 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
-        const player = isNaN(playerId) ? null : getPlayerSync(playerId)
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        const player = playerId !== null ? getPlayerSync(playerId) : null
 
         if (player === null) return reply.status(500).send({
             "error": "Internal Server Error",

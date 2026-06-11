@@ -1,11 +1,12 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getAccountPlayers, getPlayerGachaCampaignSync, getPlayerGachaInfoListSync, getPlayerGachaInfoSync, getPlayerItemSync, getPlayerSync, getSession, insertPlayerGachaCampaignSync, insertPlayerGachaInfoSync, insertReceiveHistorySync, MailType, updatePlayerGachaCampaignSync, updatePlayerGachaInfoSync, updatePlayerItemSync, updatePlayerSync } from "../../data/wdfpData";
+import { getPlayerGachaCampaignSync, getPlayerGachaInfoListSync, getPlayerGachaInfoSync, getPlayerItemSync, getPlayerSync, getSession, insertPlayerGachaCampaignSync, insertPlayerGachaInfoSync, insertReceiveHistorySync, MailType, updatePlayerGachaCampaignSync, updatePlayerGachaInfoSync, updatePlayerItemSync, updatePlayerSync } from "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
 import { drawGachaSync, rewardPlayerGachaDrawResultSync } from "../../lib/gacha";
 import { getGachaCampaignIdSync, getGachaSync } from "../../lib/assets";
 import { GachaType } from "../../lib/types";
 import { serializeGachaCampaign } from "../../data/utils";
 import { UserGachaCampaign } from "../../data/types";
+import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { givePlayerCharacterSync } from "../../lib/character";
 import { givePlayerEquipmentSync } from "../../lib/equipment";
 
@@ -78,9 +79,8 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
-        if (isNaN(playerId)) return reply.status(500).send({
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No players bound to account."
         })
@@ -150,9 +150,8 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
-        if (isNaN(playerId)) return reply.status(500).send({
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No players bound to account."
         })
@@ -234,13 +233,10 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
-        const player = isNaN(playerId) ? null : getPlayerSync(playerId)
-        if (player === null) return reply.status(500).send({
-            "error": "Internal Server Error",
-            "message": "No players bound to account."
-        })
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        if (playerId === null) return reply.status(500).send({ "error": "Internal Server Error", "message": "No players bound to account." })
+        const player = getPlayerSync(playerId)
+        if (player === null) return
 
         // get the gacha
         const gachaData = getGachaSync(gachaId)

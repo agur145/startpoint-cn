@@ -9,6 +9,7 @@ import { generateDataHeaders, getServerDate, getServerTime } from "../../utils";
 import { FinishBody, insertActiveQuest } from "./singleBattleQuest";
 import { getPlayerRushEventEndlessBattleRankingSync, getRushEventEndlessBattleRankPlayedPartyListSync, getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 import { clientSerializeDate } from "../../data/utils";
+import { resolvePlayerIdSync } from "../../data/activeAccount";
 
 interface SummaryBody {
     event_id: number,
@@ -104,9 +105,8 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
-        if (isNaN(playerId)) return reply.status(500).send({
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No player bound to account."
         })
@@ -162,9 +162,8 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
-        if (isNaN(playerId)) return reply.status(500).send({
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No player bound to account."
         })
@@ -218,9 +217,8 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
-        if (isNaN(playerId)) return reply.status(500).send({
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No player bound to account."
         })
@@ -264,8 +262,8 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        if (isNaN(playerIds[0])) return reply.status(500).send({
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No player bound to account."
         })
@@ -301,9 +299,8 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
-        if (isNaN(playerId)) return reply.status(500).send({
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No player bound to account."
         })
@@ -335,9 +332,8 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
-        if (isNaN(playerId)) return reply.status(500).send({
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No player bound to account."
         })
@@ -418,9 +414,8 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
-        if (isNaN(playerId)) return reply.status(500).send({
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No player bound to account."
         })
@@ -480,9 +475,8 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
-        if (isNaN(playerId)) return reply.status(500).send({
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No player bound to account."
         })

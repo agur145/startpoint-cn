@@ -6,6 +6,7 @@ import { getCharacterDataSync, getExAbilityPoolsSync, getExBoostItemSync, getExS
 import { generateDataHeaders } from "../../utils"
 import { randomInt } from "crypto"
 import { clientSerializeDate } from "../../data/utils"
+import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { characterExpCaps } from "../../lib/character"
 import { characterMaxOverLimits } from "./character"
 
@@ -60,9 +61,8 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
     })
 
     // get player
-    const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-    const playerId = playerIds[0]
-    if (isNaN(playerId)) return reply.status(500).send({
+    const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+    if (playerId === null) return reply.status(500).send({
         "error": "Internal Server Error",
         "message": "No players bound to account."
     })
@@ -239,9 +239,8 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get player
-        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
-        const playerId = playerIds[0]
-        if (isNaN(playerId)) return reply.status(500).send({
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No players bound to account."
         })

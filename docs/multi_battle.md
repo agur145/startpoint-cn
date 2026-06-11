@@ -22,7 +22,7 @@
 | `finish` | ✅ | 3 | 结算多人战斗 |
 | `abort` | ✅ | 3 | 放弃多人战斗 |
 | `play_continue` | ✅ | 3 | 续关 |
-| `disband_room` | ❌ | — | 解散房间（未实现） |
+| `disband_room` | ✅ | 1 | 解散房间 |
 
 ### 1.2 核心端点详细字段表
 
@@ -803,3 +803,85 @@ src/data/
 | 16 | Player CRUD + DCPL | `player.ts` | 20 | `3c65cb9` |
 
 **总计**: 16 个领域文件，169 个函数，0 TypeScript 错误。
+
+---
+
+## 12. CDN 资产下载系统
+
+### 12.1 端点
+
+| 端点 | 说明 |
+|------|------|
+| `asset/version_info` | 返回 CDN 基础信息（base_url, total_size） |
+| `asset/get_path` | 返回全量包列表 + 差分包链 + 版本信息 |
+
+### 12.2 全量/部分下载逻辑（源码：`AneAssetDownloading.startDownload()`）
+
+客户端通过 `ASSET_SIZE` 头区分模式：
+
+| 模式 | `ASSET_SIZE` | `full` 返回 | 下载内容 |
+|------|:---:|------|------|
+| **全部下载** | `fulfill` | `Some({ version, archive })` | 本体（full.archive）+ diff 链 |
+| **部分下载**（有本地资产） | `shortened` + `RES_VER` 存在 | `null` | 纯 diff 链（从本地版本出发） |
+| **部分下载**（无本地资产） | `shortened` + `RES_VER` 不存在 | `Some({ version, archive })` | 退化为全部下载 |
+
+### 12.3 diff 链遍历算法
+
+```typescript
+// 客户端下载列表构建
+archiveList = full.archive                       // 全部下载: 实际文件 | 部分下载: []
+
+// diff 索引 (key = original_version)
+diffIndex.set(diff.original_version, diff)
+
+// 链式遍历
+version = full.version
+while (diffIndex.has(version)) {
+    archiveList.concat(diffIndex.get(version).archive)
+    version = diffIndex.get(version).version       // 跳到下一版本
+}
+// 1.4.0 → 1.4.1 → 1.4.2 → ... → 1.4.54
+```
+
+### 12.4 `is_initial` 判断
+
+```typescript
+is_initial = !resVer  // 无 RES_VER 头 = 首次下载 = 弹出模式选择
+```
+
+首次下载：`is_initial=true` → 客户端翻转模式发起双请求 → 弹出"全量/部分下载"按钮
+后续下载：`is_initial=false` → 直接按当前模式下载
+
+### 12.5 `files_list` 校验规避
+
+`version_info` 响应的 `files_list` 返回空字符串 `""`。客户端 `AssetSufficiencyCheckLoading` 要求该字段为 String（否则 C8702），但空字符串意味着跳过所有文件完整性校验。
+
+### 12.6 `total_size` 计算
+
+```typescript
+// FULL_SIZE = 仅全量包文件（archive-*-full/ 目录）
+// TOTAL_SIZE = FULL_SIZE + 全部差分包（用于显示）
+// version_info 使用 FULL_SIZE 作为下载大小预估
+```
+
+### 12.7 CDN 目录结构
+
+```
+.cdn/cn/
+├── archive-common-full/    ← 全量包（1.4.0, ~100 文件 × 20MB）
+├── archive-medium-full/    ← 全量包
+├── archive-android-full/   ← 全量包
+├── archive-common-diff/    ← 差分包（1.4.0→1.4.54, 79 个真实文件）
+├── archive-medium-diff/    ← 差分包（111B 空壳占位）
+├── archive-android-diff/   ← 差分包（111B 空壳占位）
+└── EntityLists/
+```
+
+### 12.8 相关错误码
+
+| 错误 | 含义 | 原因 |
+|------|------|------|
+| C8601 | Key 不存在 | CDN 资源版本不匹配 |
+| C8702 | `data.files_list:null` | `files_list` 字段缺失（必须为 String） |
+| ClientError 20100 | Asset initial version not found | `full=null` 且本地无 info.json |
+| "Full Asset 不存在" | 响应缺少 full 字段 | `full=null` 且 `initialVersion=None` |

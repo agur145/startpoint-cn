@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { deletePlayerRushEventPlayedPartyListSync, getAccountPlayers, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, getPlayerSingleQuestProgressSync, getPlayerSync, getSession, insertPlayerQuestProgressSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerQuestProgressSync, updatePlayerRushEventSync, updatePlayerSync } from "../../data/wdfpData";
+import { deletePlayerRushEventPlayedPartyListSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, getPlayerSingleQuestProgressSync, getPlayerSync, getSession, insertPlayerQuestProgressSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerQuestProgressSync, updatePlayerRushEventSync, updatePlayerSync } from "../../data/wdfpData";
 import { getQuestFromCategorySync, getRushEventFolderClearRewards } from "../../lib/assets";
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
@@ -8,6 +8,7 @@ import { generateDataHeaders, getServerTime } from "../../utils";
 import { createRoom, disbandRoom, getNpcMates, getRoom, getRoomByToken, getRooms, serializeRoom, serializeRoomConnection, updateHostEntryTime, updateRoomState } from "../../data/multiRoom";
 import { insertActiveQuest, activeQuests } from "./singleBattleQuest";
 import { RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
+import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 import { rushEventFolderMaxRounds } from "./rushEvent";
 
@@ -187,9 +188,8 @@ const continueVmoneyCost = 50;
 async function getViewerIdAndPlayer(viewerId: number) {
     const session = await getSession(viewerId.toString());
     if (!session) return null;
-    const playerIds = await getAccountPlayers(session.accountId);
-    const playerId = playerIds[0];
-    if (isNaN(playerId)) return null;
+    const playerId = resolvePlayerIdSync(session.accountId)!;
+    if (playerId === null) return null;
     const player = getPlayerSync(playerId);
     return { session, playerId, player };
 }
@@ -449,6 +449,26 @@ const routes = async (fastify: FastifyInstance) => {
                 "establisher_follow": false
             }
         })
+    })
+
+    // ---- disband_room ----
+    fastify.post("/disband_room", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as { room_number: string, viewer_id: number, api_count: number };
+        const viewerId = body.viewer_id;
+        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid request body."
+        });
+
+        if (body.room_number) {
+            disbandRoom(body.room_number);
+            console.log(`[MULTI] room ${body.room_number} disbanded by viewer ${viewerId}`);
+        }
+
+        reply.header("content-type", "application/x-msgpack");
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+            "data": []
+        });
     })
 
     // ---- micro_community (CN-specific) ----

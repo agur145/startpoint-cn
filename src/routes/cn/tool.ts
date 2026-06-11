@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { generateDataHeaders } from "../../utils";
 import { insertAccount, insertDefaultPlayerSync, getPlayerSync, insertSessionWithToken, updateAccountSync, deleteSession, getDeviceBindingSync, insertDeviceBindingSync } from "../../data/wdfpData";
 import { SessionType } from "../../data/types";
+import { saveAccountDefaultPlayer } from "../../data/activeAccount";
 
 interface CnSignupBody {
     device_id: number;
@@ -81,7 +82,8 @@ const routes = async (fastify: FastifyInstance) => {
                 appId: "wf_cn", idpAlias: "", idpCode: "leiting", idpId: "", status: "normal"
             })
             accountId = account.id
-            insertDefaultPlayerSync(accountId)
+            const player = insertDefaultPlayerSync(accountId)
+            saveAccountDefaultPlayer(accountId, player.id)
             insertDeviceBindingSync(deviceId, accountId)
         }
 

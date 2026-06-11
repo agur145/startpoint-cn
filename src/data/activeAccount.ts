@@ -5,6 +5,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { setServerTimeOffset } from "../utils";
+import { getAccountPlayersSync } from "./domains/account";
 
 const STATE_FILE = path.join(__dirname, "..", "..", ".database", "active_account.json");
 
@@ -111,4 +112,32 @@ export function saveAccountDefaultPlayer(accountId: number, playerId: number): v
     const state = readState();
     state.defaultPlayers[accountId] = playerId;
     writeState(state);
+}
+
+/**
+ * Resolves the active player ID for an account.
+ * Uses per-account defaultPlayers, falls back to first player.
+ * Returns null if the account has no players.
+ */
+export function resolvePlayerIdSync(accountId: number): number | null {
+    const playerIds = getAccountPlayersSync(accountId);
+    if (!playerIds.length) return null;
+    const state = readState();
+    const preferredId = state.defaultPlayers[accountId];
+    return (preferredId && playerIds.includes(preferredId)) ? preferredId : playerIds[0];
+}
+
+/**
+ * Returns the per-player time_offset, or null if not set.
+ */
+export function getPlayerTimeOffsetSync(playerId: number): number | null {
+    try {
+        const { getDb } = require("./wdfpData");
+        const row = getDb().prepare(
+            `SELECT time_offset FROM players WHERE id = ?`
+        ).get(playerId) as { time_offset: number | null } | undefined;
+        return row?.time_offset ?? null;
+    } catch {
+        return null;
+    }
 }
