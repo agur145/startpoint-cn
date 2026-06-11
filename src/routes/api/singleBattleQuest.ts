@@ -78,14 +78,18 @@ interface ReturnRushEvent {
 export interface ActiveQuest {
     questId: number,
     category: QuestCategory,
-    useBossBoostPoint: boolean
-    useBoostPoint: boolean
-    isAutoStartMode: Boolean
+    useBossBoostPoint: boolean,
+    useBoostPoint: boolean,
+    isAutoStartMode: boolean,
+    isMulti: boolean,
+    roomNumber?: string,
+    matePlayerIds?: number[],
+    mateComIds?: number[]
 }
 
 const continueVmoneyCost = 50;
 
-const activeQuests: Record<number, ActiveQuest> = {}
+export const activeQuests: Record<number, ActiveQuest> = {}
 
 export function insertActiveQuest(playerId: number, quest: ActiveQuest) {
     activeQuests[playerId] = quest
@@ -459,7 +463,8 @@ const routes = async (fastify: FastifyInstance) => {
             category: category,
             useBoostPoint: useBoostPoint,
             useBossBoostPoint: useBossBoostPoint,
-            isAutoStartMode: isAutoStartMode
+            isAutoStartMode: isAutoStartMode,
+            isMulti: false
         }
 
         // update player last quest id

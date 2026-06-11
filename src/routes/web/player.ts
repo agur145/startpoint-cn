@@ -79,7 +79,7 @@ const routes = async (fastify: FastifyInstance) => {
                             <input type="text" name="name" placeholder="${name}" class="text-xs w-20 px-1 py-0.5 rounded border border-outline-variant">
                             <button type="submit" class="text-xs border border-outline-variant px-2 py-1 rounded-full">改名</button>
                         </form>
-                        <form method="post" action="/api/server/newSave?accountId=${selectedAccountId}" style="display:inline">
+                        <form method="post" action="/api/server/cloneSave?playerId=${pid}&accountId=${selectedAccountId}" style="display:inline">
                             <button type="submit" class="text-xs border border-outline-variant px-2 py-1 rounded-full">复制</button>
                         </form>
                         <form method="post" action="/api/server/deleteSave?playerId=${pid}" style="display:inline" onsubmit="return confirm('删除存档 ${pid}？')">
@@ -128,8 +128,8 @@ const routes = async (fastify: FastifyInstance) => {
     })
 
     fastify.get("/:playerId", async (request: FastifyRequest, reply: FastifyReply) => {
-        const { playerId } = request.params as GetPlayerParams
-        const { error } = request.query as GetPlayerQuery
+        const { playerId } = request.params as { playerId: string }
+        const { error } = request.query as { error?: string }
         const parsedPlayerId = Number(playerId)
         if (isNaN(parsedPlayerId)) return reply.redirect("/player");
 

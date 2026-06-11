@@ -19,6 +19,7 @@ import scoreAttackEventQuests from "../../assets/score_attack_event_quest.json";
 import soloTimeAttackEventQuests from "../../assets/solo_time_attack_event_quest.json";
 import storyEventSingleQuests from "../../assets/story_event_single_quest.json";
 import towerDungeonEventQuests from "../../assets/tower_dungeon_event_quest.json";
+import hardMultiEventQuests from "../../assets/hard_multi_event_quest.json";
 import exAbility from "../../assets/ex_ability.json";
 import exBoost from "../../assets/ex_boost.json";
 import exQuests from "../../assets/ex_quest.json";
@@ -204,6 +205,18 @@ export function getAdventEventQuest(
 }
 
 /**
+ * Gets a hard multi event quest.
+ * 
+ * @param questId The ID of the quest to get.
+ * @returns The found BattleQuest or null
+ */
+export function getHardMultiEventQuest(
+    questId: string | number
+): BattleQuest | null {
+    return getQuestSync((hardMultiEventQuests as RawQuests), questId) as BattleQuest | null
+}
+
+/**
  * Gets a quest from a specific quest category.
  * 
  * @param category The category of the quest.
@@ -254,6 +267,8 @@ export function getQuestFromCategorySync(
             return getQuestSync((soloTimeAttackEventQuests as RawQuests), questId)
         case QuestCategory.SCORE_ATTACK_EVENT:
             return getQuestSync((scoreAttackEventQuests as RawQuests), questId)
+        case QuestCategory.HARD_MULTI_EVENT:
+            return getHardMultiEventQuest(questId)
         default:
             return null
     }

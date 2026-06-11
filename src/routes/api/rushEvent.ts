@@ -438,7 +438,8 @@ const routes = async (fastify: FastifyInstance) => {
             category: QuestCategory.RUSH_EVENT,
             useBoostPoint: false,
             useBossBoostPoint: false,
-            isAutoStartMode: isAutoStartMode
+            isAutoStartMode: isAutoStartMode,
+            isMulti: false
         })
 
         const headers = generateDataHeaders({

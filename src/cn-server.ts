@@ -40,6 +40,7 @@ import rushEventApiPlugin from "./routes/api/rushEvent";
 import profileApiPlugin from "./routes/api/profile";
 import historyApiPlugin from "./routes/api/history";
 import comicApiPlugin from "./routes/api/comic";
+import { startSessionServer } from "./data/sessionServer";
 
 const fastify = Fastify({
     logger: {
@@ -226,4 +227,7 @@ fastify.listen({ port, host }, (err, address) => {
         process.exit(1);
     }
     console.log(`CN StarPoint listening on http://${host}:${port}`);
+
+    // Start multi battle TCP session server
+    startSessionServer();
 });
