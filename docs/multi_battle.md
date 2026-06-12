@@ -611,7 +611,7 @@ const NPC_TEMPLATES = {
 | `TypeError #1034` | Type coercion in `commandReceived()` | character/equipment 未用 Option `[0, val]` / `[1]` 格式包裹 | 所有 party 字段使用 Option 包裹 |
 | `S1000` | `通信が終了されました` | TCP 连接意外关闭 | 正常关闭不处理 |
 | `C8601` | `指定的Key不存在。key=2023013102` | 活动面板加载时，CDN master 数据缺少 `daily_challenge_point_campaign[2023013102]` | 通行证功能暂不实现，已清空所有角色 `daily_challenge_point_list`，默认存档不再写入该数据 |
-| `H404` | `disband_room` 端点不存在 | 未实现该端点 | 已由 TCP `removeClient` → `disbandRoom` 代偿 |
+| `H404` | `disband_room` 端点不存在 | 未实现该端点 | 已实现 `POST /multi_battle_quest/disband_room` |
 
 ---
 
@@ -619,7 +619,7 @@ const NPC_TEMPLATES = {
 
 1. **MsgPack uint32 不兼容**: 值 >65535 会用 `ce` (uint32) 编码，客户端解码为 null。受影响的潜在字段：quest_id、rankPointReward、characterId 等。当前 workaround：关键 display 字段使用 ≤65535 的值。
 
-2. **`disband_room` 未实现**: 客户端离开本地调用该端点返回 404。已由 TCP `removeClient` 中的 `disbandRoom()` 代偿清理。
+2. **`disband_room`**: 已实现 HTTP 端点 `POST /multi_battle_quest/disband_room`，TCP `removeClient` 作为补充清理。
 
 3. **单机模式**: 当前仅支持单人+NPC。真实多人联机需要：
    - 多个客户端连接到同一 room_number
@@ -691,14 +691,14 @@ const NPC_TEMPLATES = {
 | `share_room` | ⚠️ | 桩 |
 | `verify_access_token` | ⚠️ | 桩 |
 | `micro_community` | ⚠️ | 桩 |
-| `disband_room` | ❌ | 客户端调用→404，已有 TCP disbandRoom 代偿 |
+| `disband_room` | ✅ | 客户端调用→200 |
 
 ### 9.4 已知 Bug
 
 | 问题 | 状态 | 说明 |
 |------|:---:|------|
 | C8700 | ⚠️ | MsgPack uint32 (`ce`) 编码 >65535 的值，客户端解码为 null。当前用 `leaderCharacterId` 规避 |
-| 退出后弹 H404 | ⚠️ | `disband_room` 未实现 |
+| 退出后弹 H404 | ✅ 已实现 | `disband_room` HTTP 端点 |
 | 消息 TCP 合并 | ⚠️ | 100ms/200ms 延迟规避 |
 | C15202 (mates 不含自己) | ✅ 已修复 | `mates: [yourself]` |
 | C5603 (握手 #1034) | ✅ 已修复 | 切换为 `useEnumIndex` 数组格式 |
@@ -728,49 +728,6 @@ POST /api/server/cloneSave?playerId=X&accountId=Y
 |------|------|------|
 | `/api/server/newSave?accountId=X` | POST | 创建空存档 |
 | `/api/server/cloneSave?playerId=X&accountId=Y` | POST | 克隆存档到指定账号 |
-
----
-
-## 11. wdfpData.ts 重构进度
-
-| 步骤 | 模块 | 文件 | 状态 |
-|:---:|------|------|:---:|
-| 1 | Account + Session | `src/data/domains/account.ts` | ✅ |
-| 2 | Tutorial | `src/data/domains/tutorial.ts` | ✅ |
-| 3-15 | 剩余 13 个模块 | `src/data/domains/*.ts` | ⏳ 待实施 |
-
-**关键修复**:
-- `getAccountPlayersSync` / `getAccountPlayers` 添加 `ORDER BY id DESC`，确保最新玩家排在首位
-- 新增 `src/data/db.ts` — 共享 DB 实例，所有 domain 文件从中 import
-
-### 重构后的文件结构
-
-```
-src/data/
-├── db.ts                    ← 共享 DB 实例 (getDb)
-├── domains/                  ← 领域模块 (15 个)
-│   ├── account.ts            ← Account + DailyChallengePointList
-│   ├── session.ts            ← Session + DeviceBinding
-│   ├── player.ts             ← Player CRUD + insertDefaultPlayerSync
-│   ├── tutorial.ts           ← TriggeredTutorial
-│   ├── option.ts             ← PlayerOption
-│   ├── item.ts               ← PlayerItem
-│   ├── campaign.ts           ← StartDash + MultiSpecialExchange + PeriodicRewardPoint
-│   ├── equipment.ts          ← PlayerEquipment
-│   ├── party.ts              ← PlayerParty + PlayerPartyGroup
-│   ├── character.ts          ← PlayerCharacter + BondToken + ExBoost + ManaNode
-│   ├── quest.ts              ← QuestProgress + DrawnQuest
-│   ├── gacha.ts              ← GachaInfo + GachaCampaign
-│   ├── boxGacha.ts           ← BoxGacha + BoxGachaDrawnReward
-│   ├── rushEvent.ts          ← RushEvent + PlayedParty + Ranking
-│   ├── mission.ts            ← ClearedRegularMission + ActiveMission
-│   └── mail.ts               ← MailType + Mail + ReceiveHistory
-├── db.ts                      ← 共享 DB 实例 (getDb)
-├── wdfpData.ts               ← barrel re-export (4813L → 54L, -98.9%)
-├── activeAccount.ts          ← 账号默认玩家 持久化
-├── multiRoom.ts
-├── sessionServer.ts           ← Phase 1 clean room
-└── index.ts                   ← 数据库初始化
 
 ---
 
