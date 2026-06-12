@@ -496,39 +496,8 @@ export function insertDefaultPlayerSync(
 
     const playerId = insertPlayerSync(accountId, player)
 
-    // insert daily challenge points
-    insertPlayerDailyChallengePointListSync(playerId, [
-        {
-            id: 1,
-            point: 2,
-            campaignList: [
-                {
-                    campaignId: 2023013101,
-                    additionalPoint: 2
-                }
-            ]
-        },
-        {
-            id: 251,
-            point: 2,
-            campaignList: [
-                {
-                    campaignId: 2023013101,
-                    additionalPoint: 2
-                }
-            ]
-        },
-        {
-            id: 5001,
-            point: 10,
-            campaignList: []
-        },
-        {
-            id: 10008,
-            point: 1,
-            campaignList: []
-        }
-    ])
+    // daily challenge point list — disabled (CN CDN campaign data incomplete)
+    // insertPlayerDailyChallengePointListSync(playerId, [])
 
     // insert triggered tutorials — empty to trigger tutorial on new accounts
     insertPlayerTriggeredTutorialsSync(playerId, [])
