@@ -633,44 +633,51 @@ const NPC_TEMPLATES = {
 
 6. **默认存档对齐**: 默认玩家数据的初始值已按 CN 客户端 `PlayerSaveDataTools.createDummy()` 对齐（vmoney=100, name=冒险者 等）。角色 ID 使用 business code，CN 客户端中阿尔克=1、白=10，k_id 映射表当前不需要。
 
-7. **外传故事 quest 数据**: 已从 CN 源 `wf-assets-cn/orderedmap/quest/event/world_story_event_quest.json` 完全导入，覆盖 57 个事件组共 913 关（841 剧情 + 72 BOSS），替换了原有的国际服 38 组 775 关数据。
+7. **外传故事 quest 数据**: 已从 CN 源 `wf-assets-cn/orderedmap/quest/` 完全导入全部 20 个 quest 分类，共 5,158 关，覆盖所有 CN 事件组。
 
-### 外传故事 quest 数据导入详情
+### quest 数据导入详情
 
-**源数据**: `wf-assets-cn/orderedmap/quest/event/world_story_event_quest.json`
-**目标**: `assets/world_story_event_quest.json`
-**格式**: 扁平化 `{ questId: { fields } }`
+**源数据**: `wf-assets-cn/orderedmap/quest/*.json`
+**目标**: `assets/*_quest.json`
+**格式**: 扁平化 `{ questId: { fields } }`，`getQuestSync` 通过 `"manaReward" in quest` 自动区分剧情/BOSS 类型
 
-**57 个事件组**:
+**全部导入统计**:
 
-| 前缀 | 数量 | 示例 quest ID |
-|------|:---:|------|
-| 100100-100412 | 17 | `100100001` (主线序章) |
-| 100420-100424 | 5 | `100420001` (周年活动) |
-| 200100-200109, 201000 | 10 | `200100001` (个人剧情) |
-| 400001-400016 | 16 | `400010001` (外传故事), `400016001` (本次修复) |
-| 500002-500014 | 9 | `500002001` (特殊事件) |
+| 文件 | 关数 | 剧情 | BOSS | CN格式 |
+|------|:---:|:---:|:---:|------|
+| main_quest.json | 419 | 419 | 0 | 3级嵌套 |
+| ex_quest.json | 221 | 221 | 0 | 3级嵌套 |
+| boss_battle_quest.json | 232 | 0 | 232 | 3级嵌套 |
+| character_quest.json | 1,318 | 1,318 | 0 | 字典键 |
+| advent_event_quest.json | 459 | 459 | 0 | 2级嵌套 |
+| story_event_single_quest.json | 348 | 348 | 0 | 2级嵌套 |
+| daily_week_event_quest.json | 114 | 114 | 0 | 2级嵌套 |
+| ranking_event_single_quest.json | 7 | 7 | 0 | 2级嵌套 |
+| challenge_dungeon_event_quest.json | 46 | 46 | 0 | 2级嵌套 |
+| daily_exp_mana_event_quest.json | 6 | 6 | 0 | 2级嵌套 |
+| world_story_event_quest.json | 913 | 841 | 72 | 2级嵌套 |
+| world_story_event_boss_battle_quest.json | 96 | 0 | 96 | 2级嵌套 |
+| tower_dungeon_event_quest.json | 480 | 480 | 0 | 2级嵌套 |
+| expert_single_event_quest.json | 28 | 28 | 0 | 2级嵌套 |
+| carnival_event_quest.json | 171 | 171 | 0 | 2级嵌套 |
+| raid_event_quest.json | 50 | 50 | 0 | 2级嵌套 |
+| rush_event_quest.json | 110 | 110 | 0 | 2级嵌套 |
+| solo_time_attack_event_quest.json | 6 | 6 | 0 | 2级嵌套 |
+| hard_multi_event_quest.json | 12 | 12 | 0 | 2级嵌套 |
+| score_attack_event_quest.json | 123 | 60 | 63 | 2级嵌套 |
+| **合计** | **5,158** | | | |
 
-**字段映射（CN 源 → 服务端）**:
+**CN 源格式说明**:
+- **3级嵌套** (`main`, `ex`, `boss_battle`): `{ world: { stage: { node: [[quest_id,...]] } } }`
+- **2级嵌套** (事件文件): `{ event_group: { chapter: [[quest_id,...]] } }`
+- **字典键** (`character`): 顶层 key 即为 quest_id
 
-剧情关卡 (`sub-key < 100`):
-```json
-{ "name": "", "clearRewardId": <int> }
-```
-
-BOSS 战斗 (`sub-key >= 100`):
-```json
-{ 
-  "name": "", "clearRewardId": <int>,
-  "bRankTime": <int_ms>, "aRankTime": <int_ms>, 
-  "sRankTime": <int_ms>, "sPlusRankTime": <int_ms>,
-  "rankPointReward": <int>, "characterExpReward": <int>,
-  "manaReward": <int>, "poolExpReward": <int>,
-  "scoreRewardGroup": <int>
-}
-```
-
-`getQuestSync` 通过 `"manaReward" in quest` 自动区分剧情/BOSS 类型。
+**字段映射** (extract from CN array):
+- `arr[0]` → quest_id
+- `arr[4]` → clearRewardId
+- `arr[85]-[88]` → rank times (seconds×1000→ms)
+- `arr[94]-[97]` → battle rewards
+- `arr[71]` → scoreRewardGroup
 
 ---
 
