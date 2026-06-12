@@ -2866,5 +2866,167 @@
     "rarity": 5,
     "element": 5,
     "skill_count": 6
+  },
+  "111069": {
+    "name": "",
+    "rarity": 5,
+    "element": 0,
+    "skill_count": 6
+  },
+  "121057": {
+    "name": "",
+    "rarity": 5,
+    "element": 1,
+    "skill_count": 6
+  },
+  "151057": {
+    "name": "",
+    "rarity": 5,
+    "element": 4,
+    "skill_count": 6
+  },
+  "261053": {
+    "name": "",
+    "rarity": 4,
+    "element": 5,
+    "skill_count": 6
+  },
+  "213007": {
+    "name": "",
+    "rarity": 4,
+    "element": 0,
+    "skill_count": 6
+  },
+  "111117": {
+    "name": "",
+    "rarity": 5,
+    "element": 0,
+    "skill_count": 6
+  },
+  "121123": {
+    "name": "",
+    "rarity": 5,
+    "element": 1,
+    "skill_count": 6
+  },
+  "263015": {
+    "name": "",
+    "rarity": 4,
+    "element": 5,
+    "skill_count": 6
+  },
+  "111183": {
+    "name": "",
+    "rarity": 5,
+    "element": 0,
+    "skill_count": 6
+  },
+  "121189": {
+    "name": "",
+    "rarity": 5,
+    "element": 1,
+    "skill_count": 6
+  },
+  "141189": {
+    "name": "",
+    "rarity": 5,
+    "element": 3,
+    "skill_count": 6
+  },
+  "111177": {
+    "name": "",
+    "rarity": 5,
+    "element": 0,
+    "skill_count": 6
+  },
+  "131176": {
+    "name": "",
+    "rarity": 5,
+    "element": 2,
+    "skill_count": 6
+  },
+  "121183": {
+    "name": "",
+    "rarity": 5,
+    "element": 1,
+    "skill_count": 6
+  },
+  "141183": {
+    "name": "",
+    "rarity": 5,
+    "element": 3,
+    "skill_count": 6
+  },
+  "131170": {
+    "name": "",
+    "rarity": 5,
+    "element": 2,
+    "skill_count": 6
+  },
+  "121177": {
+    "name": "",
+    "rarity": 5,
+    "element": 1,
+    "skill_count": 6
+  },
+  "161195": {
+    "name": "",
+    "rarity": 5,
+    "element": 5,
+    "skill_count": 6
+  },
+  "141177": {
+    "name": "",
+    "rarity": 5,
+    "element": 3,
+    "skill_count": 6
+  },
+  "131164": {
+    "name": "",
+    "rarity": 5,
+    "element": 2,
+    "skill_count": 6
+  },
+  "111171": {
+    "name": "",
+    "rarity": 5,
+    "element": 0,
+    "skill_count": 6
+  },
+  "121171": {
+    "name": "",
+    "rarity": 5,
+    "element": 1,
+    "skill_count": 6
+  },
+  "141201": {
+    "name": "",
+    "rarity": 5,
+    "element": 3,
+    "skill_count": 6
+  },
+  "131182": {
+    "name": "",
+    "rarity": 5,
+    "element": 2,
+    "skill_count": 6
+  },
+  "161141": {
+    "name": "",
+    "rarity": 5,
+    "element": 5,
+    "skill_count": 6
+  },
+  "141129": {
+    "name": "",
+    "rarity": 5,
+    "element": 3,
+    "skill_count": 6
+  },
+  "123001": {
+    "name": "",
+    "rarity": 5,
+    "element": 1,
+    "skill_count": 6
   }
 }
