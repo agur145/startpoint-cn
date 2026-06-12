@@ -27,7 +27,14 @@ function processStoryQuestFinish(playerId: number, viewerId: number, questSectio
     if (playerData === null) return null
 
     const questData = getQuestFromCategorySync(questSection, questId)
-    if (questData === null) return null
+    if (questData === null) {
+        console.log(`[STORY] quest not found: category=${questSection} questId=${questId}`)
+        return null
+    }
+    if ("sPlusReward" in questData) {
+        console.log(`[STORY] battle quest rejected: category=${questSection} questId=${questId}`)
+        return null
+    }
 
     const questProgress = getPlayerSingleQuestProgressSync(playerId, questSection, questId);
     const finished = questProgress !== null ? questProgress.finished : false
