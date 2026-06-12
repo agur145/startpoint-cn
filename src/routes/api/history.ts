@@ -1,7 +1,3 @@
-/**
- * History API — receive.
- * Returns reward claim history for the past 7 days (last 500 entries).
- */
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getSession, getReceiveHistorySync } from "../../data/wdfpData";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -46,6 +42,21 @@ const routes = async (fastify: FastifyInstance) => {
                 history,
                 total_count: records.length,
             }
+        })
+    })
+
+    fastify.post("/practice_battle", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as any
+        const viewerId = body.viewer_id
+        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+            error: "Bad Request",
+            message: "Invalid request body."
+        })
+
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            data_headers: generateDataHeaders({ viewer_id: viewerId }),
+            data: { history: [] }
         })
     })
 }

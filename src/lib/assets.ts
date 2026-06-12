@@ -26,6 +26,7 @@ import exQuests from "../../assets/ex_quest.json";
 import exStatus from "../../assets/ex_status.json";
 import gachas from "../../assets/gacha.json";
 import mainQuests from "../../assets/main_quest.json";
+import practiceQuests from "../../assets/practice_quest.json";
 import manaNodes from "../../assets/mana_node.json";
 import rareScoreRewards from "../../assets/rare_score_reward.json";
 import scoreRewards from "../../assets/score_reward.json";
@@ -145,6 +146,18 @@ export function getExQuestSync(
 }
 
 /**
+ * Gets a practice quest.
+ * 
+ * @param questId The ID of the quest to get.
+ * @returns The found BattleQuest or null
+ */
+export function getPracticeQuestSync(
+    questId: string | number
+): BattleQuest | null {
+    return getQuestSync((practiceQuests as RawQuests), questId) as BattleQuest | null
+}
+
+/**
  * Gets a boss battle quest.
  * 
  * @param questId The ID of the quest to get.
@@ -251,6 +264,8 @@ export function getQuestFromCategorySync(
             return getQuestSync((challengeDungeonEventQuests as RawQuests), questId)
         case QuestCategory.DAILY_EXP_MANA_EVENT:
             return getQuestSync((dailyExpManaEventQuests as RawQuests), questId)
+        case QuestCategory.PRACTICE:
+            return getPracticeQuestSync(questId)
         case QuestCategory.DAILY_WEEK_EVENT:
             return getQuestSync((dailyWeekEventQuests as RawQuests), questId)
         case QuestCategory.TOWER_DUNGEON_EVENT:
