@@ -725,6 +725,36 @@ const NPC_TEMPLATES = {
 
 ---
 
+## 9. 关卡/活动测试清单
+
+每条需完成 **进入** 和 **结算** 两种流程测试（进入不报错 + 打完关卡结算正常）。
+
+| # | 活动名称 | quest JSON | 关数 | 进入 | 结算 | 备注 |
+|---|------|------|:---:|:---:|:---:|------|
+| 1 | 嘉年华 | `carnival_event_quest` | 171 | ⬜ | ⬜ | API endpoint 已实现 |
+| 2 | 战阵之宴（Rush） | `rush_event_quest` | 110 | ⬜ | ⬜ | reward+endless_battle 已实现 |
+| 3 | Raid 活动 | `raid_event_quest` | 50 | ⬜ | ⬜ | 7 端点已实现 |
+| 4 | 练习战 | `practice_quest` | 21 | ⬜ | ⬜ | 98 条 quest（双 key 映射） |
+| 5 | 分数挑战 | `score_attack_event_quest` | 123 | ⬜ | ⬜ | 含 BOSS 63 关 |
+| 6 | 剧情活动 | `story_event_single_quest` | 348 | ⬜ | ⬜ | 需活动开放期 |
+| 7 | 排名战 | `ranking_event_single_quest` | 7 | ⬜ | ⬜ | event ID 1000/1001 已映射 |
+| 8 | 专家挑战 | `expert_single_event_quest` | 28 | ⬜ | ⬜ | 高难单人 |
+| 9 | 主线关卡 | `main_quest` | 419 | ⬜ | ⬜ | |
+| 10 | 高难关卡（EX） | `ex_quest` | 221 | ⬜ | ⬜ | |
+| 11 | 角色剧情 | `character_quest` | 1,318 | ⬜ | ⬜ | |
+| 12 | 主线 BOSS 战 | `boss_battle_quest` | 232 | ⬜ | ⬜ | |
+| 13 | 降临讨伐 | `advent_event_quest` | 459 | ⬜ | ⬜ | 需活动开放期 |
+| 14 | 外传故事 | `world_story_event_quest` | 913 | ⬜ | ⬜ | |
+| 15 | 外传 BOSS（多人） | `world_story_event_boss_battle_quest` | 96 | ⬜ | ⬜ | 联机 Phase 2 |
+| 16 | 挑战迷宫 | `challenge_dungeon_event_quest` | 46 | ⬜ | ⬜ | |
+| 17 | 每日经验玛纳 | `daily_exp_mana_event_quest` | 6 | ⬜ | ⬜ | |
+| 18 | 每日周常 | `daily_week_event_quest` | 114 | ⬜ | ⬜ | |
+| 19 | 塔之迷宫 | `tower_dungeon_event_quest` | 480 | ⬜ | ⬜ | |
+| 20 | 单人计时 | `solo_time_attack_event_quest` | 6 | ⬜ | ⬜ | |
+| 21 | Hard Multi | `hard_multi_event_quest` | 12 | ⬜ | ⬜ | 联机 Phase 2 |
+
+---
+
 ## 9. 联机功能实现进度
 
 ### 9.1 阶段 1 — 创建房间 + TCP 握手 ✅（当前阶段）
