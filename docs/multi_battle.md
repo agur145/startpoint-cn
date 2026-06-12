@@ -610,6 +610,7 @@ const NPC_TEMPLATES = {
 | `Error #1009` | Null Pointer in `fixIllustrationSettingsForMate()` | mate 对象 `party` 字段命名错误（`unisonCharacters` vs `unison_characters`），缺少 `illustration_settings` | 修正字段命名，补全 `illustration_settings: [1]` |
 | `TypeError #1034` | Type coercion in `commandReceived()` | character/equipment 未用 Option `[0, val]` / `[1]` 格式包裹 | 所有 party 字段使用 Option 包裹 |
 | `S1000` | `通信が終了されました` | TCP 连接意外关闭 | 正常关闭不处理 |
+| `C8601` | `指定的Key不存在。key=2023013102` | 活动面板加载时，CDN master 数据缺少 `daily_challenge_point_campaign[2023013102]` | 服务器默认存档的 campaignId `2023013102` 在 CN CDN 中不存在，改为 `2023013101` 或清空对应 entry |
 | `H404` | `disband_room` 端点不存在 | 未实现该端点 | 已由 TCP `removeClient` → `disbandRoom` 代偿 |
 
 ---

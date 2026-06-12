@@ -513,7 +513,7 @@ export function insertDefaultPlayerSync(
             point: 2,
             campaignList: [
                 {
-                    campaignId: 2023013102,
+                    campaignId: 2023013101,
                     additionalPoint: 2
                 }
             ]
