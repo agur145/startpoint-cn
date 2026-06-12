@@ -334,7 +334,8 @@ const routes = async (fastify: FastifyInstance) => {
                 }
 
                 userCharacterManaNodeListItem.push({
-                    "mana_node_multiplied_id": manaNodeId
+                    "multiplied_id": manaNodeId,
+                    "awake_level": 0
                 })
             }
         }
