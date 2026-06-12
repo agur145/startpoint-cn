@@ -82,12 +82,21 @@ function applyMailReward(playerId: number, mail: RawPlayerMail): {
             } else {
                 insertDefaultPlayerCharacterSync(playerId, mail.type_id)
             }
-            const now = clientSerializeDate(new Date())
+            const charData = getPlayerCharacterSync(playerId, mail.type_id)!
             characterList.push({
                 character_id: mail.type_id,
-                entry_count: existing ? existing.entryCount + 1 : 1,
-                join_time: now,
-                update_time: now
+                entry_count: charData.entryCount,
+                evolution_level: charData.evolutionLevel,
+                over_limit_step: charData.overLimitStep,
+                protection: charData.protection,
+                exp: charData.exp,
+                stack: charData.stack,
+                bond_token_status: charData.bondTokenList?.map(bt => ({
+                    mana_board_index: bt.manaBoardIndex,
+                    status: bt.status
+                })) ?? [],
+                join_time: clientSerializeDate(charData.joinTime),
+                update_time: clientSerializeDate(charData.updateTime)
             })
             break
         }
