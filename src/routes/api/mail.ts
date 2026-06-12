@@ -91,7 +91,7 @@ function applyMailReward(playerId: number, mail: RawPlayerMail): {
                 protection: charData.protection,
                 exp: charData.exp,
                 stack: charData.stack,
-                bond_token_status: charData.bondTokenList?.map(bt => ({
+                bond_token_list: charData.bondTokenList?.map(bt => ({
                     mana_board_index: bt.manaBoardIndex,
                     status: bt.status
                 })) ?? [],
