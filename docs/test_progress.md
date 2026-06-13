@@ -19,7 +19,7 @@
 | 11 | 角色剧情 | `character_quest` | 1,318 | ✅ | ✅ | story_quest/finish 通过；⚠️ 阅读后不记录已读状态（紫色标记不消除），待实现 episode_trial/save |
 | 12 | 主线 BOSS 战 | `boss_battle_quest` | 232 | ⬜ | ⬜ | |
 | 13 | 降临讨伐 | `advent_event_quest` | 459 | ⬜ | ⬜ | 需活动开放期 |
-| 14 | 外传故事 | `world_story_event_quest` | 913 | ✅ | ✅ | 剧情关+ Boss 战均通过；C3212 clearRank null→0 修复 |
+| 14 | 外传故事 | `world_story_event_quest` | 913 | ✅ | ✅ | 剧情关 S+ 金冠 + Boss 战正常评级；C3212 彻底修复（见底部详解） |
 | 15 | 外传 BOSS（多人） | `world_story_event_boss_battle_quest` | 96 | ⬜ | ⬜ | 联机 Phase 2 |
 | 16 | 挑战迷宫 | `challenge_dungeon_event_quest` | 46 | ⬜ | ⬜ | |
 | 17 | 每日经验玛纳 | `daily_exp_mana_event_quest` | 6 | ⬜ | ⬜ | |
@@ -48,6 +48,26 @@
 | F1017 邮件 type_id 超 Int 范围 C8700 | `web_api/mail.ts` 加 1~2^31-1 校验，`formatMailResponse` null 安全 |
 | F1018 episode_trial_reading/finish 404 | `cn-server.ts` 新增 stub 端点 |
 | F1019 getQuestSync 统一 BattleQuest | 缺失字段默认 0，嘉年华关卡不再 400 |
-| F1020 C3212 story_quest clear_rank 缺失 | `storyQuest.ts:processStoryQuestFinish` 保存 `clearRank: 0` |
+| F1020 C3212 外传故事 clear_rank 缺失 | `storyQuest.ts` + `singleBattleQuest.ts` 三层修复：响应 `?? 5`、DB INSERT `?? 5`、DB 函数 `\|\|`→`??` |
 | F1021 carnival score + party display | DB 表 + CDN 打分数据 + `single_battle_quest/finish` carnival_event 字段 |
-| F1022 party_slot 3000 → F1009 崩溃 | `party_slot` 无效值导致 HomeScene null pointer；修复为 1 |
+| F1022 party_slot 3000 → F1009 | 外传「体验队伍」标识，战斗结束后未被清回；修复为 1 恢复进游戏 |
+| F1023 getQuestSync 统一 BattleQuest 副作用 | 纯剧情关被客户端误判为战斗关，需 `clearRank: 5` 补充 |
+
+## C3212 修复详解
+
+### 因果链
+
+```
+getQuestSync 统一 BattleQuest → 纯剧情关有了 rankPointReward 字段
+→ 客户端判定为「战斗关」→ 查 clear_rank
+→ 首次完成时 single_battle_quest/finish 响应发 null
+→ 客户端缓存 null → 外传任务列表 C3212
+```
+
+### 三层修复
+
+| 层 | 位置 | 操作 |
+|------|------|------|
+| 1 | `quest.ts:99` | `\|\| null` → `?? null`（0 不被 falsy 吞掉） |
+| 2 | `singleBattleQuest.ts` `multiBattleQuest.ts` | DB INSERT `clearRank: clearRank ?? 5` |
+| 3 | `singleBattleQuest.ts` `multiBattleQuest.ts` | 响应 `"clear_rank": clearRank ?? 5`（不发 null 给客户端） |

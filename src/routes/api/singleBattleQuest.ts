@@ -200,13 +200,14 @@ const routes = async (fastify: FastifyInstance) => {
                 updatePlayerQuestProgressSync(playerId, questCategory, updateData)
             } else {
                 // insert if it doesn't already exist.
-                insertPlayerQuestProgressSync(playerId, questCategory, {
+                const insertData: any = {
                     questId: questId,
                     finished: true,
                     bestElapsedTimeMs: clearTime,
-                    clearRank: clearRank ?? undefined,
-                    highScore: body.score
-                })
+                    highScore: body.score,
+                    clearRank: clearRank ?? 5  // default S+ for quests without rank thresholds
+                }
+                insertPlayerQuestProgressSync(playerId, questCategory, insertData)
             }
         }
 
@@ -416,7 +417,7 @@ const routes = async (fastify: FastifyInstance) => {
                     ...scoreRewardsResult.joined_character_id_list
                 ],
                 "before_rank_point": beforeRankPoint,
-                "clear_rank": clearRank,
+                "clear_rank": clearRank ?? 5,
                 "drop_score_reward_ids": scoreRewardsResult.drop_score_reward_ids,
                 "drop_rare_reward_ids": scoreRewardsResult.drop_rare_reward_ids,
                 "drop_additional_reward_ids": [],
@@ -528,7 +529,7 @@ const routes = async (fastify: FastifyInstance) => {
             isMulti: false
         }
 
-        // update player last quest id
+        // update player last party slot
         if (questData.fixedParty === undefined) {
             updatePlayerSync({
                 id: playerId,

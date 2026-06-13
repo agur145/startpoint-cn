@@ -45,13 +45,13 @@ function processStoryQuestFinish(playerId: number, viewerId: number, questSectio
             insertPlayerQuestProgressSync(playerId, questSection, {
                 questId: questId,
                 finished: true,
-                clearRank: 0
+                clearRank: 5
             })
         } else {
             updatePlayerQuestProgressSync(playerId, questSection, {
                 questId: questId,
                 finished: true,
-                clearRank: 0
+                clearRank: 5
             })
         }
     }

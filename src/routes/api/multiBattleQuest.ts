@@ -643,13 +643,14 @@ const routes = async (fastify: FastifyInstance) => {
                 }
                 updatePlayerQuestProgressSync(playerId, questCategory, updateData)
             } else {
-                insertPlayerQuestProgressSync(playerId, questCategory, {
+                const insertData: any = {
                     questId: questId,
                     finished: true,
                     bestElapsedTimeMs: clearTime,
-                    clearRank: clearRank ?? undefined,
-                    highScore: body.score
-                })
+                    highScore: body.score,
+                    clearRank: clearRank ?? 5
+                }
+                insertPlayerQuestProgressSync(playerId, questCategory, insertData)
             }
         }
 
@@ -784,7 +785,7 @@ const routes = async (fastify: FastifyInstance) => {
                     ...scoreRewardsResult.joined_character_id_list
                 ],
                 "before_rank_point": beforeRankPoint,
-                "clear_rank": clearRank,
+                "clear_rank": clearRank ?? 5,
                 "drop_score_reward_ids": scoreRewardsResult.drop_score_reward_ids,
                 "drop_rare_reward_ids": scoreRewardsResult.drop_rare_reward_ids,
                 "drop_additional_reward_ids": [],

@@ -95,9 +95,9 @@ export function insertPlayerQuestProgressSync(
         Number(section),
         data.questId,
         serializeBoolean(data.finished),
-        data.highScore || null,
-        data.clearRank || null,
-        data.bestElapsedTimeMs || null,
+        data.highScore ?? null,
+        data.clearRank ?? null,
+        data.bestElapsedTimeMs ?? null,
         playerId
     )
 }
