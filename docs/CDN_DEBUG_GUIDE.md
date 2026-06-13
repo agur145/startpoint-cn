@@ -249,3 +249,70 @@ sqlite3 .database/wdfp_data.db "SELECT id, party_slot FROM players WHERE id=20"
 5. **DROP_MULTIPLIER** 在 `.env` 中配置，测试时设 10 便于快速积累，上线设 1。
 
 6. **`wf-assets-cn` 的 `.pathlist`** 记录了所有 CDN 表的路径（976 条），是查找 CDN 数据的索引入口。
+
+---
+
+## 七、Gacha 动画种子生成（理论方案）
+
+### 背景
+
+C3032 错误：客户端收到 `seed` + `movie_id` 后，用 MersenneTwister(seed) 模拟弹珠物理，得出预期稀有度。若与角色实际稀有度不一致 → C3032。
+
+### 种子需求
+
+| movie_id | 动画配置 | 说明 |
+|------|------|------|
+| `normal` | `master/gacha/normal.orderedmap` | 常规卡池 |
+| `fes` | `master/gacha/fes.orderedmap` | FES/流星祭 |
+| `normal_guarantee` | `master/gacha/normal_guarantee.orderedmap` | 10 连保底 |
+| `fes_guarantee` | `master/gacha/fes_guarantee.orderedmap` | FES 保底 |
+
+每种配置需要按稀有度（★3/★4/★5）生成各自的种子池。
+
+### 数据源
+
+| 来源 | 路径 | 状态 |
+|------|------|------|
+| 动画配置文件 | `master/gacha/{movie_id}.orderedmap` | ⚠️ 本地 CDN ZIP 中未找到（可能仅 APK 内嵌） |
+| 客户端弹珠物理源码 | `wf-2.1.125-cn-decompiled/scripts/scripts/pinball/gacha/ballMovie/fallingField/FallingField.as` | ✅ 可用 |
+| 客户端种子校验 | `BallMovie.verifyResultBallRarity()` | ✅ 可参考 |
+
+### 种子生成流程（计划）
+
+```
+1. 提取动画配置文件
+   → SHA1("master/gacha/fes.orderedmap" + salt)
+   → 从 CDN ZIP 或 APK 提取 orderedmap 二进制
+   → zlib 解压 → JSON（ballStar4, amuletTwoUp, amulets[], playMovie 等阈值）
+
+2. 在 Node.js 中实现 MersenneTwister(seed) 模拟
+   → 参考 FallingField.as 的 initBallRarity() 和 precalculateFieldResult()
+   → 输入：seed + movie 配置参数
+   → 输出：ballRarityIndex (0=★3, 1=★4, 2=★5)
+
+3. 暴力枚举
+   for seed in range(10000000, 99999999):
+       rarity = simulate(seed, movieConfig)
+       if rarity matches target:
+           seeds.push(seed)
+
+4. 按 movie_type × rarity 分组输出
+   → gacha_movie_seeds.json: {rarity: {movie_type: [seeds]}}
+```
+
+### 参考文件
+
+- 客户端物理模拟：`wf-2.1.125-cn-decompiled/scripts/scripts/pinball/gacha/ballMovie/fallingField/FallingField.as`
+- 种子校验逻辑：`BallMovie.verifyResultBallRarity()` 
+- 动画资产加载：`BallMovieGachaSource.getGachaConfig()`
+- 配置路径生成：`GachaMovieIdTools.getGachaConfigAssetPath()`
+
+### 当前种子池
+
+| 文件 | 常规 normal | 常规 guarantee | rate-up normal | rate-up guarantee |
+|------|:---:|:---:|:---:|:---:|
+| ★5 | 23 | 7 | 14 | **2** |
+| ★4 | 124 | 44 | 56 | 24 |
+| ★3 | 292 | — | 162 | — |
+
+数据来源：历史抓包。`fes` 类型种子为空。
