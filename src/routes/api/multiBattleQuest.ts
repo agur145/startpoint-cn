@@ -601,13 +601,16 @@ const routes = async (fastify: FastifyInstance) => {
             }
         }
 
-        // calculate clear rank
+        // calculate clear rank (only if quest has rank time thresholds)
         const clearTime = body.elapsed_time_ms
-        const clearRank = questData.sPlusRankTime >= clearTime ? 5
-            : questData.sRankTime >= clearTime ? 4
-                : questData.aRankTime >= clearTime ? 3
-                    : questData.bRankTime >= clearTime ? 2
-                        : 1
+        const hasRankThresholds = questData.bRankTime > 0
+        const clearRank = hasRankThresholds ? (
+            questData.sPlusRankTime >= clearTime ? 5
+                : questData.sRankTime >= clearTime ? 4
+                    : questData.aRankTime >= clearTime ? 3
+                        : questData.bRankTime >= clearTime ? 2
+                            : 1
+        ) : null
 
         // calculate player rewards
         const newExpPool = playerData.expPool + questData.poolExpReward
@@ -629,19 +632,22 @@ const routes = async (fastify: FastifyInstance) => {
         const sPlusClearReward = (clearRank === 5) && (questProgress?.clearRank !== 5) && (questData.sPlusReward !== undefined) ? givePlayerRewardSync(playerId, questData.sPlusReward) : null
         if (questAccomplished) {
             if (questPreviouslyCompleted) {
-                updatePlayerQuestProgressSync(playerId, questCategory, {
+                const updateData: any = {
                     questId: questId,
                     finished: true,
                     bestElapsedTimeMs: questProgress.bestElapsedTimeMs === undefined || questProgress.bestElapsedTimeMs === null ? clearTime : Math.min(clearTime, questProgress.bestElapsedTimeMs),
-                    clearRank: questProgress.clearRank === undefined ? clearRank : Math.max(clearRank, questProgress.clearRank),
                     highScore: questProgress.highScore === undefined ? body.score : Math.max(body.score, questProgress.highScore)
-                })
+                }
+                if (clearRank !== null) {
+                    updateData.clearRank = questProgress.clearRank === undefined ? clearRank : Math.max(clearRank, questProgress.clearRank)
+                }
+                updatePlayerQuestProgressSync(playerId, questCategory, updateData)
             } else {
                 insertPlayerQuestProgressSync(playerId, questCategory, {
                     questId: questId,
                     finished: true,
                     bestElapsedTimeMs: clearTime,
-                    clearRank: clearRank,
+                    clearRank: clearRank ?? undefined,
                     highScore: body.score
                 })
             }

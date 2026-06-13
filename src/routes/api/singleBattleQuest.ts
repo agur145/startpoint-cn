@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { deletePlayerRushEventPlayedPartyListSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, getPlayerSingleQuestProgressSync, getPlayerSync, getSession, insertPlayerQuestProgressSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerQuestProgressSync, updatePlayerRushEventSync, updatePlayerSync } from "../../data/wdfpData";
+import { deletePlayerRushEventPlayedPartyListSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, getPlayerSingleQuestProgressSync, getPlayerSync, getSession, insertPlayerQuestProgressSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerQuestProgressSync, updatePlayerRushEventSync, updatePlayerSync, upsertPlayerCarnivalEventRecordSync } from "../../data/wdfpData";
 import { getQuestFromCategorySync, getRushEventFolderClearRewards } from "../../lib/assets";
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
@@ -8,6 +8,17 @@ import { generateDataHeaders, getServerTime } from "../../utils";
 import { rushEventFolderMaxRounds } from "./rushEvent";
 import { RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
+import { readFileSync, existsSync } from "fs";
+import path from "path";
+
+// Load carnival quest score data
+let carnivalScoreLookup: Record<string, { difficulty_score: number, time_limit_ms: number, folder_id: number, event_id: number }> = {}
+try {
+    const scorePath = path.join(process.cwd(), "assets", "carnival_event_quest_scores.json")
+    if (existsSync(scorePath)) {
+        carnivalScoreLookup = JSON.parse(readFileSync(scorePath, "utf-8"))
+    }
+} catch {} // Init failed silently; carnival scoring won't work
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 
 interface StartBody {
@@ -144,13 +155,16 @@ const routes = async (fastify: FastifyInstance) => {
         // delete the active quest data from global record
         delete activeQuests[playerId]
 
-        // calculate clear rank
+        // calculate clear rank (only if quest has rank time thresholds)
         const clearTime = body.elapsed_time_ms
-        const clearRank = questData.sPlusRankTime >= clearTime ? 5
-            : questData.sRankTime >= clearTime ? 4
-                : questData.aRankTime >= clearTime ? 3
-                    : questData.bRankTime >= clearTime ? 2
-                        : 1
+        const hasRankThresholds = questData.bRankTime > 0
+        const clearRank = hasRankThresholds ? (
+            questData.sPlusRankTime >= clearTime ? 5
+                : questData.sRankTime >= clearTime ? 4
+                    : questData.aRankTime >= clearTime ? 3
+                        : questData.bRankTime >= clearTime ? 2
+                            : 1
+        ) : null
 
         // calculate player rewards
         const newExpPool = playerData.expPool + questData.poolExpReward
@@ -174,20 +188,23 @@ const routes = async (fastify: FastifyInstance) => {
             // update quest progress
             if (questPreviouslyCompleted) {
                 // simply update the quest progress if it already exists.
-                updatePlayerQuestProgressSync(playerId, questCategory, {
+                const updateData: any = {
                     questId: questId,
                     finished: true,
                     bestElapsedTimeMs: questProgress.bestElapsedTimeMs === undefined || questProgress.bestElapsedTimeMs === null ? clearTime : Math.min(clearTime, questProgress.bestElapsedTimeMs),
-                    clearRank: questProgress.clearRank === undefined ? clearRank : Math.max(clearRank, questProgress.clearRank),
                     highScore: questProgress.highScore === undefined ? body.score : Math.max(body.score, questProgress.highScore)
-                })
+                }
+                if (clearRank !== null) {
+                    updateData.clearRank = questProgress.clearRank === undefined ? clearRank : Math.max(clearRank, questProgress.clearRank)
+                }
+                updatePlayerQuestProgressSync(playerId, questCategory, updateData)
             } else {
                 // insert if it doesn't already exist.
                 insertPlayerQuestProgressSync(playerId, questCategory, {
                     questId: questId,
                     finished: true,
                     bestElapsedTimeMs: clearTime,
-                    clearRank: clearRank,
+                    clearRank: clearRank ?? undefined,
                     highScore: body.score
                 })
             }
@@ -323,6 +340,45 @@ const routes = async (fastify: FastifyInstance) => {
             }
         }
 
+        // handle carnival event score & records
+        let carnivalEventData: any = null
+        if (questCategory === QuestCategory.CARNIVAL_EVENT && questAccomplished) {
+            const carnivalInfo = carnivalScoreLookup[String(questId)]
+            if (carnivalInfo) {
+                const characterIds = bodyPartyStatistics.characters.map((v: any) => v?.id ?? null)
+                const unisonCharacterIds = bodyPartyStatistics.unison_characters.map((v: any) => v?.id ?? null)
+                const leaderCharId = bodyPartyStatistics.leader?.id ?? 0
+
+                const difficultyBonus = carnivalInfo.difficulty_score * 100
+                const timeBonus = Math.max(0, carnivalInfo.time_limit_ms - clearTime)
+                const totalScore = difficultyBonus + timeBonus
+
+                upsertPlayerCarnivalEventRecordSync(
+                    playerId,
+                    carnivalInfo.event_id,
+                    carnivalInfo.folder_id,
+                    totalScore,
+                    characterIds,
+                    unisonCharacterIds
+                )
+
+                // Build carnival_event response for client
+                const previousTotalBest = carnivalEventData === null ? 0 : 0  // simplified: no previous total
+
+                carnivalEventData = {
+                    is_record_valid: true,
+                    leader_character_id: leaderCharId,
+                    new_degree_ids: [] as number[],
+                    previous_total_best_score: Math.min(previousTotalBest, 65535),
+                    reward_ids: [] as number[],
+                    score: {
+                        difficulty_bonus: Math.min(difficultyBonus, 65535),
+                        time_bonus: Math.min(timeBonus, 65535)
+                    }
+                }
+            }
+        }
+
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": dataHeaders,
@@ -375,6 +431,7 @@ const routes = async (fastify: FastifyInstance) => {
                     ...(rushEventRewardsResult?.items ?? {})
                 },
                 "rush_event": rushEventData,
+                "carnival_event": carnivalEventData,
                 "presigned_quest_category": []
             }
         })

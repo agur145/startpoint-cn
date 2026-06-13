@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getPlayerSync, getSession, getPlayerPartyGroupListSync, insertPlayerPartyGroupListSync } from "../../data/wdfpData";
+import { getPlayerSync, getSession, getPlayerPartyGroupListSync, insertPlayerPartyGroupListSync, getPlayerCarnivalEventRecordsSync } from "../../data/wdfpData";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDefaultPlayerPartyGroupsSync } from "../../data/domains/player";
 import { serializePartyGroupList } from "../../data/utils";
@@ -74,11 +74,23 @@ const routes = async (fastify: FastifyInstance) => {
 
         const partyGroups = buildCarnivalPartyGroupList(playerId);
 
+        // Build records from DB
+        const eventId = body.event_id
+        const dbRecords = getPlayerCarnivalEventRecordsSync(playerId, eventId)
+        const records = dbRecords.map(r => ({
+            folder_id: r.folderId,
+            best_score: r.bestScore != null ? Math.min(r.bestScore, 65535) : null,
+            previous_score: r.previousScore != null ? Math.min(r.previousScore, 65535) : null,
+            previous_character_ids: r.previousCharacterIds ?? [null, null, null],
+            previous_unison_character_ids: r.previousUnisonCharacterIds ?? [null, null, null],
+        }))
+        console.log(`[CARNIVAL] response records: ${JSON.stringify(records)}`)
+
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
-                "records": [],
+                "records": records,
                 "user_party_group_list": partyGroups
             }
         });

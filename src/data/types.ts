@@ -725,3 +725,22 @@ export interface MergedPlayerData {
     rushEventClearedFolderList?: Record<string, PlayerRushEventClearedFolders>,
     rushEventPlayedPartyList?: Record<string, PlayerRushEventPlayedParty[]>
 }
+
+export interface RawPlayerCarnivalEventRecord {
+    player_id: number
+    event_id: number
+    folder_id: number
+    best_score: number | null
+    previous_score: number | null
+    previous_character_ids: string | null
+    previous_unison_character_ids: string | null
+}
+
+export interface PlayerCarnivalEventRecord {
+    eventId: number
+    folderId: number
+    bestScore: number | null
+    previousScore: number | null
+    previousCharacterIds: (number | null)[]
+    previousUnisonCharacterIds: (number | null)[]
+}

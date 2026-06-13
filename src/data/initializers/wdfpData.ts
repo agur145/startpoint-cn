@@ -398,4 +398,16 @@ export default function init(
         PRIMARY KEY (player_id, event_id, round, battle_type),
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_carnival_event_records (
+        player_id INTEGER NOT NULL,
+        event_id INTEGER NOT NULL,
+        folder_id INTEGER NOT NULL,
+        best_score INTEGER,
+        previous_score INTEGER,
+        previous_character_ids TEXT,
+        previous_unison_character_ids TEXT,
+        PRIMARY KEY (player_id, event_id, folder_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
 }
