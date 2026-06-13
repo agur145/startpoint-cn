@@ -66,16 +66,36 @@ cdn_codes = set(cn_chars.keys())  # for validation
 
 def extract_up_chars(gacha_id):
     """Return list of UP character codes for a gacha banner"""
-    if gacha_id not in cn_fc:
-        return []
     chars = set()
-    for sections in cn_fc[gacha_id].values():
-        for row in sections:
-            for cell in row:
-                s = str(cell)
-                if s.isdigit() and len(s) == 6 and not s.startswith('0'):
-                    if s in cdn_codes:  # Validate against CharacterTable
-                        chars.add(s)
+    
+    # 1. Try from gacha_feature_content.json
+    if gacha_id in cn_fc:
+        for sections in cn_fc[gacha_id].values():
+            for row in sections:
+                for cell in row:
+                    s = str(cell)
+                    if s.isdigit() and len(s) == 6 and not s.startswith('0'):
+                        if s in cdn_codes:
+                            chars.add(s)
+    
+    # 2. Also read UP characters from gacha.json columns
+    # CN gacha has UP character IDs in various column positions
+    # Accept both 5-digit (old k_id) and 6-digit (business code) formats
+    if gacha_id in cn_gacha:
+        rows = cn_gacha[gacha_id]
+        row = rows[0] if isinstance(rows, list) and len(rows) > 0 and isinstance(rows[0], list) else rows
+        if isinstance(row, list):
+            up_cols = [21, 22, 23, 26, 27, 28]
+            for col in up_cols:
+                if col < len(row) and row[col] not in ('', '(None)', None):
+                    try:
+                        code = str(int(row[col]))
+                        if code.isdigit() and (len(code) == 5 or len(code) == 6):
+                            # Accept any 5-6 digit character ID (old k_id or business code)
+                            chars.add(code)
+                    except (ValueError, TypeError):
+                        pass
+    
     return list(chars)
 
 # 3. Build complete gacha.json
