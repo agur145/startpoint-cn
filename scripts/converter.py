@@ -40,7 +40,7 @@ def convert_main_ex_quests(obj):
                         "name": "", #chapter[1],
                         "clearRewardId": int(chapter[3]),
                         "sPlusRewardId": 1,
-                        "scoreRewardGroup": int(chapter[70]),
+                        "scoreRewardGroupId": int(chapter[70]),
                         "bRankTime": floor(float(chapter[84]) * 1000),
                         "aRankTime": floor(float(chapter[85]) * 1000),
                         "sRankTime": floor(float(chapter[86]) * 1000),
@@ -72,7 +72,7 @@ def convert_boss_quests(obj):
                         "name": "", #chapter[2],
                         "clearRewardId": int(chapter[4]),
                         "sPlusRewardId": 1,
-                        "scoreRewardGroup": int(chapter[70]),
+                        "scoreRewardGroupId": int(chapter[70]),
                         "bRankTime": floor(float(chapter[84]) * 1000),
                         "aRankTime": floor(float(chapter[85]) * 1000),
                         "sRankTime": floor(float(chapter[86]) * 1000),
@@ -88,6 +88,7 @@ def convert_world_story_event_quest(obj):
     converted = {}
     for _, chapter_stages in obj.items():
         for _, chapter in chapter_stages.items():
+            chapter = chapter[0]  # extract inner array
             # determine whether the quest is a story or not
             if chapter[85] == "":
                 # is story
@@ -110,7 +111,7 @@ def convert_world_story_event_quest(obj):
                     "poolExpReward": int(chapter[97]),
                 }
                 if chapter[71] != "(None)":
-                    converted_chapter["scoreRewardGroup"] = int(chapter[71])
+                    converted_chapter["scoreRewardGroupId"] = int(chapter[71])
                 if chapter[119] != "(None)":
                     converted_chapter["fixedParty"] = int(chapter[119])
                 converted[chapter[0]] = converted_chapter
@@ -121,6 +122,7 @@ def convert_world_story_event_boss_battle_quest(obj):
     converted = {}
     for _, chapter_stages in obj.items():
         for _, chapter in chapter_stages.items():
+            chapter = chapter[0]  # extract inner array
             converted_chapter = {
                 "name": "", #chapter[2],
                 "clearRewardId": int(chapter[4]),
@@ -135,7 +137,7 @@ def convert_world_story_event_boss_battle_quest(obj):
                 "poolExpReward": int(chapter[97])
             }
             if chapter[70] != "(None)":
-                converted_chapter["scoreRewardGroup"] = int(chapter[70])
+                converted_chapter["scoreRewardGroupId"] = int(chapter[70])
             converted[chapter[0]] = converted_chapter
 
     return converted
@@ -144,8 +146,9 @@ def convert_advent_quest(obj):
     converted = {}
     for _, chapter_stages in obj.items():
         for _, chapter in chapter_stages.items():
+            chapter = chapter[0]  # extract inner array
             # determine whether the quest is a story or not
-            if chapter[88] == "":
+            if chapter[88] == "" or chapter[88] == "(None)":
                 # is story
                 converted[chapter[0]] = {
                     "name": "", #chapter[1],
@@ -156,7 +159,7 @@ def convert_advent_quest(obj):
                     "name": "", #chapter[2],
                     "clearRewardId": int(chapter[4]),
                     "sPlusRewardId": 1,
-                    "scoreRewardGroup": int(chapter[76]),
+                    "scoreRewardGroupId": int(chapter[76]),
                     "bRankTime": floor(float(chapter[88]) * 1000),
                     "aRankTime": floor(float(chapter[89]) * 1000),
                     "sRankTime": floor(float(chapter[90]) * 1000),
@@ -173,10 +176,11 @@ def convert_daily_exp_mana_event_quest(obj):
     converted = {}
     for _, chapter_stages in obj.items():
         for _, chapter in chapter_stages.items():
+            chapter = chapter[0]  # extract inner array
             converted[chapter[0]] = {
                 "name": "", #chapter[2],
                 "clearRewardId": int(chapter[4]),
-                "scoreRewardGroup": int(chapter[66]),
+                "scoreRewardGroupId": int(chapter[66]),
                 "bRankTime": 0,
                 "aRankTime": 0,
                 "sRankTime": 0,
@@ -193,10 +197,11 @@ def convert_daily_week_event_quest(obj):
     converted = {}
     for _, chapter_stages in obj.items():
         for _, chapter in chapter_stages.items():
+            chapter = chapter[0]  # extract inner array
             converted[chapter[0]] = {
                 "name": "", #chapter[2],
                 "clearRewardId": int(chapter[3]),
-                "scoreRewardGroup": int(chapter[65]),
+                "scoreRewardGroupId": int(chapter[65]),
                 "bRankTime": 0,
                 "aRankTime": 0,
                 "sRankTime": 0,
@@ -213,10 +218,11 @@ def convert_challenge_dungeon_event_quest(obj):
     converted = {}
     for _, quests in obj.items():
         for _, quest in quests.items():
+            quest = quest[0]  # extract inner array
             converted[quest[0]] = {
                 "name": "",
                 "clearRewardId": int(quest[4]),
-                "scoreRewardGroup": int(quest[71]),
+                "scoreRewardGroupId": int(quest[71]),
                 "sPlusRewardId": 1,
                 "bRankTime": floor(float(quest[85]) * 1000),
                 "aRankTime": floor(float(quest[86]) * 1000),
@@ -233,6 +239,7 @@ def convert_story_event_single_quest(obj):
     converted = {}
     for _, quests in obj.items():
         for _, quest in quests.items():
+            quest = quest[0]  # extract inner array
             if quest[86] == "":
                 # is story
                 converted_quest = {
@@ -247,7 +254,7 @@ def convert_story_event_single_quest(obj):
                 converted[quest[0]] = {
                     "name": "",
                     "clearRewardId": int(quest[4]),
-                    "scoreRewardGroup": int(quest[72]),
+                    "scoreRewardGroupId": int(quest[72]),
                     "sPlusRewardId": 1,
                     "bRankTime": floor(float(quest[86]) * 1000),
                     "aRankTime": floor(float(quest[87]) * 1000),
@@ -264,6 +271,7 @@ def convert_ranking_event_single_quest(obj):
     converted = {}
     for _, quests in obj.items():
         for _, quest in quests.items():
+            quest = quest[0]  # extract inner array
             converted[quest[0]] = {
                 "name": "",
                 "bRankTime": 0,
@@ -281,9 +289,10 @@ def convert_solo_time_attack_event_quest(obj):
     converted = {}
     for _, quests in obj.items():
         for _, quest in quests.items():
+            quest = quest[0]  # extract inner array
             converted[quest[0]] = {
                 "name": "",
-                "scoreRewardGroup": int(quest[71]),
+                "scoreRewardGroupId": int(quest[71]),
                 "sPlusRewardId": 1,
                 "bRankTime": floor(float(quest[51]) * 1000),
                 "aRankTime": floor(float(quest[52]) * 1000),
@@ -300,9 +309,10 @@ def convert_tower_dungeon_event_quest(obj):
     converted = {}
     for _, quests in obj.items():
         for _, quest in quests.items():
+            quest = quest[0]  # extract inner array
             converted[quest[0]] = {
                 "name": "",
-                "scoreRewardGroup": int(quest[69]),
+                "scoreRewardGroupId": int(quest[69]),
                 "bRankTime": 0,
                 "aRankTime": 0,
                 "sRankTime": 0,
@@ -318,10 +328,11 @@ def convert_expert_single_event_quest(obj):
     converted = {}
     for _, quests in obj.items():
         for _, quest in quests.items():
+            quest = quest[0]  # extract inner array
             converted[quest[0]] = {
                 "name": "",
                 "clearRewardId": int(quest[6]),
-                "scoreRewardGroup": int(quest[73]),
+                "scoreRewardGroupId": int(quest[73]),
                 "sPlusRewardId": 1,
                 "bRankTime": floor(float(quest[87]) * 1000),
                 "aRankTime": floor(float(quest[88]) * 1000),
@@ -338,6 +349,7 @@ def convert_carnival_event_quest(obj):
     converted = {}
     for _, quests in obj.items():
         for _, quest in quests.items():
+            quest = quest[0]  # extract inner array
             converted[quest[0]] = {
                 "name": "",
                 "clearRewardId": int(quest[6]),
@@ -356,18 +368,20 @@ def convert_raid_event_quest(obj):
     converted = {}
     for _, quests in obj.items():
         for _, quest in quests.items():
+            quest = quest[0]  # extract inner array
+            # Raid quests use first_time_clear_reward_id instead of score rewards
+            clear_reward = quest[6] if len(quest) > 6 and quest[6] != '' else '1'
             converted[quest[0]] = {
                 "name": "",
-                "clearRewardId": int(quest[5]),
-                "scoreRewardGroup": int(quest[68]),
+                "clearRewardId": int(clear_reward),
                 "bRankTime": 0,
                 "aRankTime": 0,
                 "sRankTime": 0,
                 "sPlusRankTime": 0,
-                "rankPointReward": int(quest[81]),
-                "characterExpReward": int(quest[82]),
-                "manaReward": int(quest[83]),
-                "poolExpReward": int(quest[84])
+                "rankPointReward": 0,
+                "characterExpReward": 0,
+                "manaReward": 0,
+                "poolExpReward": 0
             }
     return converted 
 
@@ -376,6 +390,7 @@ def convert_rush_event_quest(obj):
     for rush_event_id_str, quests in obj.items():
         rush_event_id = int(rush_event_id_str)
         for _, quest in quests.items():
+            quest = quest[0]  # extract inner array
             converted[quest[0]] = {
                 "name": "",
                 "bRankTime": 0,
@@ -415,10 +430,10 @@ def convert_score_attack_event_quest(obj):
                             "aRankTime": floor(float(quest[86]) * 1000),
                             "sRankTime": floor(float(quest[87]) * 1000),
                             "sPlusRankTime": floor(float(quest[88]) * 1000),
-                            "rankPointReward": int(quest[92]) if len(quest) > 92 and quest[92] != '' else 0,
-                            "characterExpReward": int(quest[93]) if len(quest) > 93 and quest[93] != '' else 0,
-                            "manaReward": int(quest[94]) if len(quest) > 94 and quest[94] != '' else 0,
-                            "poolExpReward": int(quest[95]) if len(quest) > 95 and quest[95] != '' else 0
+                            "rankPointReward": int(float(quest[92])) if len(quest) > 92 and quest[92] != '' else 0,
+                            "characterExpReward": int(float(quest[93])) if len(quest) > 93 and quest[93] != '' else 0,
+                            "manaReward": int(float(quest[94])) if len(quest) > 94 and quest[94] != '' else 0,
+                            "poolExpReward": int(float(quest[95])) if len(quest) > 95 and quest[95] != '' else 0
                         }
     return converted 
 
@@ -937,6 +952,72 @@ def convert_star_grain_shop(obj):
 
     return converted
 
+def convert_equipment_enhancement_shop(obj):
+    converted = {}
+    for item_id, item in obj.items():
+        # value is [[cols]], extract the inner array
+        item = item[0]
+        costs = []
+        cost_offset = 14
+        for _ in range(4):
+            if item[cost_offset] != "(None)" and item[cost_offset] != "":
+                costs.append({
+                    "id": int(item[cost_offset]),
+                    "amount": int(item[cost_offset + 1])
+                })
+            cost_offset += 2
+
+        rewards = []
+        # EquipmentEnhancementKind.Normal (product_kind=0) has reward kinds at [32]-[49]
+        if item[4] == "0":
+            reward_offset = 32
+            for _ in range(6):
+                if item[reward_offset] != "(None)" and item[reward_offset] != "":
+                    reward = {
+                        "type": int(item[reward_offset])
+                    }
+                    if item[reward_offset + 1] != "":
+                        reward['id'] = int(item[reward_offset + 1])
+                    if item[reward_offset + 2] != "":
+                        reward['count'] = int(item[reward_offset + 2])
+                    rewards.append(reward)
+                reward_offset += 3
+
+        converted_item = {
+            "costs": costs,
+            "rewards": rewards,
+            "availableFrom": item[22],
+            "availableUntil": item[23] if item[23] != "(None)" else None,
+            "stock": int(item[25]) if item[25] != "" else -1,
+            "shopCategoryId": int(item[0]),
+            "groupId": int(item[2]),
+            "stage": int(item[3]),
+        }
+
+        # EquipmentEnhancement kind fields
+        if item[29] != "":
+            converted_item["equipmentId"] = int(item[29])
+        if item[30] != "":
+            converted_item["enhancementMaxLevel"] = int(item[30])
+        if item[31] != "":
+            converted_item["requireAwakeningLevel"] = int(item[31])
+        if item[26] != "" and item[26] != "(None)":
+            converted_item["maxFrequency"] = int(item[26])
+        if item[27] != "" and item[27] != "(None)":
+            converted_item["dailyStock"] = int(item[27])
+        if item[28] != "" and item[28] != "(None)":
+            converted_item["monthlyStock"] = int(item[28])
+
+        if item[11] != "(None)" and item[11] != "":
+            converted_item['userCost'] = {
+                "type": int(item[11]),
+                "amount": int(item[12])
+            }
+
+        converted[item_id] = converted_item
+
+    return converted
+
 def convert_encyclopedia(obj):
     converted = {}
     for _, entries in obj.items():
@@ -1025,6 +1106,7 @@ to_convert_files = {
     "boss_coin_shop": convert_boss_coin_shop,
     "event_item_shop": convert_event_item_shop,
     "treasure_shop": convert_treasure_shop,
+    "equipment_enhancement_shop": convert_equipment_enhancement_shop,
     "star_grain_shop": convert_star_grain_shop,
     "encyclopedia": convert_encyclopedia,
     "rush_event_quest_folder": convert_rush_event_quest_folder

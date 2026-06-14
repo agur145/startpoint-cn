@@ -2,7 +2,7 @@
     "1001": {
         "name": "",
         "clearRewardId": 1,
-        "scoreRewardGroup": 60000,
+        "scoreRewardGroupId": 60000,
         "bRankTime": 0,
         "aRankTime": 0,
         "sRankTime": 0,
@@ -15,7 +15,7 @@
     "1002": {
         "name": "",
         "clearRewardId": 1,
-        "scoreRewardGroup": 60001,
+        "scoreRewardGroupId": 60001,
         "bRankTime": 0,
         "aRankTime": 0,
         "sRankTime": 0,
@@ -28,7 +28,7 @@
     "1003": {
         "name": "",
         "clearRewardId": 1,
-        "scoreRewardGroup": 60002,
+        "scoreRewardGroupId": 60002,
         "bRankTime": 0,
         "aRankTime": 0,
         "sRankTime": 0,
@@ -41,7 +41,7 @@
     "1004": {
         "name": "",
         "clearRewardId": 1,
-        "scoreRewardGroup": 60003,
+        "scoreRewardGroupId": 60003,
         "bRankTime": 0,
         "aRankTime": 0,
         "sRankTime": 0,
@@ -54,7 +54,7 @@
     "1005": {
         "name": "",
         "clearRewardId": 1,
-        "scoreRewardGroup": 60004,
+        "scoreRewardGroupId": 60004,
         "bRankTime": 0,
         "aRankTime": 0,
         "sRankTime": 0,
@@ -67,7 +67,7 @@
     "1006": {
         "name": "",
         "clearRewardId": 1,
-        "scoreRewardGroup": 60005,
+        "scoreRewardGroupId": 60005,
         "bRankTime": 0,
         "aRankTime": 0,
         "sRankTime": 0,

@@ -2,15 +2,102 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { deserializeClientDate } from "../../data/utils";
-import { getAccountPlayers, getPlayerItemSync, getPlayerSync, getSession, updatePlayerItemSync, updatePlayerSync, getPlayerShopPurchasesMapSync, getPlayerShopPurchaseCountSync, addPlayerShopPurchaseSync } from "../../data/wdfpData";
+import { getAccountPlayers, getPlayerEquipmentSync, getPlayerItemSync, getPlayerSync, getSession, playerOwnsEquipmentSync, updatePlayerEquipmentSync, updatePlayerItemSync, updatePlayerSync, getPlayerShopPurchasesMapSync, getPlayerShopPurchaseCountSync, addPlayerShopPurchaseSync } from "../../data/wdfpData";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getBossCoinShopItemsSync, getEventShopItemsSync, getGenericShopItemsSync, getShopItemSync } from "../../lib/assets";
 import { CharacterReward, CharacterShopItemReward, CurrencyReward, CurrencyShopItemReward, EquipmentItemReward, EquipmentItemShopItemReward, Reward, RewardType, ShopItemRewardType, ShopItems, ShopItemUserCostType, ShopType } from "../../lib/types";
 import { generateDataHeaders, getServerDate, getServerTime } from "../../utils";
 import { givePlayerRewardsSync } from "../../lib/quest";
+import { clientSerializeEquipment } from "../../lib/equipment";
 import CDN_GENERAL_SHOP_WHITELIST from "../../../assets/cdn_general_shop_whitelist.json";
 
 const GENERAL_SHOP_CDN_KEYS: Set<number> = new Set(CDN_GENERAL_SHOP_WHITELIST);
+
+interface EnhancementGroup {
+    groupId: number
+    items: { id: string, item: ShopItem, stage: number }[]
+    equipmentId: number
+}
+
+function buildEnhancementSalesList(playerId: number, items: ShopItems): Object[] {
+    if (Object.keys(items).length === 0) return []
+
+    // Group items by groupId
+    const groups = new Map<number, EnhancementGroup>()
+    for (const [itemId, item] of Object.entries(items)) {
+        const gid = item.groupId ?? 0
+        if (!groups.has(gid)) {
+            groups.set(gid, {
+                groupId: gid,
+                items: [],
+                equipmentId: item.equipmentId ?? 0
+            })
+        }
+        groups.get(gid)!.items.push({ id: itemId, item, stage: item.stage ?? 0 })
+    }
+
+    const result: Object[] = []
+
+    for (const [, group] of groups) {
+        // Sort by stage ascending
+        group.items.sort((a, b) => a.stage - b.stage)
+
+        const equipmentId = group.equipmentId
+        const enhancementLevel = playerOwnsEquipmentSync(playerId, equipmentId)
+            ? (getPlayerEquipmentSync(playerId, equipmentId)?.enhancementLevel ?? 0)
+            : -1
+
+        // Find target product: first item with enhancementMaxLevel > current enhancementLevel
+        let targetItem: { id: string, item: ShopItem } | null = null
+        let stockQuantity = 0
+        let totalPurchaseNum = 0
+
+        if (enhancementLevel < 0) {
+            // Player doesn't have the equipment
+            targetItem = group.items[0]
+            stockQuantity = targetItem.item.enhancementMaxLevel ?? 0
+            totalPurchaseNum = 0
+        } else {
+            for (const entry of group.items) {
+                const maxLv = entry.item.enhancementMaxLevel ?? 0
+                if (maxLv > enhancementLevel) {
+                    targetItem = entry
+                    stockQuantity = maxLv - enhancementLevel
+                    break
+                }
+            }
+            // If no target found (fully maxed), use last item with stock_quantity=0
+            if (!targetItem) {
+                targetItem = group.items[group.items.length - 1]
+                stockQuantity = 0
+            }
+            totalPurchaseNum = enhancementLevel
+        }
+
+        // Group info: max level from last item in group
+        const maxLevel = group.items[group.items.length - 1].item.enhancementMaxLevel ?? 0
+        const multiStage = group.items.length > 1
+
+        result.push({
+            "shop_item_id": Number(targetItem.id),
+            "stock_quantity": stockQuantity,
+            "today_purchase_num": 0,
+            "this_month_purchase_num": null,  // null → MsgPack nil / Option.None
+            "total_purchase_num": totalPurchaseNum,
+            "discount_id": null,
+            "discount_rate": null,
+            "discounted_price": null,
+            "group_info": {
+                "group_total_stock_quantity": maxLevel - totalPurchaseNum,
+                "group_total_purchase_num": totalPurchaseNum,
+                "multi_stage": multiStage
+            },
+            "shop_type": ShopType.TREASURE_EQUIPMENT
+        })
+    }
+
+    return result
+}
 
 interface GetSalesListBody {
     equipment_enhancement_shop_category_ids: number[],
@@ -142,6 +229,61 @@ const routes = async (fastify: FastifyInstance) => {
             bondToken: bondTokens
         })
 
+        // Equipment enhancement shop: update equipment enhancement level
+        if (shopType === ShopType.TREASURE_EQUIPMENT) {
+            const equipmentId = shopItemData.equipmentId
+            const targetLevel = shopItemData.enhancementMaxLevel
+            if (equipmentId === undefined || targetLevel === undefined) return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Enhancement item missing equipment_id or target level."
+            })
+
+            const currentEquipment = getPlayerEquipmentSync(playerId, equipmentId)
+            if (currentEquipment === null) return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Player does not own the target equipment."
+            })
+
+            // Update to target enhancement level
+            const newLevel = Math.max(currentEquipment.enhancementLevel, targetLevel)
+            updatePlayerEquipmentSync(playerId, equipmentId, { enhancementLevel: newLevel })
+            currentEquipment.enhancementLevel = newLevel
+
+            // Record purchase
+            for (let i = 0; i < purchaseAmount; i++) {
+                addPlayerShopPurchaseSync(playerId, shopItemId)
+            }
+
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({
+                    viewer_id: viewerId
+                }),
+                "data": {
+                    "user_info": {
+                        "free_vmoney": freeVmoney,
+                        "vmoney": player.vmoney,
+                        "free_mana": freeMana,
+                        "paid_mana": player.paidMana,
+                        "stamina": player.stamina,
+                        "stamina_heal_time": getServerTime(player.staminaHealTime),
+                        "exp_pool": player.expPool,
+                        "exp_pooled_time": getServerTime(player.expPooledTime),
+                        "bond_token": bondTokens,
+                        "rank_point": player.rankPoint,
+                        "star_crumb": player.starCrumb,
+                        "boost_point": player.boostPoint,
+                        "boss_boost_point": player.bossBoostPoint
+                    },
+                    "joined_character_id_list": [],
+                    "character_list": [],
+                    "equipment_list": [clientSerializeEquipment(equipmentId, currentEquipment)],
+                    "item_list": itemList,
+                    "mail_arrived": false
+                }
+            })
+        }
+
         // build rewards array
         const rewards: Reward[] = []
         for (const reward of shopItemData.rewards) {
@@ -245,6 +387,7 @@ const routes = async (fastify: FastifyInstance) => {
         const viewerId = body.viewer_id
         const shopTypes = body.shop_types
         const bossCoinShopCategoryIds = body.boss_coin_shop_category_ids
+        const equipmentEnhancementCategoryIds = body.equipment_enhancement_shop_category_ids
         const eventList = body.event_list
         if (isNaN(viewerId) || shopTypes === undefined || bossCoinShopCategoryIds === undefined || eventList === undefined) return reply.status(400).send({
             "error": "Bad Request",
@@ -265,7 +408,7 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No players bound to account."
         })
 
-        console.log(`[shop:req] viewer=${viewerId} types=${JSON.stringify(shopTypes)} bossCats=${JSON.stringify(bossCoinShopCategoryIds)} events=${eventList.length} eventList=${JSON.stringify(eventList)}`)
+        console.log(`[shop:req] viewer=${viewerId} types=${JSON.stringify(shopTypes)} bossCats=${JSON.stringify(bossCoinShopCategoryIds)} equipCats=${JSON.stringify(equipmentEnhancementCategoryIds)} events=${eventList.length} eventList=${JSON.stringify(eventList)}`)
 
         let toParseShopItems: Record<number, ShopItems> = {}
 
@@ -301,6 +444,10 @@ const routes = async (fastify: FastifyInstance) => {
 
         let filteredCdnCount = 0
         const now: number = getServerDate().getTime()
+
+        // Collect enhancement shop items for group-level processing
+        const enhancementItems: ShopItems = {}
+
         for (const [shopType, items] of Object.entries(toParseShopItems)) {
             const shopTypeNum = Number(shopType)
             for (const [itemId, item] of Object.entries(items)) {
@@ -312,26 +459,43 @@ const routes = async (fastify: FastifyInstance) => {
                     continue
                 }
 
-                if ((now >= from.getTime()) && (until === null || (until.getTime() > now))) {
-                    const purchased = purchasedMap[Number(itemId)] ?? 0
-                    const stock = item.stock
-                    const stockQuantity = stock !== undefined ? Math.max(0, stock - purchased) : -1
-                    salesList.push({
-                        "shop_item_id": Number(itemId),
-                        "stock_quantity": stockQuantity,
-                        "today_purchase_num": purchased,
-                        "this_month_purchase_num": purchased,
-                        "total_purchase_num": purchased,
-                        "group_info": {
-                            "group_total_stock_quantity": stockQuantity,
-                            "group_total_purchase_num": purchased,
-                            "multi_stage": false
-                        },
-                        "shop_type": Number(shopType)
-                    })
+                // Filter equipment enhancement shop by category IDs
+                if (shopTypeNum === ShopType.TREASURE_EQUIPMENT && equipmentEnhancementCategoryIds?.length) {
+                    if (item.shopCategoryId === undefined || !equipmentEnhancementCategoryIds.includes(item.shopCategoryId)) {
+                        continue
+                    }
                 }
+
+                if (!((now >= from.getTime()) && (until === null || (until.getTime() > now)))) continue
+
+                if (shopTypeNum === ShopType.TREASURE_EQUIPMENT) {
+                    // Collect for group-level processing later
+                    enhancementItems[itemId] = item
+                    continue
+                }
+
+                const purchased = purchasedMap[Number(itemId)] ?? 0
+                const stock = item.stock
+                const stockQuantity = stock !== undefined ? Math.max(0, stock - purchased) : -1
+                salesList.push({
+                    "shop_item_id": Number(itemId),
+                    "stock_quantity": stockQuantity,
+                    "today_purchase_num": purchased,
+                    "this_month_purchase_num": purchased,
+                    "total_purchase_num": purchased,
+                    "group_info": {
+                        "group_total_stock_quantity": stockQuantity,
+                        "group_total_purchase_num": purchased,
+                        "multi_stage": false
+                    },
+                    "shop_type": Number(shopType)
+                })
             }
         }
+
+        // Process equipment enhancement items by group
+        const enhancementSales = buildEnhancementSalesList(playerId, enhancementItems)
+        salesList.push(...enhancementSales)
 
         if (filteredCdnCount > 0) {
             console.log(`[shop] Filtered ${filteredCdnCount} general shop items not in CDN master data`)

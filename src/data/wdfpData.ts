@@ -11,7 +11,7 @@ import { getAccountSync } from "./domains/account";
 // Session + DeviceBinding
 export { getSession, getViewerIdSync, getDeviceBindingSync, insertDeviceBindingSync, deleteDeviceBindingSync, getAccountSessionsOfType, insertSessionWithToken, insertSession, deleteSession, deleteAccountSessions, deleteAccountSessionsOfType, generateViewerIdSession } from "./domains/session";
 // DCPL + Player CRUD
-export { getPlayerSync, getAllPlayersSync, insertPlayerSync, insertMergedPlayerDataSync, insertDefaultPlayerSync, updatePlayerSync, replacePlayerDataSync, deletePlayerSync, collectPlayerDataPooledExpSync, collectPlayerPooledExpSync, dailyResetPlayerDataSync, dailyResetPlayerSync, getPlayerDailyChallengePointListSync, insertPlayerDailyChallengePointListSync, getDefaultPlayerPartyGroupsSync, getPlayerFromAccountIdSync, getAccountFromPlayerIdSync } from "./domains/player";
+export { getPlayerSync, getAllPlayersSync, insertPlayerSync, insertMergedPlayerDataSync, insertDefaultPlayerSync, updatePlayerSync, replacePlayerDataSync, deletePlayerSync, collectPlayerDataPooledExpSync, collectPlayerPooledExpSync, dailyResetPlayerDataSync, dailyResetPlayerSync, getPlayerDailyChallengePointListSync, insertPlayerDailyChallengePointListSync, updatePlayerDailyChallengePointSync, getDefaultPlayerPartyGroupsSync, getPlayerFromAccountIdSync, getAccountFromPlayerIdSync } from "./domains/player";
 import { insertDefaultPlayerSync, insertPlayerDailyChallengePointListSync } from "./domains/player";
 export { getPlayerTriggeredTutorialsSync, insertPlayerTriggeredTutorialSync, insertPlayerTriggeredTutorialsSync } from "./domains/tutorial";
 import { insertPlayerTriggeredTutorialsSync } from "./domains/tutorial";

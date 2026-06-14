@@ -3,6 +3,22 @@ import { Player, RawPlayer, MergedPlayerData, PartyCategory, PlayerPartyGroup, A
 import { getServerTime, getServerDate } from "../../utils";
 import { getDefaultPlayerData, deserializeBoolean, serializeBoolean } from "../utils";
 import { getAccountSync } from "./account";
+import dailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
+
+type DailyChallengePointLookup = Record<string, { maxPoint: number, isRecovery: boolean, name: string }>
+
+function getDailyChallengePointDefaults(): DailyChallengePointListEntry[] {
+    const lookup = dailyChallengePointLookup as DailyChallengePointLookup
+    const entries: DailyChallengePointListEntry[] = []
+    for (const [idStr, data] of Object.entries(lookup)) {
+        entries.push({
+            id: Number(idStr),
+            point: data.maxPoint,
+            campaignList: []
+        })
+    }
+    return entries
+}
 
 const expPoolMax = 100000;
 import { insertPlayerTriggeredTutorialsSync } from "./tutorial";
@@ -120,6 +136,20 @@ export function insertPlayerDailyChallengePointListSync(
             insertPlayerDailyChallengePointListEntrySync(playerId, entry)
         }
     })()
+}
+
+/**
+ * Updates a player's daily challenge point for a specific entry.
+ */
+export function updatePlayerDailyChallengePointSync(
+    playerId: number,
+    entryId: number,
+    point: number
+) {
+    getDb().prepare(`
+    UPDATE daily_challenge_point_list_entries SET point = ?
+    WHERE id = ? AND player_id = ?
+    `).run(point, entryId, playerId)
 }
 
 /**
@@ -496,8 +526,8 @@ export function insertDefaultPlayerSync(
 
     const playerId = insertPlayerSync(accountId, player)
 
-    // daily challenge point list — disabled (CN CDN campaign data incomplete)
-    // insertPlayerDailyChallengePointListSync(playerId, [])
+    // daily challenge point list — initialize all 282 CDN entries
+    insertPlayerDailyChallengePointListSync(playerId, getDailyChallengePointDefaults())
 
     // insert triggered tutorials — empty to trigger tutorial on new accounts
     insertPlayerTriggeredTutorialsSync(playerId, [])
@@ -1118,6 +1148,26 @@ export function dailyResetPlayerDataSync(
             bossBoostPoint: 3,
             boostPoint: 3
         })
+
+        // Reset daily challenge points — sync with CDN and rebuild if missing
+        const dcEntries = getPlayerDailyChallengePointListSync(playerId)
+        const defaults = getDailyChallengePointDefaults()
+        if (dcEntries.length === 0) {
+            insertPlayerDailyChallengePointListSync(playerId, defaults)
+        } else {
+            // Reset existing entries to CDN max
+            for (const entry of dcEntries) {
+                const cdn = (dailyChallengePointLookup as DailyChallengePointLookup)[String(entry.id)]
+                const maxPoint = cdn?.maxPoint ?? entry.point
+                updatePlayerDailyChallengePointSync(playerId, entry.id, maxPoint + entry.campaignList.reduce((s, c) => s + c.additionalPoint, 0))
+            }
+            // Add any new CDN entries not yet in player's list
+            const existingIds = new Set(dcEntries.map(e => e.id))
+            const missing = defaults.filter(e => !existingIds.has(e.id))
+            if (missing.length > 0) {
+                insertPlayerDailyChallengePointListSync(playerId, missing)
+            }
+        }
 
         // reset gacha "isDailyFirst" values.
         const gachaInfo = getPlayerGachaInfoListSync(playerId)

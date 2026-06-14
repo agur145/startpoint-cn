@@ -88,7 +88,8 @@ export enum ShopType {
     U6,
     BOSS_COIN,
     GENERAL,
-    STAR_GRAIN
+    STAR_GRAIN,
+    TREASURE_EQUIPMENT = 10  // CN: 追忆装备强化 / 特殊装备强化
 }
 
 export enum RushEventFolder {
@@ -176,7 +177,7 @@ export interface RawQuest {
     name: string,
     clearRewardId?: number,
     sPlusRewardId?: number,
-    scoreRewardGroup?: number,
+    scoreRewardGroupId?: number,
     bRankTime?: number,
     aRankTime?: number,
     sRankTime?: number,
@@ -451,6 +452,15 @@ export interface ShopItem {
     availableUntil: string | null,
     stock: number
     userCost?: ShopItemUserCost
+    shopCategoryId?: number
+    groupId?: number
+    stage?: number
+    equipmentId?: number
+    enhancementMaxLevel?: number
+    requireAwakeningLevel?: number
+    maxFrequency?: number
+    dailyStock?: number
+    monthlyStock?: number
 }
 
 export interface EventItemShopIdMapItem {

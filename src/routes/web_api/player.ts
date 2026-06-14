@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { deserializePlayerData, getClientSerializedData } from "../../data/utils";
-import { getAllPlayersSync, replacePlayerDataSync, getPlayerSync, updatePlayerSync, getPlayerCharactersSync, getPlayerItemsSync, getPlayerEquipmentListSync, insertPlayerCharacterSync, insertDefaultPlayerCharacterSync, updatePlayerItemSync, getDb } from "../../data/wdfpData";
+import { getAllPlayersSync, replacePlayerDataSync, getPlayerSync, updatePlayerSync, getPlayerCharactersSync, getPlayerItemsSync, getPlayerEquipmentListSync, insertPlayerCharacterSync, insertDefaultPlayerCharacterSync, updatePlayerItemSync, getPlayerDailyChallengePointListSync, insertPlayerDailyChallengePointListSync, updatePlayerDailyChallengePointSync, getDb } from "../../data/wdfpData";
+import dailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
 
 interface SaveQuery {
     id: string | undefined
@@ -223,6 +224,29 @@ const routes = async (fastify: FastifyInstance) => {
             const db = getDb()
             db.prepare(`DELETE FROM players_drawn_quests WHERE player_id = ?`).run(playerId)
             return reply.status(200).send({ ok: true })
+        } catch (e: any) { return reply.status(500).send({ error: e.message }) }
+    })
+    fastify.post("/:id/reset_challenge", async (request: FastifyRequest, reply: FastifyReply) => {
+        const playerId = Number((request.params as any).id)
+        if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid params" })
+        try {
+            const entries = getPlayerDailyChallengePointListSync(playerId)
+            const lookup = dailyChallengePointLookup as Record<string, { maxPoint: number }>
+            if (entries.length === 0) {
+                // No entries yet — create all 282 from CDN
+                const defaults = Object.entries(lookup).map(([idStr, data]) => ({
+                    id: Number(idStr),
+                    point: data.maxPoint,
+                    campaignList: [] as any[]
+                }))
+                insertPlayerDailyChallengePointListSync(playerId, defaults)
+                return reply.status(200).send({ ok: true, count: defaults.length, created: true })
+            }
+            for (const entry of entries) {
+                const maxPoint = lookup[String(entry.id)]?.maxPoint ?? entry.point
+                updatePlayerDailyChallengePointSync(playerId, entry.id, maxPoint)
+            }
+            return reply.status(200).send({ ok: true, count: entries.length })
         } catch (e: any) { return reply.status(500).send({ error: e.message }) }
     })
 }

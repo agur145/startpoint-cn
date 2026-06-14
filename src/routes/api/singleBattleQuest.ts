@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { deletePlayerRushEventPlayedPartyListSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, getPlayerSingleQuestProgressSync, getPlayerSync, getSession, insertPlayerQuestProgressSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerQuestProgressSync, updatePlayerRushEventSync, updatePlayerSync, upsertPlayerCarnivalEventRecordSync } from "../../data/wdfpData";
+import { deletePlayerRushEventPlayedPartyListSync, getPlayerItemSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, getPlayerSingleQuestProgressSync, getPlayerSync, getSession, insertPlayerQuestProgressSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerEquipmentSync, updatePlayerItemSync, updatePlayerQuestProgressSync, updatePlayerRushEventSync, updatePlayerSync, upsertPlayerCarnivalEventRecordSync } from "../../data/wdfpData";
 import { getQuestFromCategorySync, getRushEventFolderClearRewards } from "../../lib/assets";
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
@@ -10,6 +10,7 @@ import { RushEventBattleType, UserRushEventPlayedParty } from "../../data/types"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { readFileSync, existsSync } from "fs";
 import path from "path";
+import questEntryCosts from "../../../assets/quest_entry_costs.json";
 
 // Load carnival quest score data
 let carnivalScoreLookup: Record<string, { difficulty_score: number, time_limit_ms: number, folder_id: number, event_id: number }> = {}
@@ -96,7 +97,8 @@ export interface ActiveQuest {
     isMulti: boolean,
     roomNumber?: string,
     matePlayerIds?: number[],
-    mateComIds?: number[]
+    mateComIds?: number[],
+    entryItemId?: number
 }
 
 const continueVmoneyCost = 50;
@@ -429,6 +431,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "is_multi": "single",
                 "quest_name": "",
                 "item_list": {
+                    ...(activeQuestData.entryItemId ? { [activeQuestData.entryItemId]: getPlayerItemSync(playerId, activeQuestData.entryItemId) ?? 0 } : {}),
                     ...scoreRewardsResult.items,
                     ...(rushEventRewardsResult?.items ?? {})
                 },
@@ -518,6 +521,21 @@ const routes = async (fastify: FastifyInstance) => {
             })
         }
 
+        // Deduct entry cost (ticket/item)
+        const questKey = String(questId)
+        const entryCost = (questEntryCosts as Record<string, {itemId: number, itemCount: number, stamina: number}>)[questKey]
+        console.log(`[BATTLE] start entry: questId=${questId} questKey=${questKey} entryCost=${JSON.stringify(entryCost)}`)
+        if (entryCost && entryCost.itemId > 0) {
+            const playerItemCount = getPlayerItemSync(playerId, entryCost.itemId) ?? 0
+            console.log(`[BATTLE] start deduct: itemId=${entryCost.itemId} playerHas=${playerItemCount} need=${entryCost.itemCount}`)
+            if (playerItemCount < entryCost.itemCount) {
+                return reply.status(400).send({
+                    "error": "Bad Request",
+                    "message": `Not enough entry items (need ${entryCost.itemCount} of ${entryCost.itemId}, have ${playerItemCount}).`
+                })
+            }
+            updatePlayerItemSync(playerId, entryCost.itemId, playerItemCount - entryCost.itemCount)
+        }
 
         // add to active quests table
         delete activeQuests[playerId]
@@ -527,7 +545,8 @@ const routes = async (fastify: FastifyInstance) => {
             useBoostPoint: useBoostPoint,
             useBossBoostPoint: useBossBoostPoint,
             isAutoStartMode: isAutoStartMode,
-            isMulti: false
+            isMulti: false,
+            entryItemId: entryCost?.itemId
         }
 
         // update player last party slot

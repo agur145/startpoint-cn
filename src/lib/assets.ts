@@ -38,6 +38,7 @@ import eventItemShopIdMap from "../../assets/event_item_shop_id_map.json";
 import generalShopItems from "../../assets/general_shop.json";
 import starGrainShopItems from "../../assets/star_grain_shop.json";
 import treasureShopItems from "../../assets/treasure_shop.json";
+import equipmentEnhancementShopItems from "../../assets/equipment_enhancement_shop.json";
 import rushEventQuestFolders from "../../assets/rush_event_quest_folder.json"
 import { AssetCharacter, BattleQuest, BossCoinShopItems, BoxGacha, ClearRewards, EventItemShopIdMapItem, EventShopItems, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, Gachas, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopItem, ShopItems, ShopType, StoryQuest } from "./types";
 
@@ -101,8 +102,8 @@ function getQuestSync(
         name: quest.name,
         clearReward: quest.clearRewardId === undefined ? undefined : getClearRewardSync(quest.clearRewardId),
         sPlusReward: quest.sPlusRewardId === undefined ? undefined : getClearRewardSync(quest.sPlusRewardId),
-        scoreRewardGroupId: quest.scoreRewardGroup ?? undefined,
-        scoreRewardGroup: quest.scoreRewardGroup != null ? getScoreRewardGroup(quest.scoreRewardGroup) : undefined,
+            scoreRewardGroupId: quest.scoreRewardGroupId ?? undefined,
+            scoreRewardGroup: quest.scoreRewardGroupId != null ? getScoreRewardGroup(quest.scoreRewardGroupId) : undefined,
         bRankTime: quest.bRankTime ?? 0,
         aRankTime: quest.aRankTime ?? 0,
         sRankTime: quest.sRankTime ?? 0,
@@ -442,6 +443,8 @@ export function getGenericShopItemsSync(
     switch (shopType) {
         case ShopType.TREASURE:
             return treasureShopItems as ShopItems
+        case ShopType.TREASURE_EQUIPMENT:
+            return equipmentEnhancementShopItems as ShopItems
         case ShopType.GENERAL:
             return generalShopItems as ShopItems
         case ShopType.STAR_GRAIN:
@@ -493,6 +496,8 @@ export function getShopItemSync(
     switch(shopType) {
         case ShopType.TREASURE:
             return (treasureShopItems as ShopItems)[String(itemId)] ?? null
+        case ShopType.TREASURE_EQUIPMENT:
+            return (equipmentEnhancementShopItems as ShopItems)[String(itemId)] ?? null
         case ShopType.GENERAL:
             return (generalShopItems as ShopItems)[String(itemId)] ?? null
         case ShopType.STAR_GRAIN:

@@ -152,6 +152,9 @@
                         上传 JSON
                     </button>
                 </form>
+                <button onclick="resetChallenge()" class="text-sm border border-primary text-primary h-[40px] px-[24px] rounded-full flex items-center justify-center hover:bg-primary hover:text-on-primary transition-colors">
+                    恢复挑战次数
+                </button>
             </section>
         </article>
     </div>
@@ -226,6 +229,13 @@
         if (!confirm('删除全部抽选关卡?')) return;
         const r = await fetch('/api/player/' + PID + '/drawn_quest', { method: 'DELETE' });
         if (r.ok) location.reload();
+    }
+
+    async function resetChallenge() {
+        if (!confirm('将所有每日挑战次数恢复至 CDN 默认值？')) return;
+        const r = await fetch('/api/player/' + PID + '/reset_challenge', { method: 'POST' });
+        if (r.ok) { alert('已恢复'); location.reload(); }
+        else { alert('恢复失败'); }
     }
     </script>
 </body>
