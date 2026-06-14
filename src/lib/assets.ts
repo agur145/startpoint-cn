@@ -480,7 +480,17 @@ export function getEventShopItemsSync(
     const typeSection = (eventItemShopItems as EventShopItems)[String(eventType)]
     if (typeSection === undefined) return null;
 
-    return typeSection[String(eventId)] ?? null
+    // Try exact event ID first
+    let result = typeSection[String(eventId)] ?? null
+    if (result !== null) return result;
+
+    // Fallback: for rush event reruns (700011-700017), try primary event (ID - 10)
+    const eventIdNum = Number(eventId)
+    if (eventIdNum >= 700010 && eventIdNum <= 700019) {
+        return typeSection[String(eventIdNum - 10)] ?? null
+    }
+
+    return null
 }
 
 /**
@@ -540,7 +550,20 @@ export function getRushEventFolderClearRewards(
     folderId: number
 ): Reward[] | null {
     const folders = (rushEventQuestFolders as RushEventFolders)[rushEventId]
-    if (folders === undefined) return null;
+    if (folders !== undefined) {
+        const rewards = folders[folderId]
+        if (rewards !== undefined && Array.isArray(rewards) && rewards.length > 0) {
+            return rewards
+        }
+    }
 
-    return folders[folderId] ?? null
+    // Fallback: for rush event reruns (700011-700017), try primary event (ID - 10)
+    if (rushEventId >= 700010 && rushEventId <= 700019) {
+        const primaryFolders = (rushEventQuestFolders as RushEventFolders)[rushEventId - 10]
+        if (primaryFolders !== undefined) {
+            return primaryFolders[folderId] ?? null
+        }
+    }
+
+    return null
 }

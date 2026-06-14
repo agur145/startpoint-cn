@@ -715,19 +715,30 @@ const routes = async (fastify: FastifyInstance) => {
                             endlessBattleMaxRoundCharacterEvolutionImgLvls: evolutionImgLevels
                         })
                     }
-                } else if (rushEventBattleType === RushEventBattleType.FOLDER && (rushEventRound >= (rushEventFolderMaxRounds[rushEventFolderId] ?? 0))) {
-                    insertPlayerRushEventClearedFolderSync(playerId, rushEventId, rushEventFolderId)
-                    updatePlayerRushEventSync(playerId, { eventId: rushEventId, activeRushBattleFolderId: null })
-                    deletePlayerRushEventPlayedPartyListSync(playerId, rushEventId, rushEventBattleType)
-                }
 
-                insertPlayerRushEventPlayedPartySync(playerId, rushEventId, {
-                    characterIds, unisonCharacterIds,
-                    equipmentIds: bodyPartyStatistics.equipments.map(val => val?.id ?? null),
-                    abilitySoulIds: bodyPartyStatistics.ability_soul_ids,
-                    evolutionImgLevels, unisonEvolutionImgLevels,
-                    battleType: rushEventBattleType, round
-                })
+                    insertPlayerRushEventPlayedPartySync(playerId, rushEventId, {
+                        characterIds, unisonCharacterIds,
+                        equipmentIds: bodyPartyStatistics.equipments.map(val => val?.id ?? null),
+                        abilitySoulIds: bodyPartyStatistics.ability_soul_ids,
+                        evolutionImgLevels, unisonEvolutionImgLevels,
+                        battleType: rushEventBattleType, round
+                    })
+                } else if (rushEventBattleType === RushEventBattleType.FOLDER) {
+                    const isFolderFinal = rushEventRound >= (rushEventFolderMaxRounds[rushEventFolderId] ?? 0)
+                    if (isFolderFinal) {
+                        insertPlayerRushEventClearedFolderSync(playerId, rushEventId, rushEventFolderId)
+                        updatePlayerRushEventSync(playerId, { eventId: rushEventId, activeRushBattleFolderId: null })
+                        deletePlayerRushEventPlayedPartyListSync(playerId, rushEventId, rushEventBattleType)
+                    } else {
+                        insertPlayerRushEventPlayedPartySync(playerId, rushEventId, {
+                            characterIds, unisonCharacterIds,
+                            equipmentIds: bodyPartyStatistics.equipments.map(val => val?.id ?? null),
+                            abilitySoulIds: bodyPartyStatistics.ability_soul_ids,
+                            evolutionImgLevels, unisonEvolutionImgLevels,
+                            battleType: rushEventBattleType, round
+                        })
+                    }
+                }
 
                 const serializedPlayedParties = getSerializedPlayerRushEventPlayedPartiesSync(playerId, rushEventId)
                 rushEventData = {
@@ -737,7 +748,7 @@ const routes = async (fastify: FastifyInstance) => {
                     "is_out_of_period": false
                 }
 
-                if (rushEventRound >= (rushEventFolderMaxRounds[rushEventFolderId] ?? 0)) {
+                if (rushEventBattleType === RushEventBattleType.FOLDER && rushEventRound >= (rushEventFolderMaxRounds[rushEventFolderId] ?? 0)) {
                     const rewards = getRushEventFolderClearRewards(rushEventId, rushEventFolderId) ?? []
                     rushEventRewardsResult = givePlayerRewardsSync(playerId, rewards)
                     rushEventData.rush_battle_reward_list = rewards.map(reward => {

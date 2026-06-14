@@ -337,6 +337,7 @@ const routes = async (fastify: FastifyInstance) => {
             const rushEventId = questData.rushEventId
             const rushEventFolderId = questData.rushEventFolderId
             const rushEventRound = questData.rushEventRound
+            console.log(`[RUSH] finish: playerId=${playerId} eventId=${rushEventId} folderId=${rushEventFolderId} round=${rushEventRound} clearTime=${clearTime}`)
 
             if (rushEventFolderId !== undefined && rushEventRound !== undefined && rushEventId !== undefined) {
                 // update rush event data
@@ -374,6 +375,7 @@ const routes = async (fastify: FastifyInstance) => {
 
                     const isNewRecord = (playerNextRound >= playerMaxRound && playerBestClearTime >= clearTime) || (playerNextRound > playerMaxRound)
                     if (isNewRecord) {
+                        console.log(`[RUSH] finish: ENDLESS NEW RECORD! round=${playerNextRound} time=${clearTime}`)
                         updatePlayerRushEventSync(playerId, {
                             eventId: rushEventId,
                             endlessBattleMaxRound: playerNextRound,
@@ -388,29 +390,33 @@ const routes = async (fastify: FastifyInstance) => {
                         newBestElapsedTimeMs = playerBestClearTime < Number.MAX_SAFE_INTEGER ? playerBestClearTime : null
                     }
                     newEndlessNextRound = playerNextRound + 1
-                } else if (rushEventBattleType === RushEventBattleType.FOLDER && (rushEventRound >= (rushEventFolderMaxRounds[rushEventFolderId] ?? 0))) {
-                    // mark folder as complete since this is the final round
-                    insertPlayerRushEventClearedFolderSync(playerId, rushEventId, rushEventFolderId)
-                    // update the active folder value
-                    updatePlayerRushEventSync(playerId, {
-                        eventId: rushEventId,
-                        activeRushBattleFolderId: null
-                    })
-                    // delete played parties
-                    deletePlayerRushEventPlayedPartyListSync(playerId, rushEventId, rushEventBattleType)
-                }
 
-                // insert played party
-                insertPlayerRushEventPlayedPartySync(playerId, rushEventId, {
-                    characterIds: characterIds,
-                    unisonCharacterIds: unisonCharacterIds,
-                    equipmentIds: bodyPartyStatistics.equipments.map(val => val?.id ?? null),
-                    abilitySoulIds: bodyPartyStatistics.ability_soul_ids,
-                    evolutionImgLevels: evolutionImgLevels,
-                    unisonEvolutionImgLevels: unisonEvolutionImgLevels,
-                    battleType: rushEventBattleType,
-                    round: round
-                })
+                    // always record played party for endless
+                    insertPlayerRushEventPlayedPartySync(playerId, rushEventId, {
+                        characterIds, unisonCharacterIds,
+                        equipmentIds: bodyPartyStatistics.equipments.map(val => val?.id ?? null),
+                        abilitySoulIds: bodyPartyStatistics.ability_soul_ids,
+                        evolutionImgLevels, unisonEvolutionImgLevels,
+                        battleType: rushEventBattleType, round
+                    })
+                } else if (rushEventBattleType === RushEventBattleType.FOLDER) {
+                    const isFolderFinal = rushEventRound >= (rushEventFolderMaxRounds[rushEventFolderId] ?? 0)
+                    if (isFolderFinal) {
+                        // mark folder as complete
+                        insertPlayerRushEventClearedFolderSync(playerId, rushEventId, rushEventFolderId)
+                        updatePlayerRushEventSync(playerId, { eventId: rushEventId, activeRushBattleFolderId: null })
+                        deletePlayerRushEventPlayedPartyListSync(playerId, rushEventId, rushEventBattleType)
+                    } else {
+                        // record played party for non-final rounds
+                        insertPlayerRushEventPlayedPartySync(playerId, rushEventId, {
+                            characterIds, unisonCharacterIds,
+                            equipmentIds: bodyPartyStatistics.equipments.map(val => val?.id ?? null),
+                            abilitySoulIds: bodyPartyStatistics.ability_soul_ids,
+                            evolutionImgLevels, unisonEvolutionImgLevels,
+                            battleType: rushEventBattleType, round
+                        })
+                    }
+                }
 
                 // get serialized parties
                 const serializedPlayedParties = getSerializedPlayerRushEventPlayedPartiesSync(playerId, rushEventId)
@@ -430,9 +436,10 @@ const routes = async (fastify: FastifyInstance) => {
                     "old_best_elapsed_time_ms": isEndless ? oldBestElapsedTimeMs : null
                 }
 
-                // give rewards if allowed
-                if (rushEventRound >= (rushEventFolderMaxRounds[rushEventFolderId] ?? 0)) {
+                // give rewards if allowed (FOLDER only, not ENDLESS)
+                if (rushEventBattleType === RushEventBattleType.FOLDER && rushEventRound >= (rushEventFolderMaxRounds[rushEventFolderId] ?? 0)) {
                     const rewards = getRushEventFolderClearRewards(rushEventId, rushEventFolderId) ?? []
+                    console.log(`[RUSH] finish: folder clear! rewards=${rewards.length} items`)
                     rushEventRewardsResult = givePlayerRewardsSync(playerId, rewards)
 
                     rushEventData.rush_battle_reward_list = rewards.map(reward => {

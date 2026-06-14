@@ -10,6 +10,7 @@ import { FinishBody, insertActiveQuest } from "./singleBattleQuest";
 import { getPlayerRushEventEndlessBattleRankingSync, getRushEventEndlessBattleRankPlayedPartyListSync, getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
+import rushEventRankingRewards from "../../../assets/rush_event_ranking_reward.json";
 
 interface SummaryBody {
     event_id: number,
@@ -61,6 +62,18 @@ enum ResetQuestType {
     FOLDER,
     ENDLESS
 }
+
+interface RushEventRankingRewardEntry {
+    fromRank: number,
+    toRank: number,
+    kind: number,
+    kindId: number,
+    number: number
+}
+
+type RushEventRankingRewards = Record<string, Record<string, RushEventRankingRewardEntry[]>>
+
+const rankingRewards = rushEventRankingRewards as RushEventRankingRewards
 
 interface RushParty {
     ability_soul_ids: (number | null)[],
@@ -133,8 +146,9 @@ const routes = async (fastify: FastifyInstance) => {
             }),
             "data": {
                 "endless_battle_next_round": rushEventData.endlessBattleNextRound,
+                "endless_battle_max_round": rushEventData.endlessBattleMaxRound,
                 "active_rush_battle_folder_id": rushEventData.activeRushBattleFolderId,
-                "endless_battle_played_max_round": rushEventData.endlessBattleNextRound,
+                "endless_battle_played_max_round": rushEventData.endlessBattleMaxRound,
                 "cleared_folder_id_list": clearedFolderIdList,
                 "endless_battle_played_party_list": serializedPlayedParties.endlessParties,
                 "rush_battle_played_party_list": serializedPlayedParties.folderParties,
@@ -152,6 +166,7 @@ const routes = async (fastify: FastifyInstance) => {
         const viewerId = body.viewer_id
         const eventId = body.event_id
         const folderId = body.folder_id
+        console.log(`[RUSH] select_folder: viewer=${viewerId} eventId=${eventId} folderId=${folderId}`)
         if (isNaN(viewerId) || isNaN(eventId) || isNaN(folderId)) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
@@ -207,6 +222,7 @@ const routes = async (fastify: FastifyInstance) => {
         const viewerId = body.viewer_id
         const eventId = body.event_id
         const page = body.page ?? 0
+        console.log(`[RUSH] ranking: viewer=${viewerId} eventId=${eventId} page=${page}`)
         if (isNaN(viewerId) || isNaN(eventId)) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
@@ -241,7 +257,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "current_page": page + 1,
                 "page_max": rankings.pageMax,
                 "my_data": endlessRanking,
-                "ranking_list": rankings.list
+                "ranking_data": rankings.list
             }
         })
     })
@@ -396,6 +412,7 @@ const routes = async (fastify: FastifyInstance) => {
         const isAutoStartMode = body.is_auto_start_mode
         const partyId = body.party_id
         const questId = body.quest_id
+        console.log(`[RUSH] battle/start: viewer=${viewerId} questId=${questId} partyId=${partyId} autoStart=${isAutoStartMode}`)
         if (isNaN(viewerId) || isNaN(partyId) || isNaN(questId) || isAutoStartMode === undefined) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
@@ -457,6 +474,7 @@ const routes = async (fastify: FastifyInstance) => {
         const questType: ResetQuestType = body.quest_type
         const resetTargetId: number | undefined = body.reset_target_id
         const isResetAfterTargetRound: boolean | undefined = body.is_reset_after_target_round
+        console.log(`[RUSH] reset: viewer=${viewerId} eventId=${eventId} questType=${questType} resetTargetId=${resetTargetId} isResetAfterTarget=${isResetAfterTargetRound}`)
         if (isNaN(viewerId) || isNaN(eventId) || isNaN(questType)) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
@@ -515,17 +533,53 @@ const routes = async (fastify: FastifyInstance) => {
     fastify.post("/reward", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as { event_id: number, viewer_id: number, api_count: number };
         const viewerId = body.viewer_id;
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+        const eventId = body.event_id;
+        console.log(`[RUSH] reward: viewer=${viewerId} eventId=${eventId}`)
+        if (!viewerId || isNaN(viewerId) || isNaN(eventId)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         });
+
+        const viewerIdSession = await getSession(viewerId.toString())
+        if (!viewerIdSession) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid viewer id."
+        })
+
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        if (playerId === null) return reply.status(500).send({
+            "error": "Internal Server Error", "message": "No player bound to account."
+        })
+
+        // get player's rank
+        const myRanking = getPlayerRushEventEndlessBattleRankingSync(playerId, eventId)
+        const rankNumber = myRanking?.rank_number ?? null
+
+        // find matching reward tier
+        const rewards = rankingRewards[String(eventId)] ?? {}
+        let rewardList: RushEventRankingRewardEntry[] = []
+        if (rankNumber !== null && rankNumber > 0) {
+            for (const entries of Object.values(rewards)) {
+                for (const entry of entries) {
+                    if (rankNumber >= entry.fromRank && rankNumber <= entry.toRank) {
+                        rewardList.push(entry)
+                        break
+                    }
+                }
+            }
+        }
+
+        console.log(`[RUSH] reward: rank=${rankNumber} rewards=${rewardList.length}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
-                "rank_number": null,
+                "rank_number": rankNumber,
                 "ranking_reward": {
-                    "reward_list": [],
+                    "reward_list": rewardList.map(r => ({
+                        "kind": r.kind,
+                        "kind_id": r.kindId,
+                        "number": r.number
+                    })),
                     "status": 0
                 }
             }
@@ -536,17 +590,38 @@ const routes = async (fastify: FastifyInstance) => {
     fastify.post("/endless_battle", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as { event_id: number, viewer_id: number, api_count: number };
         const viewerId = body.viewer_id;
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+        const eventId = body.event_id;
+        console.log(`[RUSH] endless_battle: viewer=${viewerId} eventId=${eventId}`)
+        if (!viewerId || isNaN(viewerId) || isNaN(eventId)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         });
+
+        const viewerIdSession = await getSession(viewerId.toString())
+        if (!viewerIdSession) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid viewer id."
+        })
+
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        if (playerId === null) return reply.status(500).send({
+            "error": "Internal Server Error", "message": "No player bound to account."
+        })
+
+        const rushEventData = getPlayerRushEventSync(playerId, eventId)
+        const serializedPlayedParties = rushEventData !== null
+            ? getSerializedPlayerRushEventPlayedPartiesSync(playerId, eventId)
+            : { endlessParties: null, folderParties: null }
+        const maxRound = rushEventData?.endlessBattleMaxRound ?? null
+        const nextRound = rushEventData?.endlessBattleNextRound ?? 1
+
+        console.log(`[RUSH] endless_battle: maxRound=${maxRound} nextRound=${nextRound}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
-                "endless_battle_max_round": 10,
-                "endless_battle_next_round": 1,
-                "endless_battle_played_party_list": null
+                "endless_battle_max_round": maxRound,
+                "endless_battle_next_round": nextRound,
+                "endless_battle_played_party_list": serializedPlayedParties.endlessParties ?? null
             }
         });
     })

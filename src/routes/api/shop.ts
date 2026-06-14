@@ -1,7 +1,6 @@
 // Handles the insertion of mana into characters.
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { deserializeClientDate } from "../../data/utils";
 import { getAccountPlayers, getPlayerEquipmentSync, getPlayerItemSync, getPlayerSync, getSession, playerOwnsEquipmentSync, updatePlayerEquipmentSync, updatePlayerItemSync, updatePlayerSync, getPlayerShopPurchasesMapSync, getPlayerShopPurchaseCountSync, addPlayerShopPurchaseSync } from "../../data/wdfpData";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getBossCoinShopItemsSync, getEventShopItemsSync, getGenericShopItemsSync, getShopItemSync } from "../../lib/assets";
@@ -443,7 +442,6 @@ const routes = async (fastify: FastifyInstance) => {
         const purchasedMap = getPlayerShopPurchasesMapSync(playerId)
 
         let filteredCdnCount = 0
-        const now: number = getServerDate().getTime()
 
         // Collect enhancement shop items for group-level processing
         const enhancementItems: ShopItems = {}
@@ -451,8 +449,6 @@ const routes = async (fastify: FastifyInstance) => {
         for (const [shopType, items] of Object.entries(toParseShopItems)) {
             const shopTypeNum = Number(shopType)
             for (const [itemId, item] of Object.entries(items)) {
-                const from = deserializeClientDate(item.availableFrom)
-                const until = item.availableUntil === null ? null : deserializeClientDate(item.availableUntil)
 
                 if (shopTypeNum === ShopType.GENERAL && !GENERAL_SHOP_CDN_KEYS.has(Number(itemId))) {
                     filteredCdnCount++
@@ -466,7 +462,7 @@ const routes = async (fastify: FastifyInstance) => {
                     }
                 }
 
-                if (!((now >= from.getTime()) && (until === null || (until.getTime() > now)))) continue
+                // Skip date filtering on test server — client controls which shops to display
 
                 if (shopTypeNum === ShopType.TREASURE_EQUIPMENT) {
                     // Collect for group-level processing later
