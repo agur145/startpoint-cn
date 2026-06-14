@@ -265,14 +265,8 @@ const routes = async (fastify: FastifyInstance) => {
                         }
                     }
                     if (matched) {
-                        console.log(`[SCORE_ATTACK] borderReward matched: score=${body.score} tierScore=${matched.score} rewardItem=${matched.rewardItemId} coinItem=${matched.coinItemId}x${matched.coinCount}`)
-                        // Give reward item
-                        if (matched.rewardItemId > 0 && matched.rewardCount > 0) {
-                            givePlayerItemSync(playerId, matched.rewardItemId, matched.rewardCount)
-                            scoreRewardsResult.items[String(matched.rewardItemId)] = (scoreRewardsResult.items[String(matched.rewardItemId)] ?? 0) + matched.rewardCount
-                            scoreAttackRewardIds.push(matched.rewardItemId)
-                        }
-                        // Give coin item
+                        console.log(`[SCORE_ATTACK] borderReward matched: score=${body.score} tierScore=${matched.score} coinItem=${matched.coinItemId}x${matched.coinCount}`)
+                        // Give coin item only (rewardItemId=16001 does not exist in CDN)
                         if (matched.coinItemId > 0 && matched.coinCount > 0) {
                             givePlayerItemSync(playerId, matched.coinItemId, matched.coinCount)
                             scoreRewardsResult.items[String(matched.coinItemId)] = (scoreRewardsResult.items[String(matched.coinItemId)] ?? 0) + matched.coinCount

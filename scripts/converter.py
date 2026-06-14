@@ -148,27 +148,29 @@ def convert_advent_quest(obj):
         for _, chapter in chapter_stages.items():
             chapter = chapter[0]  # extract inner array
             # determine whether the quest is a story or not
-            if chapter[88] == "" or chapter[88] == "(None)":
+            if chapter[90] == "" or chapter[90] == "(None)":
                 # is story
                 converted[chapter[0]] = {
                     "name": "", #chapter[1],
                     "clearRewardId": int(chapter[4])
                 }
             else:
-                converted[chapter[0]] = {
+                converted_chapter = {
                     "name": "", #chapter[2],
                     "clearRewardId": int(chapter[4]),
                     "sPlusRewardId": 1,
-                    "scoreRewardGroupId": int(chapter[76]),
-                    "bRankTime": floor(float(chapter[88]) * 1000),
-                    "aRankTime": floor(float(chapter[89]) * 1000),
-                    "sRankTime": floor(float(chapter[90]) * 1000),
-                    "sPlusRankTime":  floor(float(chapter[91]) * 1000),
+                    "bRankTime": floor(float(chapter[90]) * 1000),
+                    "aRankTime": floor(float(chapter[91]) * 1000),
+                    "sRankTime": floor(float(chapter[92]) * 1000),
+                    "sPlusRankTime":  floor(float(chapter[93]) * 1000),
                     "rankPointReward": int(chapter[97]),
                     "characterExpReward": int(chapter[98]),
                     "manaReward": int(chapter[99]),
                     "poolExpReward": int(chapter[100])
                 }
+                if chapter[76] != "(None)" and chapter[76] != '':
+                    converted_chapter["scoreRewardGroupId"] = int(chapter[76])
+                converted[chapter[0]] = converted_chapter
 
     return converted
 

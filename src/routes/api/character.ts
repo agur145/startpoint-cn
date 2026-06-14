@@ -1,9 +1,9 @@
 // Handles the insertion of mana into characters.
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getAccountPlayers, getPlayerCharacterManaNodesSync, getPlayerCharacterSync, getPlayerCharactersManaNodesSync, getPlayerItemSync, getPlayerSync, getSession, givePlayerItemSync, hasPlayerUnlockedCharacterManaNodeSync, insertPlayerCharacterManaNodesSync, updatePlayerCharacterBondTokenSync, updatePlayerCharacterSync, updatePlayerItemSync, updatePlayerSync } from "../../data/wdfpData";
+import { getAccountPlayers, getPlayerCharacterManaNodesSync, getPlayerCharacterSync, getPlayerCharactersManaNodesSync, getPlayerItemSync, getPlayerSync, getSession, givePlayerItemSync, hasPlayerUnlockedCharacterManaNodeSync, insertPlayerCharacterBondTokenSync, insertPlayerCharacterManaNodesSync, updatePlayerCharacterBondTokenSync, updatePlayerCharacterSync, updatePlayerItemSync, updatePlayerSync } from "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
-import { getCharacterDataSync, getCharacterManaNodeSync, getCharacterManaNodesSync } from "../../lib/assets";
+import { getCharacterDataSync, getCharacterManaBoardCountSync, getCharacterManaNodeSync, getCharacterManaNodesSync } from "../../lib/assets";
 import { characterExpCaps } from "../../lib/character";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -106,6 +106,7 @@ const routes = async (fastify: FastifyInstance) => {
         const viewerId = body.viewer_id
         const characterId = body.character_id
         const manaBoardIndex = body.mana_board_index
+        console.log(`[MANA] receive_bond_token: viewer=${viewerId} char=${characterId} boardIdx=${manaBoardIndex}`)
         if (isNaN(viewerId) || isNaN(characterId) || isNaN(manaBoardIndex)) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
@@ -191,6 +192,7 @@ const routes = async (fastify: FastifyInstance) => {
         const viewerId = body.viewer_id
         const characterId = body.character_id
         const manaBoardIndex = body.mana_board_index
+        console.log(`[MANA] open_mana_board: viewer=${viewerId} char=${characterId} boardIdx=${manaBoardIndex}`)
         if (isNaN(viewerId) || isNaN(characterId) || isNaN(manaBoardIndex)) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
@@ -223,26 +225,45 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No character asset data found."
         })
 
-        // make sure that the mana board index is valid
-        if (!characterData.bondTokenList[manaBoardIndex - 1]) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": `Character does not have mana board with index ${manaBoardIndex}.`
-        })
+        // make sure that the mana board index is valid, auto-create missing bond tokens
+        if (!characterData.bondTokenList[manaBoardIndex - 1]) {
+            const boardCount = getCharacterManaBoardCountSync(characterId)
+            console.log(`[MANA] open_mana_board: auto-creating bond tokens, bondListLen=${characterData.bondTokenList.length} boardCount=${boardCount}`)
+            for (let i = characterData.bondTokenList.length + 1; i <= boardCount; i++) {
+                insertPlayerCharacterBondTokenSync(playerId, characterId, {
+                    manaBoardIndex: i,
+                    status: 0
+                })
+                characterData.bondTokenList.push({
+                    manaBoardIndex: i,
+                    status: 0
+                })
+            }
+        }
 
         // ensure that the mana board can be opened
         const requiredLevelExp = openManaBoardRequiredExp[characterAssetData.rarity]
-        if (requiredLevelExp !== undefined && requiredLevelExp > characterData.exp) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": `Character level is too low to unlock mana board.`
-        })
-        if (openManaBoardRequiredUncaps[characterAssetData.rarity] > characterData.overLimitStep) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": `Character is not uncapped enough to unlock mana board.`
-        })
-        if (1 > characterData.bondTokenList[manaBoardIndex - 2]?.status) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": `Must unlock all previous mana board nodes.`
-        })
+        if (requiredLevelExp !== undefined && requiredLevelExp > characterData.exp) {
+            console.log(`[MANA] open_mana_board FAIL: exp too low, need=${requiredLevelExp} have=${characterData.exp} rarity=${characterAssetData.rarity}`)
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": `Character level is too low to unlock mana board.`
+            })
+        }
+        if (openManaBoardRequiredUncaps[characterAssetData.rarity] > characterData.overLimitStep) {
+            console.log(`[MANA] open_mana_board FAIL: uncap too low, need=${openManaBoardRequiredUncaps[characterAssetData.rarity]} have=${characterData.overLimitStep} rarity=${characterAssetData.rarity}`)
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": `Character is not uncapped enough to unlock mana board.`
+            })
+        }
+        if (1 > characterData.bondTokenList[manaBoardIndex - 2]?.status) {
+            console.log(`[MANA] open_mana_board FAIL: prev node not unlocked, prevIdx=${manaBoardIndex - 2} prevStatus=${characterData.bondTokenList[manaBoardIndex - 2]?.status} bondList=${JSON.stringify(characterData.bondTokenList)}`)
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": `Must unlock all previous mana board nodes.`
+            })
+        }
 
         updatePlayerCharacterSync(playerId, characterId, {
             manaBoardIndex: manaBoardIndex
@@ -275,6 +296,7 @@ const routes = async (fastify: FastifyInstance) => {
         const viewerId = body.viewer_id
         const characterId = body.character_id
         const toUnlockNodeIds = body.mana_node_multiplied_id_list
+        console.log(`[MANA] learn_mana_node: viewer=${viewerId} char=${characterId} nodes=${JSON.stringify(toUnlockNodeIds)}`)
         if (!viewerId || isNaN(viewerId) || !characterId || isNaN(characterId) || !toUnlockNodeIds) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
@@ -416,6 +438,8 @@ const routes = async (fastify: FastifyInstance) => {
                 })
             }
         }
+
+        console.log(`[MANA] learn_mana_node done: bondGiven=${amityScrollReceivable && (indexUnlockedNodesCount + toUnlockNodeIds.length) === Object.keys(characterManaNodes).length} bondList=${JSON.stringify(bondTokenList)}`)
 
         // insert new mana nodes
         insertPlayerCharacterManaNodesSync(playerId, characterId, toUnlockNodeIds)

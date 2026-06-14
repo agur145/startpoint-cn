@@ -306,10 +306,10 @@ export function getCharacterDataSync(
 }
 
 /**
- * Gets all of a character's mana nodes of a certain level.
+ * Gets all mana node data for a character on a specific level.
  * 
  * @param characterId The ID of the character.
- * @param level The mana node level to get the nodes of.
+ * @param level The mana node level.
  * @returns A record containing ManaNode objects or null.
  */
 export function getCharacterManaNodesSync(
@@ -320,6 +320,17 @@ export function getCharacterManaNodesSync(
     if (!characterManaNodes) return null;
 
     return characterManaNodes[String(level)] || null
+}
+
+/**
+ * Gets the number of mana boards a character has in CDN data.
+ */
+export function getCharacterManaBoardCountSync(
+    characterId: string | number
+): number {
+    const characterManaNodes = (manaNodes as ManaNodes)[String(characterId)]
+    if (!characterManaNodes) return 0
+    return Object.keys(characterManaNodes).length
 }
 
 /**

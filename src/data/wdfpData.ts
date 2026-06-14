@@ -25,7 +25,7 @@ export { getPlayerEquipmentListSync, getPlayerEquipmentSync, playerOwnsEquipment
 import { insertPlayerEquipmentListSync } from "./domains/equipment";
 export { getPlayerPartyGroupListSync, insertPlayerPartyGroupListSync, updatePlayerPartySync, updatePlayerPartyGroupSync } from "./domains/party";
 import { insertPlayerPartyGroupListSync } from "./domains/party";
-export { playerOwnsCharacterSync, getPlayerCharacterSync, getPlayerCharactersSync, updatePlayerCharacterBondTokenSync, insertPlayerCharacterSync, insertDefaultPlayerCharacterSync, updatePlayerCharacterSync, getPlayerCharactersManaNodesSync, getPlayerCharacterManaNodesSync, hasPlayerUnlockedCharacterManaNodeSync, insertPlayerCharacterManaNodesSync, insertPlayerCharactersSync, insertPlayerCharactersManaNodesSync } from "./domains/character";
+export { playerOwnsCharacterSync, getPlayerCharacterSync, getPlayerCharactersSync, updatePlayerCharacterBondTokenSync, insertPlayerCharacterBondTokenSync, insertPlayerCharacterSync, insertDefaultPlayerCharacterSync, updatePlayerCharacterSync, getPlayerCharactersManaNodesSync, getPlayerCharacterManaNodesSync, hasPlayerUnlockedCharacterManaNodeSync, insertPlayerCharacterManaNodesSync, insertPlayerCharactersSync, insertPlayerCharactersManaNodesSync } from "./domains/character";
 import { insertPlayerCharactersSync, insertPlayerCharactersManaNodesSync } from "./domains/character";
 export { getPlayerQuestProgressSync, getPlayerSingleQuestProgressSync, insertPlayerQuestProgressSync, insertPlayerQuestProgressListSync, updatePlayerQuestProgressSync, getPlayerDrawnQuestsSync, insertPlayerDrawnQuestsSync } from "./domains/quest";
 import { insertPlayerDrawnQuestsSync, insertPlayerQuestProgressListSync } from "./domains/quest";

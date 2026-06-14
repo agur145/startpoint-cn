@@ -174,7 +174,7 @@ export function getPlayerCharactersSync(
  * @param characterId The ID of the character.
  * @param bondToken The bond token to insert.
  */
-function insertPlayerCharacterBondTokenSync(
+export function insertPlayerCharacterBondTokenSync(
     playerId: number,
     characterId: number | string,
     bondToken: PlayerCharacterBondToken
