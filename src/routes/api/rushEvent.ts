@@ -93,6 +93,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         const viewerId = body.viewer_id
         const eventId = body.event_id
+        console.log(`[RUSH] summary: viewer=${viewerId} eventId=${eventId}`)
         if (isNaN(viewerId) || isNaN(eventId)) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
@@ -123,6 +124,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         // get serialized parties
         const serializedPlayedParties = getSerializedPlayerRushEventPlayedPartiesSync(playerId, eventId)
+        console.log(`[RUSH] summary: folderParties=${Object.keys(serializedPlayedParties.folderParties ?? {}).length} endlessParties=${Object.keys(serializedPlayedParties.endlessParties ?? {}).length}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -340,18 +342,10 @@ const routes = async (fastify: FastifyInstance) => {
 
         // get parties
         let playerPartyGroups = getPlayerPartyGroupListSync(playerId, PartyCategory.EVENT)
-        // insert default parties if no parties already exist
+        console.log(`[RUSH] party: EVENT groups=${Object.keys(playerPartyGroups).length}`)
         if (0 >= Object.keys(playerPartyGroups).length) {
-            playerPartyGroups = getPlayerPartyGroupListSync(playerId, PartyCategory.NORMAL)
-
-            // convert party categories
-            for (const group of Object.values(playerPartyGroups)) {
-                for (const party of Object.values(group.list)) {
-                    party.category = PartyCategory.EVENT
-                }
-                group.category = PartyCategory.EVENT
-            }
-
+            console.log(`[RUSH] party: creating default EVENT parties`)
+            playerPartyGroups = getDefaultPlayerPartyGroupsSync(PartyCategory.EVENT)
             insertPlayerPartyGroupListSync(playerId, playerPartyGroups)
         }
 

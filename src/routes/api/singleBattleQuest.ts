@@ -106,7 +106,8 @@ export interface ActiveQuest {
     roomNumber?: string,
     matePlayerIds?: number[],
     mateComIds?: number[],
-    entryItemId?: number
+    entryItemId?: number,
+    eventId?: number
 }
 
 const continueVmoneyCost = 50;
@@ -145,6 +146,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         // get active quest data
         const activeQuestData = activeQuests[playerId]
+        console.log(`[FINISH] req: playerId=${playerId} questId=${body.quest_id} category=${body.category} activeExists=${activeQuestData !== undefined}`)
         if (activeQuestData === undefined) return reply.status(400).send({
             "error": "Bad Request",
             "message": "No active quest to finish."
@@ -152,6 +154,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         const questCategory = activeQuestData.category
         const questId = activeQuestData.questId
+        console.log(`[FINISH] active: category=${questCategory} questId=${questId}`)
         const questData = getQuestFromCategorySync(questCategory, questId) as BattleQuest | null
         if (questData === null || !('rankPointReward' in questData)) {
             console.log(`[BATTLE] finish failed: category=${questCategory} questId=${questId} found=${!!questData} hasRankReward=${questData ? ('rankPointReward' in questData) : 'N/A'}`)
@@ -442,6 +445,25 @@ const routes = async (fastify: FastifyInstance) => {
                     })
                 }
             }
+        }
+
+        // Record played party for RAID_EVENT
+        if (questCategory === QuestCategory.RAID_EVENT && activeQuestData.eventId) {
+            const eventId = activeQuestData.eventId
+            const characterIds = bodyPartyStatistics.characters.map(val => val?.id ?? null)
+            const unisonCharacterIds = bodyPartyStatistics.unison_characters.map(val => val?.id ?? null)
+            const evolutionImgLevels = getCharactersEvolutionImgLevels(playerId, characterIds)
+            const unisonEvolutionImgLevels = getCharactersEvolutionImgLevels(playerId, unisonCharacterIds)
+            insertPlayerRushEventPlayedPartySync(playerId, eventId, {
+                characterIds, unisonCharacterIds,
+                equipmentIds: bodyPartyStatistics.equipments.map(val => val?.id ?? null),
+                abilitySoulIds: bodyPartyStatistics.ability_soul_ids,
+                evolutionImgLevels,
+                unisonEvolutionImgLevels,
+                battleType: RushEventBattleType.FOLDER,
+                round: questId
+            })
+            console.log(`[RAID] recorded played party: eventId=${eventId} questId=${questId}`)
         }
 
         // handle carnival event score & records

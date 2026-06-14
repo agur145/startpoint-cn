@@ -522,7 +522,7 @@ export function insertPlayerRushEventPlayedPartySync(
     party: PlayerRushEventPlayedParty
 ) {
     getDb().prepare(`
-    INSERT INTO players_rush_events_played_parties
+    INSERT OR REPLACE INTO players_rush_events_played_parties
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         party.characterIds[0],

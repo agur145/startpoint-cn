@@ -439,6 +439,11 @@ const routes = async (fastify: FastifyInstance) => {
         // update each slot
         const characterOwnedMap: Record<number, boolean> = {}
         const equipmentOwnedMap: Record<number, boolean> = {}
+        const editCategories: number[] = []
+        for (const updateInfo of body.party_info_list) {
+            editCategories.push(updateInfo.party_category)
+        }
+        console.log(`[PARTY] edit: viewer=${viewerId} parties=${body.party_info_list.length} categories=${JSON.stringify(editCategories)} mainPartyId=${body.main_party_id}`)
 
         const mapOwnedCharacters = (characterId: number | null): number | null => {
             let isOwned = characterId === null ? false : characterOwnedMap[characterId]
@@ -472,7 +477,7 @@ const routes = async (fastify: FastifyInstance) => {
                     abilitySoulIds: updateInfo.ability_soul_ids,
                     options: { allowOtherPlayersToHealMe: updateInfo.options.allow_other_players_to_heal_me },
                     edited: updateInfo.party_edited,
-                    category: updateInfo.party_category
+                    category: updateInfo.party_category === 3 ? 1 : updateInfo.party_category
                 }
             )
         }

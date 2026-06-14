@@ -373,18 +373,18 @@ def convert_raid_event_quest(obj):
     for _, quests in obj.items():
         for _, quest in quests.items():
             quest = quest[0]  # extract inner array
-            # Raid quests use first_time_clear_reward_id instead of score rewards
-            clear_reward = quest[6] if len(quest) > 6 and quest[6] != '' else '1'
+            clear_reward = quest[6] if len(quest) > 6 and quest[6] != '' and quest[6] != '(None)' else '1'
             converted[quest[0]] = {
                 "name": "",
                 "clearRewardId": int(clear_reward),
-                "bRankTime": 0,
-                "aRankTime": 0,
-                "sRankTime": 0,
-                "sPlusRankTime": 0,
-                "rankPointReward": 0,
-                "characterExpReward": 0,
-                "manaReward": 0,
+                "sPlusRewardId": 1,
+                "bRankTime": floor(float(quest[82]) * 1000) if len(quest) > 82 and quest[82] not in ('', '(None)') else 0,
+                "aRankTime": floor(float(quest[83]) * 1000) if len(quest) > 83 and quest[83] not in ('', '(None)') else 0,
+                "sRankTime": floor(float(quest[84]) * 1000) if len(quest) > 84 and quest[84] not in ('', '(None)') else 0,
+                "sPlusRankTime": floor(float(quest[85]) * 1000) if len(quest) > 85 and quest[85] not in ('', '(None)') else 0,
+                "rankPointReward": int(quest[96]) if len(quest) > 96 and quest[96] not in ('', '(None)') else 0,
+                "characterExpReward": int(quest[97]) if len(quest) > 97 and quest[97] not in ('', '(None)') else 0,
+                "manaReward": int(quest[98]) if len(quest) > 98 and quest[98] not in ('', '(None)') else 0,
                 "poolExpReward": 0
             }
     return converted 
