@@ -4,7 +4,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getAccountPlayers, getPlayerCharacterManaNodesSync, getPlayerCharacterSync, getPlayerCharactersManaNodesSync, getPlayerItemSync, getPlayerSync, getSession, givePlayerItemSync, hasPlayerUnlockedCharacterManaNodeSync, insertPlayerCharacterBondTokenSync, insertPlayerCharacterManaNodesSync, updatePlayerCharacterBondTokenSync, updatePlayerCharacterSync, updatePlayerItemSync, updatePlayerSync } from "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
 import { getCharacterDataSync, getCharacterManaBoardCountSync, getCharacterManaNodeSync, getCharacterManaNodesSync } from "../../lib/assets";
-import { characterExpCaps } from "../../lib/character";
+import { characterExpCaps, givePlayerCharacterSync } from "../../lib/character";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 
@@ -619,10 +619,28 @@ const routes = async (fastify: FastifyInstance) => {
 
         givePlayerCharacterSync(playerId, characterId)
 
+        // Return character_list so the framework updates local player data
+        const charData = getPlayerCharacterSync(playerId, characterId)
+        const characterList = charData ? [{
+            "character_id": characterId,
+            "entry_count": charData.entryCount,
+            "evolution_level": charData.evolutionLevel,
+            "bond_token_list": charData.bondTokenList?.map(bt => ({
+                "mana_board_index": bt.manaBoardIndex,
+                "status": bt.status
+            })) ?? [],
+            "create_time": clientSerializeDate(charData.joinTime),
+            "update_time": clientSerializeDate(charData.updateTime),
+            "join_time": clientSerializeDate(charData.joinTime)
+        }] : []
+
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {}
+            "data": {
+                "character_list": characterList,
+                "mail_arrived": false
+            }
         })
     })
 }
