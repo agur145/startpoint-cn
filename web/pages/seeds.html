@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>种子验证器</title>
+    <link rel="stylesheet" href="/tailwind.css">
+    <meta http-equiv="refresh" content="10">
+    <style>
+        body { font-family: monospace; background: #000; color: #fff; padding: 1rem; }
+        a { color: #58a6ff; }
+        .stat { padding: 0.5rem 1rem; border: 1px solid #333; border-radius: 4px; display: inline-block; margin: 0.25rem; }
+        .stat .label { color: #888; font-size: 0.7rem; text-transform: uppercase; }
+        .stat .value { font-size: 1.3rem; font-weight: bold; }
+        table { border-collapse: collapse; width: 100%; max-width: 800px; margin-top: 1rem; }
+        th, td { padding: 0.25rem 0.5rem; border: 1px solid #333; text-align: left; font-size: 0.85rem; }
+        th { background: #111; }
+        .unk { color: #6e7681; }
+        .p1 { color: #d29922; }
+        .p2 { color: #d29922; }
+        .ok { color: #3fb950; }
+        .bad { color: #f85149; }
+        button { background: #238636; color: #fff; border: none; padding: 0.15rem 0.4rem; border-radius: 3px; cursor: pointer; font-size: 0.8rem; }
+        button:hover { background: #2ea043; }
+        button.danger { background: #da3633; }
+        button.danger:hover { background: #f85149; }
+        .progress { height: 8px; background: #222; border-radius: 4px; overflow: hidden; max-width: 500px; margin: 0.5rem 0; }
+        .progress div { height: 100%; float: left; transition: width 0.5s; }
+        .bar-ok { background: #3fb950; }
+        .bar-p2 { background: #d29922; }
+        .bar-p1 { background: #9a6b0a; }
+        .bar-bad { background: #f85149; }
+        .bar-unk { background: #6e7681; }
+    </style>
+</head>
+<body>
+    <div style="margin-bottom:1rem">
+        <a href="/">&larr; 首页</a>
+    </div>
+    <h1>种子验证器</h1>
+    <p style="color:#888;font-size:0.8rem;margin:0">
+        UNKNOWN (从未发送) → 发送 1x → PENDING·1 → 发送 2x → PENDING·2 → 发送 3x → VERIFIED (确认安全)
+    </p>
+
+    <div class="progress" id="progressBar">
+        <div class="bar-ok" id="barOk" style="width:0%"></div>
+        <div class="bar-p2" id="barP2" style="width:0%"></div>
+        <div class="bar-p1" id="barP1" style="width:0%"></div>
+        <div class="bar-bad" id="barBad" style="width:0%"></div>
+        <div class="bar-unk" id="barUnk" style="width:0%"></div>
+    </div>
+
+    <div id="stats" style="margin:0.5rem 0"></div>
+    <p id="summary" style="margin:0.25rem 0"></p>
+
+    <div style="display:flex;gap:2rem;flex-wrap:wrap;margin-top:1rem">
+        <div>
+            <h2 style="color:#888;margin:0">BLOCKED</h2>
+            <div id="blockedInfo" style="color:#888;font-size:0.8rem"></div>
+            <table id="blockedTable" style="display:none">
+                <thead><tr><th>#</th><th>Seed</th><th>操作</th></tr></thead>
+                <tbody id="blockedBody"></tbody>
+            </table>
+        </div>
+        <div>
+            <h2 style="color:#888;margin:0">VERIFIED</h2>
+            <div id="verifiedInfo" style="color:#888;font-size:0.8rem"></div>
+            <table id="verifiedTable" style="display:none">
+                <thead><tr><th>#</th><th>Seed</th></tr></thead>
+                <tbody id="verifiedBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+    function fmt(n) { return n.toLocaleString(); }
+
+    async function load() {
+        try {
+            const res = await fetch('/api/seeds/stats');
+            const s = await res.json();
+
+            document.getElementById('stats').innerHTML = `
+                <span class="stat"><span class="label unk">UNKNOWN</span><br><span class="value unk">${fmt(s.unknown)}</span></span>
+                <span class="stat"><span class="label p1">PENDING·1</span><br><span class="value p1">${s.pending1}</span></span>
+                <span class="stat"><span class="label p2">PENDING·2</span><br><span class="value p2">${s.pending2}</span></span>
+                <span class="stat"><span class="label ok">VERIFIED</span><br><span class="value ok">${fmt(s.verified)}</span></span>
+                <span class="stat"><span class="label bad">BLOCKED</span><br><span class="value bad">${s.blocked}</span></span>
+            `;
+            document.getElementById('summary').innerHTML =
+                `安全率: <span class="ok">${s.accuracy}%</span> ` +
+                `| 已测: <span class="ok">${fmt(s.tested)}</span> ` +
+                `| 覆盖率: ${s.coverage}%`;
+
+            // Progress bar
+            const t = s.total;
+            document.getElementById('barOk').style.width = (s.verified/t*100) + '%';
+            document.getElementById('barP2').style.width = (s.pending2/t*100) + '%';
+            document.getElementById('barP1').style.width = (s.pending1/t*100) + '%';
+            document.getElementById('barBad').style.width = (s.blocked/t*100) + '%';
+            document.getElementById('barUnk').style.width = (s.unknown/t*100) + '%';
+        } catch(e) { console.error(e); }
+
+        try {
+            const res2 = await fetch('/api/seeds/list');
+            const data = await res2.json();
+
+            const blocked = data.blocked || [];
+            document.getElementById('blockedInfo').textContent = blocked.length > 0
+                ? `共 ${blocked.length} 个` : '暂无';
+            if (blocked.length > 0) {
+                document.getElementById('blockedTable').style.display = '';
+                document.getElementById('blockedBody').innerHTML = blocked.map((s, i) =>
+                    `<tr><td>${i+1}</td><td class="bad">${s}</td><td><button class="danger" onclick="unblock(${s})">解除</button></td></tr>`
+                ).join('');
+            }
+
+            const verified = data.verified || [];
+            document.getElementById('verifiedInfo').textContent = verified.length > 0
+                ? `共 ${verified.length} 个` : '暂无';
+            if (verified.length > 0) {
+                document.getElementById('verifiedTable').style.display = '';
+                document.getElementById('verifiedBody').innerHTML = verified.slice(0, 100).map((s, i) =>
+                    `<tr><td>${i+1}</td><td class="ok">${s}</td></tr>`
+                ).join('');
+                if (verified.length > 100) {
+                    document.getElementById('verifiedBody').innerHTML +=
+                        `<tr><td colspan="2" style="color:#888">...和其他 ${verified.length - 100} 个</td></tr>`;
+                }
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    async function unblock(seed) {
+        await fetch('/api/seeds/unblock', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({seed})
+        });
+        load();
+    }
+
+    load();
+    </script>
+</body>
+</html>

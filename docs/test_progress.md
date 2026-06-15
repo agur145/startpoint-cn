@@ -35,7 +35,7 @@
 | C8702/C2280 mail 角色响应字段补齐 | 邮件领取角色不再报错 |
 | F1010 bondTokenStatusList 空指针修复 | 战斗结算经验卡界面不再崩溃 |
 | F1009 mana board 二版渲染崩溃 | 玛纳板正常显示 + 时间窗口适配 |
-| C3032 抽卡动画种子不匹配 | ⚠️ 已知不修复（非必现） |
+| C3032 抽卡动画种子不匹配 | ✅ 种子验证器自动过滤（`gacha-physics.ts` + `seed-validator.ts`） |
 | shop/buy 响应 free_vmoney 补齐 | 购买后珠子余量正确显示 |
 | CDN 白名单修正 | 商店商品不再 C8601 崩溃 |
 | F1011 score reward MANA 写入 freeVmoney | `src/lib/quest.ts:61` `freeVmoney`→`freeMana`，玛纳结算正确累加 |
@@ -65,7 +65,12 @@
 | F1034 gacha.json CDN odds 重建 | 从 926 个 CDN `gacha_odds/` 有序映射文件完整重建 490 卡池：CDN 权重 + `odds_up` UP 标记 + `is_limited`/`is_exchangeable` |
 | F1035 C8024/C3032 卡池动画修复 | `gacha.ts`：`movie_id` 从硬编码→读取 `gacha.movieName`；`seed` 从 `characterId*1000`→预验证种子池随机选取 |
 | F1036 装备卡池 CDN 赔率重建 | 91 个装备卡池（type=1）从 CDN `equipment_odds_rarity` 赔率文件构建，含权重/UP/限定 |
-| ⚠️ 种子池 | 当前种子来自抓包数据，可能不全，与国服数据有差距 |
+| F1037 seed-validator 四态验证 | `seed-validator.ts`：UNKNOWN→PENDING(1x/2x)→VERIFIED/BLOCKED，3 次无 crash 标记安全，C3032 自动 block |
+| F1038 gacha-physics 物理引擎 | `gacha-physics.ts`：MT19937 + FallingField + FixedFallingField + CCD 护符检测，CN CDN 种子池生成 |
+| F1039 CN 种子池重建 | 从 CN CDN `archive-common-full` 提取 4 个 gacha 物理配置 AMF3，200K seed 扫描生成 `gacha_movie_seeds.json` |
+| F1040 种子管理面板 | `/seeds` Web 页面：四态统计 + 进度条 + blocked 列表 + 解除操作 |
+| F1041 evolution 修复 | `learn_mana_node` 进化仅在板 1 全部节点学完后触发（对齐 `isAbilitiesEvolution()`） |
+| ⚠️ 种子池 | CN 物理引擎生成 200K seeds，验证器自动过滤不准确的种子，收敛到 100% 设备兼容 |
 | ⚠️ 复刻卡池 UP 标记 | 复刻版（col[0] 带 `_1`/`_2`）共享原版赔率含 `odds_up=true`，客户端可能不应展示 UP；待验证
 
 ## C3212 修复详解

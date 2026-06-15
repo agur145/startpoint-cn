@@ -13,6 +13,8 @@ import cnLoadPlugin from "./routes/cn/load";
 import cnAssetPlugin from "./routes/cn/asset";
 import indexWebPlugin from "./routes/web";
 import indexWebApiPlugin from "./routes/web_api";
+import seedsWebApiPlugin from "./routes/web_api/seeds";
+import seedValidator from "./lib/seed-validator";
 import reproduceApiPlugin from "./routes/api/reproduce";
 import tutorialApiPlugin from "./routes/api/tutorial";
 import gachaApiPlugin from "./routes/api/gacha";
@@ -164,7 +166,29 @@ fastify.post("/debug", async (request, reply) => {
 });
 
 fastify.post("/crash", async (request, reply) => {
-    console.log(`[CRASH] ${JSON.stringify(request.body).substring(0, 2000)}`);
+    // Log crash (truncated to avoid log explosion)
+    const bodyStr = JSON.stringify(request.body);
+    console.log(`[CRASH] ${bodyStr.substring(0, 2000)}`);
+
+    // Parse C3032 gacha seed mismatches and auto-block bad seeds
+    try {
+        const seedMatch = bodyStr.match(/seed=(\d+)/);
+        if (seedMatch && bodyStr.includes("C3032")) {
+            const badSeed = parseInt(seedMatch[1], 10);
+
+            // Extract device rarity info for analysis
+            const ballMatch = bodyStr.match(/結果レア度=★(\d)/);
+            const charMatch = bodyStr.match(/キャラクターレア度=★(\d)/);
+            const ballRarity = ballMatch ? parseInt(ballMatch[1], 10) : '?';
+            const charRarity = charMatch ? parseInt(charMatch[1], 10) : '?';
+
+            seedValidator.blockSeed(badSeed);
+            console.log(`[CRASH] Auto-blocked seed ${badSeed} (device★${ballRarity} vs char★${charRarity}) from C3032`);
+        }
+    } catch (e) {
+        // Non-critical — never let crash parsing crash the crash handler
+    }
+
     reply.status(200).send("OK");
 });
 
@@ -204,6 +228,7 @@ fastify.register(questUnlockApiPlugin, { prefix: `${apiPrefix}/quest` });
 // Web management panel
 fastify.register(indexWebPlugin);
 fastify.register(indexWebApiPlugin, { prefix: "/api" });
+fastify.register(seedsWebApiPlugin, { prefix: "/api/seeds" });
 
 const cdnHost = process.env.CN_LISTEN_HOST || "localhost";
 const cdnPort = process.env.CN_LISTEN_PORT || "8001";

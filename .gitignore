@@ -16,3 +16,9 @@ build
 .unzip-temp
 .cn-cdn.env
 web/public/comic/
+
+# Seed validator runtime data
+assets/blocked_seeds.json
+assets/verified_seeds.json
+assets/pending_seeds.json
+

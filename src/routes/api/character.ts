@@ -405,26 +405,14 @@ const routes = async (fastify: FastifyInstance) => {
             updatePlayerItemSync(playerId, itemId, newAmount)
         }
 
-        // increase evolution level
         let characterEvolutionLevel = characterData.evolutionLevel
         let evolutionData: Object = []
-        if (characterEvolutionLevel === 0) {
-            characterEvolutionLevel = 1
-            updatePlayerCharacterSync(playerId, characterId, {
-                evolutionLevel: characterEvolutionLevel
-            })
-
-            evolutionData = {
-                "character_id": characterId,
-                "level": 1,
-                "img_level": 1
-            }
-        }
 
         // give bond reward, if available
         const amityScrollReceivable = characterData.bondTokenList[currentManaNodeIndex - 1]?.status === 0
         const bondTokenList: Object[] = []
-        if (amityScrollReceivable && (indexUnlockedNodesCount + toUnlockNodeIds.length) === Object.keys(characterManaNodes).length) {
+        const isBoardComplete = (indexUnlockedNodesCount + toUnlockNodeIds.length) === Object.keys(characterManaNodes).length
+        if (amityScrollReceivable && isBoardComplete) {
             updatePlayerCharacterBondTokenSync(playerId, characterId, {
                 manaBoardIndex: currentManaNodeIndex,
                 status: 1
@@ -437,9 +425,22 @@ const routes = async (fastify: FastifyInstance) => {
                     "status": entryIndex === currentManaNodeIndex ? 1 : entry.status
                 })
             }
+
+            // Evolution level: only bump when ALL ability-slot nodes (hash=1) are learned per isAbilitiesEvolution()
+            if (characterEvolutionLevel === 0) {
+                characterEvolutionLevel = 1
+                updatePlayerCharacterSync(playerId, characterId, {
+                    evolutionLevel: characterEvolutionLevel
+                })
+                evolutionData = {
+                    "character_id": characterId,
+                    "level": 1,
+                    "img_level": 1
+                }
+            }
         }
 
-        console.log(`[MANA] learn_mana_node done: bondGiven=${amityScrollReceivable && (indexUnlockedNodesCount + toUnlockNodeIds.length) === Object.keys(characterManaNodes).length} bondList=${JSON.stringify(bondTokenList)}`)
+        console.log(`[MANA] learn_mana_node done: boardComplete=${isBoardComplete} bondGiven=${amityScrollReceivable && isBoardComplete} evoLevel=${characterEvolutionLevel} bondList=${JSON.stringify(bondTokenList)}`)
 
         // insert new mana nodes
         insertPlayerCharacterManaNodesSync(playerId, characterId, toUnlockNodeIds)

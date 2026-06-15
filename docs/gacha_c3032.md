@@ -193,21 +193,73 @@ for seed in range(10000000, 10010000):
 
 **预估**: 1-2h（物理配置提取可能占大部分时间）
 
-## 6. 辅助工具
+## 6. 永久修复（已完成 2026-06-15）
 
-**文件**: `scripts/extract_seeds.py` (87 行)
+### 步骤 1：提取 CN 物理配置 ✅
 
-从 mitmproxy 流量文件中提取种子表。需要的输入：国服官方服务器的 `gacha/exec` 响应抓包。国服已关服，工具当前不可用。
+从 CN CDN `archive-common-full` 中提取 4 个 gacha 动画配置文件：
+
+| 文件 | CDN 路径 | 大小 |
+|------|----------|:---:|
+| `normal.amf3` | `production/upload/9d/29fc191c...` | 807B |
+| `fes.amf3` | `production/upload/95/dc776712...` | 811B |
+| `normal_guarantee.amf3` | `production/upload/1c/fc6f0f07...` | 807B |
+| `rarity_5_guarantee.amf3` | `production/upload/4a/4fb93779...` | 790B |
+
+提取流程：
+1. 找到 hash 算法：`SHA1(path + "K6R9T9Hz22OpeIGEWB0ui6c6PYFQnGy")`
+   - path = `gacha/{movie_id}.gacha.amf3.deflate`
+   - `AssetPathTools.as:14` 硬编码 salt
+2. 从 `starpoint-cn/.cdn/cn/archive-common-full/*.zip` 定位文件
+3. zlib raw deflate 解压 → AMF3 binary
+
+关键阈值（4 个配置基本一致）：
+
+```
+ballStar4:     0.7583    (球初始 ★4 概率阈值)
+amuletTwoUp:   0.8148    (护符 +2 升级阈值)
+playMovie:     0.8995    (播放入场动画概率)
+amulets[6]:    0.9022    (第 6 个护符启用阈值)
+其余 amulets:  null 或 0   (全部禁用)
+```
+
+### 步骤 2：移植物理引擎 ✅
+
+**文件**: `src/lib/gacha-physics.ts`
+
+实现内容（~400 行 TypeScript）：
+- MT19937 MersenneTwister 完整移植（624 元素状态数组 + 燃烧）
+- `FallingField.initField()` RNG 消费顺序（ball ×4, playProbability ×1, pins, amulets）
+- `FixedFallingField.initBallRarity()` / `initAmuletRarity()` 阈值判定
+- 简化 2D 物理引擎：重力积分 + circle-circle 碰撞 + 弹性反弹 + 护符接触检测
+- `performAmuletContacted()` ★5 升级全接触逻辑
+
+### 步骤 3：批量生成种子表 ✅
+
+```
+$ node -e "generateSeedPools()"
+Scanned 200001 seeds in 14s (~15K seeds/sec)
+★3: 13169  ★4: 45108  ★5: 141724
+```
+
+写入 `assets/gacha_movie_seeds.json` 和 `assets/gacha_rate_up_movie_seeds.json`。
+
+### 步骤 4：还原 gacha.ts ✅
+
+恢复完整的随机种子 + 动画选择逻辑：
+- `rankMovieRates` 选择 NORMAL(80%) / GUARANTEE(20%) 动画类型
+- CN 种子池随机选取对应稀有度的 seed
+- `movie_id` 按动画类型选择 `movieName` 或 `guaranteeMovieName`
 
 ## 7. 当前状态
 
 | 项目 | 状态 |
 |------|:---:|
-| C3032 报错 | ✅ 临时方案已消除 |
-| 种子表（★3） | ⚠️ 162 seeds (国际服)，混入 ★4 |
-| 种子表（★4/★5） | ⚠️ 国际服数据，CN 兼容性待验证 |
-| 物理配置 | ❌ 未提取 |
-| 永久修复 | ⏳ 待物理配置就绪后执行 §5 步骤 |
+| C3032 报错 | ✅ 永久修复 |
+| 种子表 | ✅ CN 物理引擎生成 |
+| 物理配置 | ✅ 从 CN CDN 提取 4 个 |
+| 物理引擎 | ✅ `gacha-physics.ts` 移植完成 |
+| gacha.ts | ✅ 完整随机种子 + 动画逻辑 |
 
 ## 8. 相关 commit
 

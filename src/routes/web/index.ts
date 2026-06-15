@@ -16,6 +16,12 @@ const routes = async (fastify: FastifyInstance) => {
         reply.send(html)
     })
 
+    fastify.get("/seeds", async (_: FastifyRequest, reply: FastifyReply) => {
+        const html = readFileSync(path.join(__dirname, staticPagesDir, "seeds.html")).toString("utf-8")
+        reply.header("content-type", "text/html; charset=utf-8")
+        reply.send(html)
+    })
+
     fastify.register(playerRoutePlugin, { prefix: "/player" })
     fastify.register(mailRoutePlugin)
 }
