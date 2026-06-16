@@ -166,6 +166,8 @@ const routes = async (fastify: FastifyInstance) => {
             }
         }
 
+        console.log(`[shop:buy] player=${playerId} shopType=${shopType} item=${shopItemId} x${purchaseAmount} before freeMana=${player.freeMana} freeVmoney=${player.freeVmoney}`)
+
         // keep track of various stats
         const itemList: Record<string, number> = {}
         let freeVmoney = player.freeVmoney
@@ -261,20 +263,9 @@ const routes = async (fastify: FastifyInstance) => {
                 "data": {
                     "user_info": {
                         "free_vmoney": freeVmoney,
-                        "vmoney": player.vmoney,
                         "free_mana": freeMana,
-                        "paid_mana": player.paidMana,
-                        "stamina": player.stamina,
-                        "stamina_heal_time": getServerTime(player.staminaHealTime),
-                        "exp_pool": player.expPool,
-                        "exp_pooled_time": getServerTime(player.expPooledTime),
-                        "bond_token": bondTokens,
-                        "rank_point": player.rankPoint,
-                        "star_crumb": player.starCrumb,
-                        "boost_point": player.boostPoint,
-                        "boss_boost_point": player.bossBoostPoint
+                        "bond_token": bondTokens
                     },
-                    "joined_character_id_list": [],
                     "character_list": [],
                     "equipment_list": [clientSerializeEquipment(equipmentId, currentEquipment)],
                     "item_list": itemList,
@@ -347,6 +338,10 @@ const routes = async (fastify: FastifyInstance) => {
             addPlayerShopPurchaseSync(playerId, shopItemId)
         }
 
+        // verify DB write
+        const afterPlayer = getPlayerSync(playerId)!
+        console.log(`[shop:buy] after DB freeMana=${afterPlayer.freeMana} freeVmoney=${afterPlayer.freeVmoney} rewardItems=${JSON.stringify(rewardResult?.items ?? {})}`)
+
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({
@@ -354,21 +349,11 @@ const routes = async (fastify: FastifyInstance) => {
             }),
             "data": {
                 "user_info": {
-                    "free_vmoney": freeVmoney,
-                    "vmoney": player.vmoney,
+                    "free_vmoney": freeVmoney + (rewardResult?.user_info.free_vmoney ?? 0),
                     "free_mana": freeMana + (rewardResult?.user_info.free_mana ?? 0),
-                    "paid_mana": player.paidMana,
-                    "stamina": player.stamina,
-                    "stamina_heal_time": getServerTime(player.staminaHealTime),
-                    "exp_pool": player.expPool + (rewardResult?.user_info.exp_pool ?? 0),
-                    "exp_pooled_time": getServerTime(player.expPooledTime),
                     "bond_token": bondTokens,
-                    "rank_point": player.rankPoint,
-                    "star_crumb": player.starCrumb,
-                    "boost_point": player.boostPoint,
-                    "boss_boost_point": player.bossBoostPoint
+                    "exp_pool": player.expPool + (rewardResult?.user_info.exp_pool ?? 0),
                 },
-                "joined_character_id_list": rewardResult?.joined_character_id_list ?? [],
                 "character_list": rewardResult?.character_list ?? [],
                 "equipment_list": rewardResult?.equipment_list ?? [],
                 "item_list": {
@@ -440,6 +425,8 @@ const routes = async (fastify: FastifyInstance) => {
 
         // Load purchase history for stock tracking
         const purchasedMap = getPlayerShopPurchasesMapSync(playerId)
+        const totalPurchased = Object.values(purchasedMap).reduce((a, b) => a + b, 0)
+        console.log(`[shop:get_sales] player=${playerId} purchasedKeys=${Object.keys(purchasedMap).length} totalPurchased=${totalPurchased}`)
 
         let filteredCdnCount = 0
 
@@ -462,7 +449,18 @@ const routes = async (fastify: FastifyInstance) => {
                     }
                 }
 
-                // Skip date filtering on test server — client controls which shops to display
+                // Date filtering: only show items active at current server time
+                {
+                    const now = getServerDate()
+                    if (item.availableFrom) {
+                        const fromStr = item.availableFrom.replace(' ', 'T') + 'Z'
+                        if (new Date(fromStr) > now) continue
+                    }
+                    if (item.availableUntil) {
+                        const untilStr = item.availableUntil.replace(' ', 'T') + 'Z'
+                        if (new Date(untilStr) < now) continue
+                    }
+                }
 
                 if (shopTypeNum === ShopType.TREASURE_EQUIPMENT) {
                     // Collect for group-level processing later

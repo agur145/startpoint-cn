@@ -64,10 +64,6 @@
                     <button id="prio4" class="prio-btn" onclick="setPrio('4')">★4</button>
                     <button id="prio3" class="prio-btn" onclick="setPrio('3')">★3</button>
                 </div>
-                <label class="anim-toggle mb-2" id="animLabel">
-                    <input type="checkbox" id="animCheck" onchange="toggleAnim(this.checked)">
-                    强制动画触发（100%，仅测试池）
-                </label>
                 <div class="progress"><div class="bar-ok" id="barOk" style="width:0"></div><div class="bar-p1" id="barP1" style="width:0"></div><div class="bar-unk" id="barUnk" style="width:0"></div></div>
                 <div id="testStats"></div><p id="testSummary" class="text-xs text-on-surface-variant mt-1"></p>
             </div>
@@ -89,7 +85,6 @@
     function fmt(n) { return n.toLocaleString(); }
     async function setMode(m) { await fetch('/api/seeds/mode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:m})});load(); }
     async function setPrio(p) { await fetch('/api/seeds/mode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({priority:p})});load(); }
-    async function toggleAnim(v) { await fetch('/api/seeds/mode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forceAnimation:v})});load(); }
     async function setTag(seed,tag) { await fetch('/api/seeds/tag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seed,tag})});load(); }
     async function setTestSeed(seed,rarity) { await fetch('/api/seeds/test-seed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seed,rarity})});load(); }
     async function clearTestSeed(rarity) { await fetch('/api/seeds/test-seed',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({rarity})});load(); }
@@ -120,9 +115,6 @@
 
         // Priority
         ['All','5','4','3'].forEach(p=>{const el=document.getElementById('prio'+p);if(el)el.className='prio-btn'+(s.priority===p.toLowerCase()?' active':'');});
-
-        // Animation toggle
-        document.getElementById('animCheck').checked = s.forceAnimation;
 
         // Test pool
         document.getElementById('testStats').innerHTML = `
