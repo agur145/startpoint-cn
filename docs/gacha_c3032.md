@@ -255,11 +255,26 @@ Scanned 200001 seeds in 14s (~15K seeds/sec)
 
 | 项目 | 状态 |
 |------|:---:|
-| C3032 报错 | ✅ 永久修复 |
-| 种子表 | ✅ CN 物理引擎生成 |
+| C3032 报错 | ✅ 自动净化系统 |
+| 种子表 | ✅ CN 物理引擎生成 200K |
 | 物理配置 | ✅ 从 CN CDN 提取 4 个 |
-| 物理引擎 | ✅ `gacha-physics.ts` 移植完成 |
-| gacha.ts | ✅ 完整随机种子 + 动画逻辑 |
+| 物理引擎 | ✅ `gacha-physics.ts` 移植完成（含 CCD） |
+| gacha.ts | ✅ 池模式 + 优先级 + 惊险种子支持 |
+| 惊险种子 | ✅ 15 个 PURIFIED（★3:6 ★4:7 ★5:2） |
+| 自动净化 | ✅ C3032 → recordDeviceData → autoPurify |
+| Web 管理 | ✅ `/seeds` 模式切换 + 三栏比例 |
+
+## 8. 自动净化流程（2026-06-15 新增）
+
+```
+手机抽卡 → C3032 crash
+    → /crash 解析 device★X + seed
+    → recordDeviceData(seed, ★X, ★Y)
+    → blockSeed(seed)
+    → autoPurify()  ← 有 device★ 的自动移入 PURIFIED
+```
+
+惊险种子在净化池模式下优先选取，**零 C3032 抽卡**。
 
 ## 8. 相关 commit
 

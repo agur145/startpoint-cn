@@ -175,19 +175,17 @@ fastify.post("/crash", async (request, reply) => {
         const seedMatch = bodyStr.match(/seed=(\d+)/);
         if (seedMatch && bodyStr.includes("C3032")) {
             const badSeed = parseInt(seedMatch[1], 10);
-
-            // Extract device rarity info for analysis
             const ballMatch = bodyStr.match(/結果レア度=★(\d)/);
             const charMatch = bodyStr.match(/キャラクターレア度=★(\d)/);
-            const ballRarity = ballMatch ? parseInt(ballMatch[1], 10) : '?';
-            const charRarity = charMatch ? parseInt(charMatch[1], 10) : '?';
+            const ballRarity = ballMatch ? parseInt(ballMatch[1], 10) : 0;
+            const charRarity = charMatch ? parseInt(charMatch[1], 10) : 0;
 
+            if (ballRarity > 0) seedValidator.recordDeviceData(badSeed, ballRarity, charRarity);
             seedValidator.blockSeed(badSeed);
-            console.log(`[CRASH] Auto-blocked seed ${badSeed} (device★${ballRarity} vs char★${charRarity}) from C3032`);
+            seedValidator.autoPurify();
+            console.log(`[CRASH] seed ${badSeed} device★${ballRarity} char★${charRarity}`);
         }
-    } catch (e) {
-        // Non-critical — never let crash parsing crash the crash handler
-    }
+    } catch (e) {}
 
     reply.status(200).send("OK");
 });
@@ -263,6 +261,10 @@ fastify.listen({ port, host }, (err, address) => {
         process.exit(1);
     }
     console.log(`CN StarPoint listening on http://${host}:${port}`);
+
+    // Auto-purify blocked seeds that have device data
+    const purified = seedValidator.autoPurify();
+    if (purified > 0) console.log(`[SEED] Startup: purified ${purified} seeds`);
 
     // Start multi battle TCP session server
     startSessionServer();

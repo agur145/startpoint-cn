@@ -149,9 +149,9 @@ export function rewardPlayerGachaDrawResultSync(
                     const seedPool: number[] = (movieSeeds as any)[seedKey]?.[String(movieType)] || []
                     const fallbackPool: number[] = (movieSeeds as any)[seedKey]?.["0"] || []
                     const pool = seedPool.length > 0 ? seedPool : fallbackPool
-                    // Use seed validator to skip blocked (C3032-causing) seeds
+                    // Use seed validator with pool mode support
                     const seed = pool.length > 0
-                        ? seedValidator.getSafeSeed(pool, characterId)
+                        ? seedValidator.getSeed(rarity, pool, characterId)
                         : characterId * 1000
 
                     // Mark seed as TESTING (pending verification)

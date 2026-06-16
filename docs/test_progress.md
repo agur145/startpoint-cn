@@ -70,7 +70,10 @@
 | F1039 CN 种子池重建 | 从 CN CDN `archive-common-full` 提取 4 个 gacha 物理配置 AMF3，200K seed 扫描生成 `gacha_movie_seeds.json` |
 | F1040 种子管理面板 | `/seeds` Web 页面：四态统计 + 进度条 + blocked 列表 + 解除操作 |
 | F1041 evolution 修复 | `learn_mana_node` 进化仅在板 1 全部节点学完后触发（对齐 `isAbilitiesEvolution()`） |
-| ⚠️ 种子池 | CN 物理引擎生成 200K seeds，验证器自动过滤不准确的种子，收敛到 100% 设备兼容 |
+| F1042 PURIFIED 惊险种子净化 | C3032 自动捕获 device★ 数据 → `autoPurify()` 移入 PURIFIED 惊险池，0 blocked 残留 |
+| F1043 双池模式 + 测试优先级 | 测试池/净化池一键切换，UNKNOWN 可选 ★3/★4/★5 优先测试 |
+| F1044 Web nav 统一 | 5 页中文侧边栏：首页/玩家/发送邮件/种子，移除 Source Code |
+| ✅ 种子池 | C3032 自动净化收敛，惊险种子 15 个（★3:6 ★4:7 ★5:2），净化池模式零 C3032 |
 | ⚠️ 复刻卡池 UP 标记 | 复刻版（col[0] 带 `_1`/`_2`）共享原版赔率含 `odds_up=true`，客户端可能不应展示 UP；待验证
 
 ## C3212 修复详解
