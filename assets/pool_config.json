@@ -1,5 +1,5 @@
 {
   "mode": "purified",
   "priority": "all",
-  "forceAnimation": false
+  "forceAnimation": true
 }

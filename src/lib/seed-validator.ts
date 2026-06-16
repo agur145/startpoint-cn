@@ -196,8 +196,8 @@ export class SeedValidator {
 
     setMode(mode: PoolMode): void {
         this.mode = mode;
-        // 净化池 + 无测试种子 → 自动关
-        if (mode === 'purified' && !this.hasActiveTestSeeds()) this.forceAnimation = false;
+        // 净化池 → 根据是否有测试种子自动切换
+        if (mode === 'purified') this.forceAnimation = this.hasActiveTestSeeds();
         // 测试池 → 自动开
         if (mode === 'unknown') this.forceAnimation = true;
         this.saveConfig();
@@ -214,6 +214,30 @@ export class SeedValidator {
             if (this.testSeeds[i] !== null && (this.testSeedTimestamps[i] === null || now - this.testSeedTimestamps[i]! < TEST_SEED_TIMEOUT_MS)) return true;
         }
         return false;
+    }
+
+    /**
+     * 过滤出 playProbability >= playMovie 的种子（100% 触发动画）。
+     * 扫描至多 5000 个种子，找到至少 50 个满足条件的。
+     * moviePlayable = playProbability >= playMovie(0.8995)
+     */
+    private filterPlayable(pool: number[]): number[] {
+        const result: number[] = [];
+        const PLAY_MOVIE = 0.8995;
+        const MAX_SCAN = 5000;
+        const MIN_MATCH = 50;
+        for (let i = 0; i < pool.length && i < MAX_SCAN; i++) {
+            const sim = new GachaSimulator(pool[i]);
+            if (sim.getPlayProbability() >= PLAY_MOVIE) {
+                result.push(pool[i]);
+                if (result.length >= MIN_MATCH) break;
+            }
+        }
+        if (result.length === 0) {
+            console.log(`[SEED] ForceAnim: no playable seeds found in ${Math.min(pool.length, MAX_SCAN)} scanned`);
+            return pool.slice(0, MIN_MATCH); // fallback: return some seeds anyway
+        }
+        return result;
     }
 
     // ========================================================================
@@ -247,37 +271,33 @@ export class SeedValidator {
             }
         }
 
-        if (this.mode === 'purified') {
-            // ① 测试种子（同稀有度，未过期）
-            const ts = this.testSeeds[ri];
-            if (ts !== null) return ts;
+        // 测试种子优先于 forceAnimation 过滤
+        const ts = this.testSeeds[ri];
+        if (ts !== null) return ts;
 
+        // 强制动画过滤（所有模式生效，采样前500个满足条件的种子）
+        let effectivePool = pool;
+        if (this.forceAnimation) {
+            effectivePool = this.filterPlayable(pool);
+            console.log(`[SEED] ForceAnim: filtered ${pool.length}→${effectivePool.length} seeds for ★${rarity}`);
+        }
+
+        if (this.mode === 'purified') {
             // ② 同稀有度 + 非冷血
-            const same = pool.filter(s => {
+            const same = effectivePool.filter(s => {
                 const e = this.purified.get(s);
                 return e && e.r === ri && e.tag !== '冷血躲避球';
             });
             if (same.length > 0) return same[Math.floor(Math.random() * same.length)];
 
             // ③ 复用（任意非冷血 purified, 已确认安全）
-            const any = pool.filter(s => {
+            const any = effectivePool.filter(s => {
                 const e = this.purified.get(s);
                 return e && e.tag !== '冷血躲避球';
             });
             if (any.length > 0) return any[Math.floor(Math.random() * any.length)];
 
             console.log(`[SEED] No available purified for ★${rarity}, this should not happen`);
-        }
-
-        // 测试池：动画强制过滤
-        let effectivePool = pool;
-        if (this.forceAnimation && this.mode === 'unknown') {
-            effectivePool = pool.filter(s => {
-                const sim = new GachaSimulator(s);
-                const pp = sim.getPlayProbability();
-                return pp >= 0.9; // playMovie threshold
-            });
-            if (effectivePool.length === 0) effectivePool = pool; // fallback
         }
 
         // 测试池：UNKNOWN > PENDING·N > VERIFIED > PURIFIED
