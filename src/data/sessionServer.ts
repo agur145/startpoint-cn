@@ -157,8 +157,10 @@ function handleNotify(client: SessionClient, msg: any[]) {
                 if (ed.skillAbilityBehaviorMode !== undefined) host.skillAbilityBehaviorMode = ed.skillAbilityBehaviorMode
                 if (ed.dashBehaviorMode !== undefined) host.dashBehaviorMode = ed.dashBehaviorMode
                 if (ed.allowHealFromOtherPlayers !== undefined) host.allowHealFromOtherPlayers = ed.allowHealFromOtherPlayers
-                if (ed.currentPartyId !== undefined) host.currentPartyId = ed.currentPartyId
-                console.log(`[SESSION] host synced: auto=${host.autoplayMode} speed=${host.autoSpeedLevel} allowHeal=${host.allowHealFromOtherPlayers} partyId=${host.currentPartyId}`)
+                // currentPartyId intentionally NOT synced — CN client sends global PartyId (group*10+slot)
+                // which differs from the party loaded in the handshake. Syncing it causes the room's
+                // party selection to be overwritten with the client's local last-party value.
+                console.log(`[SESSION] host synced: auto=${host.autoplayMode} speed=${host.autoSpeedLevel} allowHeal=${host.allowHealFromOtherPlayers}`)
                 // Push updated mate data to client
                 sendJson(client.socket, [1, [1, client.mates]])
             }
@@ -453,8 +455,8 @@ function buildRealParty(playerId: number, party: PlayerParty): any {
         if (!charId) return [1]  // Option None
         const dbChar = getPlayerCharacterSync(playerId, charId)
         if (!dbChar) return [1]
-        // mana_node_ids must stay empty — CN client ManaNodeTable lookup crashes (C8601 key=0) in multi-battle
-        const manaNodeIds: number[] = []
+        // mana_node_ids from DB — may trigger C8601 (key=0) in multi-battle, to be analyzed
+        const manaNodeIds = getPlayerCharacterManaNodesSync(playerId, charId)
         // ex boost from DB
         let exBoost: any = [1]
         if (dbChar.exBoost && dbChar.exBoost.abilityIdList && dbChar.exBoost.abilityIdList.length > 0) {
