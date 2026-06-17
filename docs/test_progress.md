@@ -76,9 +76,13 @@
 | F1045 惊险池 Tag + 测试种子 | Tag 四态（未测试/热血/普通/冷血），测试种子每稀有度1个+10min超时，三栏横向 Web UI |
 | F1046 净化池跨稀有度修复 | 删除 step③ 无稀有度过滤复用，purified 种子前置到 basePool，getSeed() 只选同稀有度 |
 | F1047 forceAnimation 移除 | playProbability 由客户端 RNG 决定不可服务端控制，删除 filterPlayable/getPlayProbability/Web toggle |
-| ✅ 种子池 | C3032 自动净化收敛，惊险种子 35 个（★3:12 ★4:15 ★5:8），服务器默认净化池，零 C3032 |
+| F1048 MersenneTwister int32 修复 | `Math.imul` + `|0` 替代 `>>>0`，匹配 AS3 有符号 int32 溢出行为，精度从 0%→31.9% |
+| F1049 AMF3 解码器修复 | 空字符串不写入 string table，class name 用 `rbytes`，`getPurifiedForRarity` 跨池注入 |
+| F1050 种子池完全重置 | 清空 purified/verified/pending/blocked，干净状态从头测试，新种子池 ★3:19K ★4:60K ★5:121K |
+| ✅ 种子池 | 验证器等待设备反馈，当前精度 31.9%，28/32 错误为 SIM 高估（amulet 参数偏差 1-2 像素） |
 | ⚠️ 复刻卡池 UP 标记 | 复刻版（col[0] 带 `_1`/`_2`）共享原版赔率含 `odds_up=true`，客户端可能不应展示 UP；待验证 |
-| ⚠️ AMF3 配置解码 | 护符/barAmulet 参数来自手动 hex 读取，string ref 映射未验证，偏差约 1-2 像素即翻转护符接触结果 |
+| ⚠️ AMF3 配置解码 | 护符参数已验证字段存在性，key 名偏移 1 位已手工纠正，barAmulet 5 参数确认，pin.radius 24 确认 |
+| ⚠️ MT19937 精度 | AS3 版有 624 次构造器 burn-in（非标准），仿真输出序列正确，31.9% 剩余误差在 amulet 参数 |
 
 ## C3212 修复详解
 

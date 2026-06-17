@@ -441,7 +441,8 @@ function buildRealParty(playerId: number, party: PlayerParty): any {
         if (!charId) return [1]  // Option None
         const dbChar = getPlayerCharacterSync(playerId, charId)
         if (!dbChar) return [1]
-        const manaNodeIds = getPlayerCharacterManaNodesSync(playerId, charId)
+        // TEST: empty mana nodes to verify C8601 goes away
+        const manaNodeIds: number[] = []
         // ex boost from DB
         let exBoost: any = [1]
         if (dbChar.exBoost && dbChar.exBoost.abilityIdList && dbChar.exBoost.abilityIdList.length > 0) {

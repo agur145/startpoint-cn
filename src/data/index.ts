@@ -71,7 +71,7 @@ export default function getDatabase(
 
     // set pragma
     db.pragma('journal_mode = WAL')
-    db.pragma('foreign_keys = ON')
+    db.pragma('foreign_keys = OFF')
 
     // call init & update function
     const init = metadata.init
@@ -82,13 +82,16 @@ export default function getDatabase(
             // try to update before initialization
             const latestVersion = metadata.latestVersion
             const updateRequired = dbExists && metadata.latestVersion > currentVersion
+            console.log(`[DB] init: dbExists=${dbExists} currentVersion=${currentVersion} latestVersion=${latestVersion} updateRequired=${updateRequired}`)
             if (updateRequired && updateBefore !== undefined) {
                 console.log("Updating wdfp_data.db...")
                 updateBefore(db, currentVersion)
             }
 
             // initialize
+            console.log("[DB] calling init...")
             init(db, dbExists)
+            console.log("[DB] init done")
 
             // try to update after initialization
             if (updateRequired && updateAfter !== undefined) {
@@ -103,6 +106,9 @@ export default function getDatabase(
             console.log(`Initalization failed for module ${metadata.path}. Error: ${error}`)
         }
     }
+
+    // re-enable foreign keys
+    db.pragma('foreign_keys = ON')
 
     // add to loaded databases
     loadedDatabases[database] = db
