@@ -321,6 +321,7 @@ function buildPlayer(
         enableAuto3x: deserializeBoolean(raw.enable_auto_3x),
         tutorialStep: raw.tutorial_step,
         tutorialSkipFlag: raw.tutorial_skip_flag === null ? null : deserializeBoolean(raw.tutorial_skip_flag),
+        tutorialGachaCharacterId: raw.tutorial_gacha_character_id,
     }
 }
 
@@ -332,7 +333,7 @@ export function getPlayerSync(
         transition_state, role, name, last_login_time, comment,
         vmoney, free_vmoney, rank_point, star_crumb,
         bond_token, exp_pool, exp_pooled_time, leader_character_id, party_slot,
-        degree_id, birth, free_mana, paid_mana, enable_auto_3x, tutorial_step, tutorial_skip_flag
+        degree_id, birth, free_mana, paid_mana, enable_auto_3x, tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id
     FROM players
     WHERE id = ?    
     `).get(playerId) as RawPlayer | undefined
@@ -351,7 +352,7 @@ export function getAllPlayersSync(
         transition_state, role, name, last_login_time, comment,
         vmoney, free_vmoney, rank_point, star_crumb,
         bond_token, exp_pool, exp_pooled_time, leader_character_id, party_slot,
-        degree_id, birth, free_mana, paid_mana, enable_auto_3x, tutorial_step, tutorial_skip_flag
+        degree_id, birth, free_mana, paid_mana, enable_auto_3x, tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id
     FROM players
     LIMIT ?
     OFFSET ?
@@ -400,7 +401,8 @@ export function insertPlayerSync(
         serializeBoolean(player.enableAuto3x),
         accountId,
         player.tutorialStep === null ? null : player.tutorialStep,
-        player.tutorialSkipFlag === null ? null : serializeBoolean(player.tutorialSkipFlag)
+        player.tutorialSkipFlag === null ? null : serializeBoolean(player.tutorialSkipFlag),
+        player.tutorialGachaCharacterId === undefined ? null : player.tutorialGachaCharacterId
     ]
 
     if (playerIdGiven)
@@ -411,8 +413,8 @@ export function insertPlayerSync(
         transition_state, role, name, last_login_time, comment, vmoney, free_vmoney,
         rank_point, star_crumb, bond_token, exp_pool, exp_pooled_time, leader_character_id,
         party_slot, degree_id, birth, free_mana, paid_mana, enable_auto_3x, account_id, 
-        tutorial_step, tutorial_skip_flag${playerIdGiven ? ', id' : ''})
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${playerIdGiven ? ', ?' : ''})
+        tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id${playerIdGiven ? ', id' : ''})
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${playerIdGiven ? ', ?' : ''})
     `).run(values)
 
     // return
@@ -476,8 +478,7 @@ export function getDefaultPlayerPartyGroupsSync(
     const partyGroups: Record<string, PlayerPartyGroup> = {}
 
     const partyNames = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
-    const groupCount = 6
-    let currentParty = 1
+    const groupCount = 12  // CN version: 12 groups × 10 slots = 120 parties
 
     const character1 = characterIds[0]
     const character2 = characterIds[1]
@@ -491,8 +492,9 @@ export function getDefaultPlayerPartyGroupsSync(
             category: partyType
         }
 
-        for (const name of partyNames) {
-            list[currentParty] = {
+        for (let slot = 1; slot <= 10; slot++) {
+            const name = partyNames[slot - 1]
+            list[slot] = {
                 name: `Party ${name}`,
                 characterIds: [character1, character2, character3],
                 unisonCharacterIds: [null, null, null],
@@ -504,7 +506,6 @@ export function getDefaultPlayerPartyGroupsSync(
                 },
                 category: partyType
             }
-            currentParty += 1
         }
 
         partyGroups[(i + 1).toString()] = group
@@ -1030,7 +1031,8 @@ export function updatePlayerSync(
         'paidMana': 'paid_mana',
         'enableAuto3x': 'enable_auto_3x',
         'tutorialStep': 'tutorial_step',
-        'tutorialSkipFlag': 'tutorial_skip_flag'
+        'tutorialSkipFlag': 'tutorial_skip_flag',
+        'tutorialGachaCharacterId': 'tutorial_gacha_character_id'
     }
 
     const sets: string[] = []

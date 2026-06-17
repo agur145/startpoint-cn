@@ -108,8 +108,10 @@ export function serializePartyGroupList(
     const serialized: Record<string, UserPartyGroup> = {}
     for (const [groupId, group] of Object.entries(partyGrouplist)) {
         const list: Record<string, UserPartyGroupTeam> = {}
-        for (const [partyId, party] of Object.entries(group.list)) {
-            list[partyId] = {
+        for (const [slot, party] of Object.entries(group.list)) {
+            // Convert per-group slot to CN global PartyId: (groupId - 1) * 10 + slot
+            const globalPartyId = (Number(groupId) - 1) * 10 + Number(slot)
+            list[globalPartyId] = {
                 "name": party.name,
                 "character_ids": party.characterIds?.map((id: number | null) => id != null ? kIdToBusinessCode(id) : null),
                 "unison_character_ids": party.unisonCharacterIds?.map((id: number | null) => id != null ? kIdToBusinessCode(id) : null),
@@ -123,6 +125,7 @@ export function serializePartyGroupList(
                 "before_battle_power": party.beforeBattlePower ?? 0
             }
         }
+        console.log(`[PARTY-SER] group=${groupId} slots=${Object.keys(group.list).length} keys=${Object.keys(list).slice(0,3).join(',')}...`)
         serialized[groupId] = {
             "list": list,
             "color_id": group.colorId
@@ -305,7 +308,9 @@ export function serializePlayerData(
         "user_notice_list": [],
         "user_triggered_tutorial": toSerialize.triggeredTutorial,
         "user_tutorial": userTutorial,
-        "tutorial_gacha": null,
+        "tutorial_gacha": toSerialize.player.tutorialGachaCharacterId !== null && toSerialize.player.tutorialGachaCharacterId !== undefined
+            ? { character_id: toSerialize.player.tutorialGachaCharacterId }
+            : null,
         "cleared_regular_mission_list": toSerialize.clearedRegularMissionList,
         "user_character_list": userCharacterList,
         "user_character_mana_node_list": (() => {
@@ -523,7 +528,8 @@ export function deserializePlayerData(
             paidMana: userInfo.paid_mana,
             enableAuto3x: userInfo.enable_auto_3x,
             tutorialStep: userTutorial?.tutorial_step === undefined ? null : userTutorial.tutorial_step,
-            tutorialSkipFlag: userTutorial?.skip_flag === undefined ? null : userTutorial.skip_flag
+            tutorialSkipFlag: userTutorial?.skip_flag === undefined ? null : userTutorial.skip_flag,
+            tutorialGachaCharacterId: toDeserialize['tutorial_gacha']?.character_id ?? null
         }
 
         // deserialize user daily challenge point list

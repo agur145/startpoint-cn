@@ -481,6 +481,7 @@ export interface RawPlayer {
     enable_auto_3x: number
     tutorial_step: number | null
     tutorial_skip_flag: number | null
+    tutorial_gacha_character_id: number | null
     time_offset: number | null
 }
 
@@ -511,6 +512,7 @@ export interface Player {
     enableAuto3x: boolean
     tutorialStep: number | null
     tutorialSkipFlag: boolean | null
+    tutorialGachaCharacterId: number | null
     timeOffset?: number | null
 }
 

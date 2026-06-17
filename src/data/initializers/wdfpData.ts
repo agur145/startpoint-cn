@@ -60,9 +60,13 @@ export default function init(
         account_id INTEGER NOT NULL,
         tutorial_step INTEGER,
         tutorial_skip_flag INTEGER,
+        tutorial_gacha_character_id INTEGER DEFAULT NULL,
         time_offset INTEGER DEFAULT NULL,
         FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE CASCADE
     )`).run();
+
+    // migration: add tutorial_gacha_character_id to existing tables
+    try { database.prepare(`ALTER TABLE players ADD COLUMN tutorial_gacha_character_id INTEGER DEFAULT NULL`).run(); } catch { /* column already exists */ }
 
     database.prepare(`CREATE TABLE IF NOT EXISTS device_bindings (
         device_id INTEGER PRIMARY KEY,

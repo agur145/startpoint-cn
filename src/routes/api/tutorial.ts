@@ -147,7 +147,8 @@ const routes = async (fastify: FastifyInstance) => {
             const newFreeVmoney = player.freeVmoney - gachaData.singleCost
             updatePlayerSync({
                 id: playerId,
-                freeVmoney: newFreeVmoney
+                freeVmoney: newFreeVmoney,
+                tutorialGachaCharacterId: randomCharacterId
             })
 
             const draw = rewardResult.draw[0] as GachaCharacterDraw
