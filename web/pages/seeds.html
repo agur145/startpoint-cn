@@ -44,8 +44,9 @@
             <div class="flex flex-wrap gap-3 items-center">
                 <button class="refresh-btn" onclick="load()">刷新</button>
                 <span class="text-sm text-on-surface-variant">模式:</span>
-                <button id="btnUnknown" class="mode-btn active" onclick="setMode('unknown')">测试池</button>
-                <button id="btnPurified" class="mode-btn" onclick="setMode('purified')">净化池</button>
+                <button id="btnNatural" class="mode-btn active" onclick="setMode('natural')">自然模式</button>
+                <button id="btnPlay" class="mode-btn" onclick="setMode('play')">播放模式</button>
+                <button id="btnTest" class="mode-btn" onclick="setMode('test')">测试模式</button>
             </div>
 
             <!-- ====== 卡池选择 ====== -->
@@ -143,8 +144,9 @@
         }
         s.coverage = s.total > 0 ? Math.round(s.tested / s.total * 100) : 0;
 
-        document.getElementById('btnUnknown').className = 'mode-btn'+(s.mode==='unknown'?' active':'');
-        document.getElementById('btnPurified').className = 'mode-btn'+(s.mode==='purified'?' active':'');
+        document.getElementById('btnNatural').className = 'mode-btn'+(s.mode==='natural'?' active':'');
+        document.getElementById('btnPlay').className = 'mode-btn'+(s.mode==='play'?' active':'');
+        document.getElementById('btnTest').className = 'mode-btn'+(s.mode==='test'?' active':'');
 
         // Config selector
         var ch = '';

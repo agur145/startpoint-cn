@@ -61,7 +61,7 @@ const routes = async (fastify: FastifyInstance) => {
 
     fastify.post("/mode", async (request: FastifyRequest, reply: FastifyReply) => {
         const { mode, selectedMovieId } = request.body as ModeBody;
-        if (mode && ['unknown', 'purified'].includes(mode)) seedValidator.setMode(mode);
+        if (mode && ['natural','play','test'].includes(mode)) seedValidator.setMode(mode);
         if (selectedMovieId) seedValidator.setSelectedMovieId(selectedMovieId);
         reply.status(200).send({ mode: seedValidator.getMode(), selectedMovieId: seedValidator.getSelectedMovieId() });
     });

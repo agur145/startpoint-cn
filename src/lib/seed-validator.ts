@@ -18,7 +18,7 @@ const PURIFIED_FILE = join(ASSETS_DIR, "purified_seeds.json");
 const CONFIG_FILE = join(ASSETS_DIR, "pool_config.json");
 const TEST_SEEDS_FILE = join(ASSETS_DIR, "test_seeds.json");
 
-export type PoolMode = 'unknown' | 'purified';
+export type PoolMode = 'natural' | 'play' | 'test';
 export type SeedTag = '未测试' | '热血躲避球' | '普通躲避球' | '冷血躲避球';
 
 interface PurifiedEntry { r: number; tag: SeedTag; play?: boolean }
@@ -43,7 +43,7 @@ class MoviePool {
 export class SeedValidator {
     private pools: Map<string, MoviePool> = new Map();
     private testSeeds: (number | null)[] = [null, null, null];
-    private mode: PoolMode = 'unknown';
+    private mode: PoolMode = 'natural';
     private selectedMovieId: string = 'fes';
 
     constructor() { this.load(); }
@@ -55,8 +55,8 @@ export class SeedValidator {
         try { if (existsSync(PURIFIED_FILE)) { const o = JSON.parse(readFileSync(PURIFIED_FILE, "utf-8")); for (const [mid, seeds] of Object.entries(o)) { if (typeof seeds !== 'object' || seeds === null) continue; for (const [s, e] of Object.entries(seeds as any)) this.pool(mid).purified.set(Number(s), { r: (e as any).r ?? 0, tag: (e as any).tag || '未测试', play: (e as any).play }); } } } catch (_) {}
         try { if (existsSync(TEST_SEEDS_FILE)) { const a = JSON.parse(readFileSync(TEST_SEEDS_FILE, "utf-8")); if (Array.isArray(a)) { this.testSeeds = [null, null, null]; for (let i = 0; i < 3; i++) if (typeof a[i] === 'number') this.testSeeds[i] = a[i]; } } } catch (_) {}
         try { if (existsSync(CONFIG_FILE)) { const c = JSON.parse(readFileSync(CONFIG_FILE, "utf-8")); if (c.selectedMovieId) this.selectedMovieId = c.selectedMovieId; } } catch (_) {}
-        // mode always defaults to 'purified' — not loaded from config (temporary web toggle only)
-        this.mode = 'purified';
+        // mode always defaults to 'natural' — not loaded from config (temporary web toggle only)
+        this.mode = 'natural';
         let t = 0; for (const m of this.pools.values()) t += m.purified.size;
         let c = 0; for (const m of this.pools.values()) c += m.confirmed.size;
         console.log(`[SEED] Confirmed:${c} Purified:${t} Mode:${this.mode}`);
@@ -129,29 +129,41 @@ export class SeedValidator {
     // 种子选取
     getSeed(movieId: string, rarity: number, pool: number[], characterId: number): number {
         const ri = rarity - 3;
+        const PURIFIED_PLAY_RATE = 0.10; // 10% natural play rate
 
-        // ① 全局测试种子
+        // ① 全局测试种子（最高优先级）
         const ts = this.testSeeds[ri];
         if (ts !== null) return ts;
 
         const p = this.pool(movieId);
 
-        if (this.mode === 'purified') {
-            // 纯净模式：优先可播放种子
-            // ② 净化池（play=1，按 rarity 匹配）
+        if (this.mode === 'play') {
+            // 播放模式：100% purified 可播放种子
             const pur = pool.find(s => { const e = p.purified.get(s); return e && e.r === ri && e.tag !== '冷血躲避球'; });
             if (pur !== undefined) return pur;
-
-            // ③ 已确认可播放的种子（PLAY beacon: play=1 known）
             const play = pool.find(s => p.confirmedPlay.has(s));
             if (play !== undefined) return play;
         }
 
-        // 两种模式共用：④ 未测试种子
+        if (this.mode === 'natural') {
+            // 自然模式：10% 用 purified 播放种子，90% 用不播放种子（模拟真实客户端）
+            const pur = pool.find(s => { const e = p.purified.get(s); return e && e.r === ri && e.tag !== '冷血躲避球'; });
+            if (pur !== undefined && Math.random() < PURIFIED_PLAY_RATE) return pur;
+        }
+
+        // 未知种子（所有模式兜底）
         const unknown = pool.find(s => !p.confirmed.has(s) && !p.purified.has(s));
         if (unknown !== undefined) return unknown;
 
-        // ⑤ 兜底
+        // 已确认可播放种子
+        const play = pool.find(s => p.confirmedPlay.has(s));
+        if (play !== undefined) return play;
+
+        // 已确认不播放种子
+        const conf = pool.find(s => p.confirmed.has(s));
+        if (conf !== undefined) return conf;
+
+        // 兜底
         return characterId * 1000;
     }
 
