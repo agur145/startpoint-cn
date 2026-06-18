@@ -96,6 +96,8 @@
 | F1065 purified_r3=0 | ★3+play=1 物理上极难（fes 护符全覆盖，球必升级）。非 bug，confirmed_play 补充 |
 | F1066 PLAY beacon 接入 | parsePlayBeacon 在 /debug handler 中运行，confirmed_play 积累 play=1 ground truth |
 | F1067 gacha 抽卡去重 | drawGachaSync 返回 number[]（flat array，按原始随机顺序），不再 group 同一角色 |
+| F1068 种子池扩容 | fes 400K, normal 400K, guarantee 各 100K。总计 1,000,000 种子 |
+| F1069 三模式 | natural(默认, 10%播放率) / play(100%播放) / test(全unknown)。模式不持久化，重启回 natural |
 | F1060 RNG tempering 修复 | `randomUInt()` tempering 从 post-twist 值改为 pre-twist 值（匹配 AS3），精度 17% → 85% |
 | F1061 threshold.amulets 越界 | `?? 0` → `!== undefined`（匹配 AS3 Number(undefined)=NaN），fes_guarantee 37% → 90% |
 | F1062 play= beacon 字段 | APK patch: C3032 beacon 加入 `play=1|0`（client moviePlayable），服务端解析存储 |

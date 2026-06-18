@@ -377,16 +377,17 @@ Scanned 200001 seeds in 14s (~15K seeds/sec)
 | 项目 | 状态 |
 |------|:---:|
 | C3032 报错 | ✅ 自动净化系统 |
-| 种子表 | ✅ 5 movie × 100K 种子（unkown/confirmed/purified 三池模型） |
+| 种子表 | ✅ 1,000,000 种子（fes 400K, normal 400K, guarantee 各 100K）。三模式选取：natural/play/test |
 | 物理配置 | ✅ 从 CN CDN 提取 5 个 AMF3 二进制，`threshold.amulets`/`ballStar4`/`isRarity5` 已重新验证 |
 | 物理引擎 | ✅ MT19937 AS3 兼容 + MathCompat cos/sin 移植 + Box2D 半隐式欧拉积分 |
-| 物理仿真精度 | ✅ normal 81%, fes 85% — ★3 95%, ★4 90%, ★5 0%。fes_guarantee 90%（越界修复后） |
-| RNG tempering | ✅ 修复：pre-twist 值 tempering（2026-06-18，从 17% → 85%） |
-| 惊险种子 | ✅ C3032→beacon→purified(play=1) 或 confirmed(play=0)。1 次无 C3032→confirmed |
+| 物理仿真精度 | ✅ rarity ~85%（RNG tempering 修复后）。playMovie ~5%（不可靠——playProbability 被 RNG 重试偏移） |
+| RNG tempering | ✅ 修复：pre-twist 值 tempering（精度 17% → 85%） |
+| 惊险种子 | ✅ C3032→beacon→purified(play=1) 或 confirmed(play=0) |
 | 自动净化 | ✅ 简化模型：unknown→confirmed（1 次无 crash）→purified（play=1 beacon） |
-| Web 管理 | ✅ `/seeds` 模式切换 + CONFIRMED/UNKNOWN 进度 + purified 标签管理 |
-| playMovie 预测 | ✅ play=1 beacon → purified 100% 准确（客户端实测）。仿真 ~5%（不可靠——playProbability 被 RNG 重试次数偏移） |
-| gacha 抽卡去重 | ✅ 2026-06-19：flat array 按原始随机顺序，不再 group 同一角色 |
+| Web 管理 | ✅ 三模式切换 + 组选择器 + purified 标签管理 |
+| playMovie 预测 | ✅ client PLAY beacon 100% 准确。purified play=1 种子天然可靠 |
+| gacha 抽卡去重 | ✅ flat array 按原始随机顺序，不再 group 同一角色 |
+| 自然模式 | ✅ 默认：10% PURIFIED_PLAY_RATE，模拟客户端真实播放率 |
 | gacha.ts | ✅ 池模式 + 优先级 + 惊险种子 + 跨池注入 |
 | 惊险种子 | 🔄 从头测试（500K 种子，play= beacon 已部署） |
 | 自动净化 | ✅ C3032 → recordDeviceData → autoPurify |

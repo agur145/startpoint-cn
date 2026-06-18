@@ -232,8 +232,8 @@ fastify.post("/crash", async (request, reply) => {
             const r = ballRarity - 3;
             const movieMatch = bodyStr.match(/movie_id=(\w+)/);
             const movieId = movieMatch ? movieMatch[1] : "normal";
-            // Crash path: no play= info → confirm only (rarity correct, play unknown)
-            if (r >= 0 && r <= 2) seedValidator.purify(movieId, badSeed, r, false);
+            // Crash path: no play= info → pendingPlay (rarity known, play unknown)
+            if (r >= 0 && r <= 2) seedValidator.addPending(movieId, badSeed, r);
             console.log(`[CRASH] seed ${badSeed} device★${ballRarity} movie=${movieId}`);
         }
     } catch (e) {}

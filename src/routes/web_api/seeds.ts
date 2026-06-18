@@ -44,6 +44,7 @@ const routes = async (fastify: FastifyInstance) => {
             unknown: mid ? Math.max(0, movieTotal - perMovieKnown) : totalSeeds - known,
             movie_total: movieTotal,
             confirmed: s.confirmed, confirmed_play: s.confirmed_play, confirmed_total: s.confirmed_total,
+            pending_play: s.pending_play || 0, pending_play_total: s.pending_play_total || 0,
             purified_r3: s.purified_r3, purified_r4: s.purified_r4, purified_r5: s.purified_r5, purified_total: s.purified_total,
             mov_r3: s.mov_r3, mov_r4: s.mov_r4, mov_r5: s.mov_r5, mov_total: s.mov_total,
             test_seeds: s.test_seeds,
