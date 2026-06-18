@@ -31,6 +31,7 @@ interface SessionClient {
     enterData: any;
     playerId: number | null;
     isBattle: boolean;
+    yourself?: any;  // pre-built host mate, sent on Enter (official relay mode)
 }
 
 const clients = new Map<string, SessionClient>();
@@ -143,26 +144,41 @@ function handleClient2Server(client: SessionClient, msg: any[]) {
 function handleNotify(client: SessionClient, msg: any[]) {
     const tag = msg[0];
     switch (tag) {
-        case 0: // Enter
+        case 0: // Enter — client sends own party data (official relay mode)
             client.enterData = msg[1];
             console.log(`[SESSION] client ${client.viewerId} entered room ${client.roomNumber}`);
-            // Sync host mate with client's actual settings from Enter data
-            if (client.mates[0] && msg[1]) {
-                const host = client.mates[0]
-                const ed = msg[1]
-                if (ed.autoplayMode !== undefined) host.autoplayMode = ed.autoplayMode
-                if (ed.autoskillMode !== undefined) host.autoskillMode = ed.autoskillMode
-                if (ed.autoSpeedLevel !== undefined) host.autoSpeedLevel = ed.autoSpeedLevel
-                if (ed.autoStart !== undefined) host.autoStart = ed.autoStart
-                if (ed.skillAbilityBehaviorMode !== undefined) host.skillAbilityBehaviorMode = ed.skillAbilityBehaviorMode
-                if (ed.dashBehaviorMode !== undefined) host.dashBehaviorMode = ed.dashBehaviorMode
-                if (ed.allowHealFromOtherPlayers !== undefined) host.allowHealFromOtherPlayers = ed.allowHealFromOtherPlayers
-                // currentPartyId intentionally NOT synced — CN client sends global PartyId (group*10+slot)
-                // which differs from the party loaded in the handshake. Syncing it causes the room's
-                // party selection to be overwritten with the client's local last-party value.
-                console.log(`[SESSION] host synced: auto=${host.autoplayMode} speed=${host.autoSpeedLevel} allowHeal=${host.allowHealFromOtherPlayers}`)
-                // Push updated mate data to client
-                sendJson(client.socket, [1, [1, client.mates]])
+            if (client.mates[0] && client.yourself && msg[1]?.party) {
+                const yours = client.yourself;
+                const ed = msg[1];
+                // Relay the client's OWN party (serialized from OwnedCharacterLogic via getMate())
+                yours.party = ed.party;
+                console.log(`[SESSION] host party from client Enter: chars=${ed.party?.characters?.map((c: any) => c?.[0] === 0 ? c[1]?.id : 'none')?.join(',')}`);
+                // Log relay party detail for AB comparison with buildRealParty
+                if (ed.party?.characters?.[0]) {
+                    const rChar = ed.party.characters[0]
+                    const rInner = rChar?.[0] === 0 && rChar[1] ? rChar[1] : rChar
+                    console.log(`[RELAY-DIFF] relay char[0] keys: ${JSON.stringify(Object.keys(rInner || {}).sort())}`)
+                    console.log(`[RELAY-DIFF] relay char[0]: ${JSON.stringify(rInner)}`)
+                }
+                if (ed.party?.equipments?.[0]) {
+                    const rEquip = ed.party.equipments[0]
+                    const rEqInner = rEquip?.[0] === 0 && rEquip[1] ? rEquip[1] : rEquip
+                    console.log(`[RELAY-DIFF] relay equip[0] keys: ${JSON.stringify(Object.keys(rEqInner || {}).sort())}`)
+                    console.log(`[RELAY-DIFF] relay equip[0]: ${JSON.stringify(rEqInner)}`)
+                }
+                console.log(`[RELAY-DIFF] relay abilitySoulIds[0]: ${JSON.stringify(ed.party?.abilitySoulIds?.[0])}`)
+                // Sync settings from Enter data
+                if (ed.autoplayMode !== undefined) yours.autoplayMode = ed.autoplayMode;
+                if (ed.autoskillMode !== undefined) yours.autoskillMode = ed.autoskillMode;
+                if (ed.autoSpeedLevel !== undefined) yours.autoSpeedLevel = ed.autoSpeedLevel;
+                if (ed.autoStart !== undefined) yours.autoStart = ed.autoStart;
+                if (ed.skillAbilityBehaviorMode !== undefined) yours.skillAbilityBehaviorMode = ed.skillAbilityBehaviorMode;
+                if (ed.dashBehaviorMode !== undefined) yours.dashBehaviorMode = ed.dashBehaviorMode;
+                if (ed.allowHealFromOtherPlayers !== undefined) yours.allowHealFromOtherPlayers = ed.allowHealFromOtherPlayers;
+                console.log(`[SESSION] host synced: auto=${yours.autoplayMode} speed=${yours.autoSpeedLevel} allowHeal=${yours.allowHealFromOtherPlayers}`);
+                // Send Welcome + Mates with client's own party
+                sendJson(client.socket, [1, [0, yours, [yours]]]);
+                setTimeout(() => sendJson(client.socket, [1, [1, [yours]]]), 100);
             }
             break;
 
@@ -303,8 +319,23 @@ function handleEnterComs(client: SessionClient, coms: any[]) {
                 for (const g of Object.values(groups)) {
                     for (const party of Object.values(g.list)) {
                         if (party.name && party.name.includes("NPC")) {
-                            npcParties.push(buildRealParty(client.playerId, party))
+                            const brp = buildRealParty(client.playerId, party)
+                            npcParties.push(brp)
                             console.log(`[SESSION] EnterComs: NPC party "${party.name}" slot=${Object.keys(g.list).find(k => g.list[k] === party)}`)
+                            // Log buildRealParty output for AB comparison with relay
+                            if (brp?.characters?.[0]) {
+                                const bChar = brp.characters[0]
+                                const bInner = bChar?.[0] === 0 && bChar[1] ? bChar[1] : bChar
+                                console.log(`[BUILD-DIFF] build char[0] keys: ${JSON.stringify(Object.keys(bInner || {}).sort())}`)
+                                console.log(`[BUILD-DIFF] build char[0]: ${JSON.stringify(bInner)}`)
+                            }
+                            if (brp?.equipments?.[0]) {
+                                const bEquip = brp.equipments[0]
+                                const bEqInner = bEquip?.[0] === 0 && bEquip[1] ? bEquip[1] : bEquip
+                                console.log(`[BUILD-DIFF] build equip[0] keys: ${JSON.stringify(Object.keys(bEqInner || {}).sort())}`)
+                                console.log(`[BUILD-DIFF] build equip[0]: ${JSON.stringify(bEqInner)}`)
+                            }
+                            console.log(`[BUILD-DIFF] build abilitySoulIds[0]: ${JSON.stringify(brp?.abilitySoulIds?.[0])}`)
                         }
                     }
                 }
@@ -633,10 +664,9 @@ async function handleHandshake(socket: net.Socket, data: string, remoteAddr: str
         currentPartyId: playerPartySlot
     };
 
-    // Welcome(self, [self]) — room with host only (avoids C15202)
-    setTimeout(() => sendJson(socket, [1, [0, yourself, [yourself]]]), 100);
-    setTimeout(() => sendJson(socket, [1, [1, [yourself]]]), 200);
-
+    // Welcome sent after client's Enter (official relay mode)
+    // self party will be replaced with client's own party data from Enter
+    client.yourself = yourself;
     client.mates = [yourself]; // for future StartBattle
 
     return client;
