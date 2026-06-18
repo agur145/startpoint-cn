@@ -265,14 +265,15 @@ Scanned 200001 seeds in 14s (~15K seeds/sec)
 | Web 管理 | ✅ `/seeds` 模式切换 + 三栏比例 + 标签管理 |
 | MT19937 精度 | ⚠️ AS3 版构造器额外 624 次 burn-in，剩余偏差在 amulet 参数
 
-## 8. 自动净化流程（2026-06-15 新增）
+## 8. 自动净化流程（2026-06-15 新增，2026-06-18 修复稀有度解析）
 
 ```
 手机抽卡 → C3032 crash
-    → /crash 解析 device★X + seed
-    → recordDeviceData(seed, ★X, ★Y)
+    → CrashUtil.debugBeacon GET → /debug 有 loc=...&C3032...&seed=...&movie_id=...
+    → parseC3032Beacon() 用 /â(\d)/g 从乱码提取 ball★ 和 char★（★→â）
+    → recordDeviceData(seed, ballRarity, charRarity)
     → blockSeed(seed)
-    → autoPurify()  ← 有 device★ 的自动移入 PURIFIED
+    → autoPurify() → r = ball-3 → 移入正确稀有度净化池
 ```
 
 惊险种子在净化池模式下优先选取，**零 C3032 抽卡**。

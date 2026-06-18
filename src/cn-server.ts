@@ -166,7 +166,7 @@ fastify.get("/debug", async (request, reply) => {
     reply.status(200).send("OK");
 });
 
-// Parse C3032 from beacon loc string — Japanese text garbled, extract seed/movie_id only
+// Parse C3032 from beacon loc string — ★ garbled to â, extract digits via garbled pattern
 function parseC3032Beacon(loc: string): void {
     if (!loc.includes("C3032")) return;
     const seedMatch = loc.match(/seed=(\d+)/);
@@ -174,12 +174,16 @@ function parseC3032Beacon(loc: string): void {
     const badSeed = parseInt(seedMatch[1], 10);
     const movieMatch = loc.match(/movie_id=(\w+)/);
     const movieId = movieMatch ? movieMatch[1] : "normal";
-    // Japanese text is garbled in beacon, cannot extract ball rarity.
-    // Record a placeholder so autoPurify can proceed.
-    seedValidator.recordDeviceData(badSeed, 3, 0);
+    // ★ character is garbled to â in URL encoding, but digits survive.
+    // Pattern: 結果レア度=â5 → first match = ball rarity
+    //         キャラクターレア度=â4 → second match = char rarity
+    const starDigits = [...loc.matchAll(/â(\d)/g)];
+    const ballRarity = starDigits.length > 0 ? parseInt(starDigits[0][1], 10) : 3;
+    const charRarity = starDigits.length > 1 ? parseInt(starDigits[1][1], 10) : 3;
+    seedValidator.recordDeviceData(badSeed, ballRarity, charRarity);
     seedValidator.blockSeed(badSeed);
     seedValidator.autoPurify(movieId);
-    console.log(`[BEACON] C3032 → purified seed ${badSeed} [${movieId}]`);
+    console.log(`[BEACON] C3032 → purified seed ${badSeed} ★${ballRarity} [${movieId}]`);
 }
 
 fastify.post("/debug", async (request, reply) => {
