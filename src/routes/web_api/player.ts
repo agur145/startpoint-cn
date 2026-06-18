@@ -100,6 +100,25 @@ const routes = async (fastify: FastifyInstance) => {
         }
     })
 
+    // Refill resources for AFK gacha pulling
+    fastify.post("/:id/refill_resources", async (request: FastifyRequest, reply: FastifyReply) => {
+        const playerId = Number((request.params as any).id)
+        if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid player ID" })
+        const threshold = Number((request.body as any).threshold) || 2000
+        const amount = Number((request.body as any).amount) || 999999
+
+        const player = getPlayerSync(playerId)
+        if (!player) return reply.status(404).send({ error: "Player not found" })
+
+        const current = player.freeVmoney
+        if (current >= threshold) {
+            return reply.status(200).send({ ok: true, freeVmoney: current, refilled: false })
+        }
+
+        updatePlayerSync({ id: playerId, freeVmoney: amount, vmoney: amount, freeMana: 99999999, stamina: 999 })
+        return reply.status(200).send({ ok: true, freeVmoney: amount, refilled: true, previous: current })
+    })
+
     // Add character
     fastify.post("/:id/character", async (request: FastifyRequest, reply: FastifyReply) => {
         const { id } = request.params as { id: string }
