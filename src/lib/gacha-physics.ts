@@ -828,12 +828,15 @@ export function generateSeedPools(
     config?: Partial<GachaPhysicsConfig>,
     seedMin: number = 10_000_000,
     seedMax: number = 10_100_000,
+    requirePlayable: boolean = false,
 ): Record<number, number[]> {
     const pools: Record<number, number[]> = { 0: [], 1: [], 2: [] };
 
     for (let seed = seedMin; seed <= seedMax; seed++) {
         const sim = new GachaSimulator(seed, config);
         const rarity = sim.simulate();
+
+        if (requirePlayable && !sim.moviePlayable) continue;
 
         if (!pools[rarity]) pools[rarity] = [];
         pools[rarity].push(seed);
