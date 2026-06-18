@@ -117,3 +117,33 @@ getQuestSync 统一 BattleQuest → 纯剧情关有了 rankPointReward 字段
 | 1 | `quest.ts:99` | `\|\| null` → `?? null`（0 不被 falsy 吞掉） |
 | 2 | `singleBattleQuest.ts` `multiBattleQuest.ts` | DB INSERT `clearRank: clearRank ?? 5` |
 | 3 | `singleBattleQuest.ts` `multiBattleQuest.ts` | 响应 `"clear_rank": clearRank ?? 5`（不发 null 给客户端） |
+
+## C2274 详解
+
+### 错误信息
+
+```
+ClientError 2274: ID: 141010のキャラクターの entry_count が存在しません
+```
+
+### 触发条件（客户端 `PlayerLogic.as:3043`）
+
+| 条件 | 说明 |
+|------|------|
+| 响应 `character_list` 包含某角色 | `_loc4_ = int(_loc3_.character_id)` |
+| 客户端 `hasCharacter()` 返回 `false` | 玩家尚未拥有 |
+| `entry_count` 字段为 `Option.None` | 缺失，对**新角色**是必填项 |
+
+### 原因
+
+1. **`2b2bdb9`** 已修复 10 连相同角色重复导致 C2274 的 bug（同 ID 合并逻辑）
+2. 这次 C2274 的 `character_id=141010` **不在任何数据源中**（CN/EN character.json、gacha.json、DB 均无）
+3. 堆栈含 `Reproduce/executeEvent()`——是**客户端 replay 日志重放**触发，不是服务端实时响应
+4. `entry_count` 对**已有角色**不是必填（`hasCharacter=true` 时跳过检查），仅**新角色**触发
+
+### 未修复
+
+标记为 ⚠️ 已知不修复。根因在客户端 replay 日志数据损坏（旧 session 残留在设备存储中），服务端无法处理。重装 APK 可清除。
+
+临时防御：在所有返回 `character_list` 的服务器端点确保每条记录都含 `entry_count`，但当前未实施（不影响核心流程）。
+
