@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import seedValidator, { PoolMode, TestPriority, SeedTag } from "../../lib/seed-validator";
+import seedValidator, { PoolMode, SeedTag } from "../../lib/seed-validator";
 import { readdirSync, readFileSync, existsSync } from "fs";
 import { join } from "path";
 
@@ -19,7 +19,7 @@ function countAllSeeds(): number {
     return total > 0 ? total : 19941;
 }
 
-interface ModeBody { mode: PoolMode; priority: TestPriority; selectedMovieId?: string; }
+interface ModeBody { mode: PoolMode; selectedMovieId?: string; }
 interface TagBody { seed: number; tag: SeedTag; movieId: string; }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -49,11 +49,10 @@ const routes = async (fastify: FastifyInstance) => {
     });
 
     fastify.post("/mode", async (request: FastifyRequest, reply: FastifyReply) => {
-        const { mode, priority, selectedMovieId } = request.body as ModeBody;
+        const { mode, selectedMovieId } = request.body as ModeBody;
         if (mode && ['unknown', 'purified'].includes(mode)) seedValidator.setMode(mode);
-        if (priority && ['all', '3', '4', '5'].includes(priority)) seedValidator.setPriority(priority);
         if (selectedMovieId) seedValidator.setSelectedMovieId(selectedMovieId);
-        reply.status(200).send({ mode: seedValidator.getMode(), priority: seedValidator.getPriority(), selectedMovieId: seedValidator.getSelectedMovieId() });
+        reply.status(200).send({ mode: seedValidator.getMode(), selectedMovieId: seedValidator.getSelectedMovieId() });
     });
 
     fastify.post("/tag", async (request: FastifyRequest, reply: FastifyReply) => {

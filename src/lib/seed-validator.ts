@@ -23,7 +23,6 @@ const VERIFY_THRESHOLD = 10;
 const TEST_SEED_TIMEOUT_MS = 10 * 60 * 1000;
 
 export type PoolMode = 'unknown' | 'purified';
-export type TestPriority = 'all' | '3' | '4' | '5';
 export type SeedTag = '未测试' | '热血躲避球' | '普通躲避球' | '冷血躲避球';
 
 interface PurifiedEntry { r: number; tag: SeedTag }
@@ -37,11 +36,6 @@ class MoviePool {
     getPurifiedSame(ri: number, pool: number[]): number | null {
         const same = pool.filter(s => { const e = this.purified.get(s); return e && e.r === ri && e.tag !== '冷血躲避球'; });
         return same.length > 0 ? same[Math.floor(Math.random() * same.length)] : null;
-    }
-
-    getPurifiedAny(ri: number, pool: number[]): number | null {
-        const any = pool.filter(s => { const e = this.purified.get(s); return e && e.r === ri && e.tag !== '冷血躲避球'; });
-        return any.length > 0 ? any[Math.floor(Math.random() * any.length)] : null;
     }
 
     selectFromTestPool(ri: number, pool: number[]): number | null {
@@ -83,7 +77,6 @@ export class SeedValidator {
     private testSeeds: (number | null)[] = [null, null, null];
     private testTimestamps: (number | null)[] = [null, null, null];
     private mode: PoolMode = 'unknown';
-    private priority: TestPriority = 'all';
     private selectedMovieId: string = 'fes';
 
     constructor() { this.load(); }
@@ -97,7 +90,7 @@ export class SeedValidator {
         try { if (existsSync(VERIFIED_FILE)) { const o = JSON.parse(readFileSync(VERIFIED_FILE, "utf-8")); this.loadPerMovie(o, 'verified'); } } catch (_) {}
         try { if (existsSync(PENDING_FILE)) { const o = JSON.parse(readFileSync(PENDING_FILE, "utf-8")); this.loadPerMovie(o, 'pending'); } } catch (_) {}
         try { if (existsSync(TEST_SEEDS_FILE)) { const a = JSON.parse(readFileSync(TEST_SEEDS_FILE, "utf-8")); this.loadTestSeeds(a); } } catch (_) {}
-        try { if (existsSync(CONFIG_FILE)) { const c = JSON.parse(readFileSync(CONFIG_FILE, "utf-8")); if (c.mode) this.mode = c.mode; if (c.priority) this.priority = c.priority; if (c.selectedMovieId) this.selectedMovieId = c.selectedMovieId; } } catch (_) {}
+        try { if (existsSync(CONFIG_FILE)) { const c = JSON.parse(readFileSync(CONFIG_FILE, "utf-8")); if (c.mode) this.mode = c.mode; if (c.selectedMovieId) this.selectedMovieId = c.selectedMovieId; } } catch (_) {}
         let t = 0; for (const m of this.pools.values()) t += m.purified.size;
         console.log(`[SEED] Blocked:${this.blocked.size} Purified:${t} Mode:${this.mode}`);
     }
@@ -139,7 +132,7 @@ export class SeedValidator {
     private saveTestSeeds(): void { writeFileSync(TEST_SEEDS_FILE, JSON.stringify([...this.testSeeds, this.testTimestamps], null, 2), "utf-8"); }
     private saveBlocked(): void { writeFileSync(BLOCKED_FILE, JSON.stringify(Array.from(this.blocked).sort((a, b) => a - b), null, 2), "utf-8"); }
     private saveDeviceData(): void { writeFileSync(DEVICE_FILE, JSON.stringify(Object.fromEntries(this.deviceData), null, 2), "utf-8"); }
-    private saveConfig(): void { writeFileSync(CONFIG_FILE, JSON.stringify({ mode: this.mode, priority: this.priority, selectedMovieId: this.selectedMovieId }, null, 2), "utf-8"); }
+    private saveConfig(): void { writeFileSync(CONFIG_FILE, JSON.stringify({ mode: this.mode, selectedMovieId: this.selectedMovieId }, null, 2), "utf-8"); }
 
     // C3032
     recordDeviceData(seed: number, ballRarity: number, _charRarity: number): void { this.deviceData.set(seed, ballRarity); this.saveDeviceData(); }
@@ -147,8 +140,12 @@ export class SeedValidator {
     autoPurify(movieId: string): number {
         let count = 0; const toDelete: number[] = [];
         for (const seed of this.blocked) { const ball = this.deviceData.get(seed); if (ball) { this.pool(movieId).purified.set(seed, { r: ball - 3, tag: '未测试' }); toDelete.push(seed); count++; } }
-        for (const s of toDelete) this.blocked.delete(s);
-        if (count > 0) { this.savePurified(); this.saveBlocked(); console.log(`[SEED] PURIFIED [${movieId}]: ${count} seeds`); }
+        for (const s of toDelete) {
+            this.blocked.delete(s);
+            // Clear from all pools' pending/verified so selectFromTestPool doesn't re-pick it
+            for (const [, p] of this.pools) { p.pending.delete(s); p.verified.delete(s); }
+        }
+        if (count > 0) { this.savePurified(); this.saveBlocked(); this.savePending(); this.saveVerified(); console.log(`[SEED] PURIFIED [${movieId}]: ${count} seeds`); }
         return count;
     }
 
@@ -170,8 +167,8 @@ export class SeedValidator {
     }
 
     // 模式
-    getMode(): PoolMode { return this.mode; } getPriority(): TestPriority { return this.priority; } getSelectedMovieId(): string { return this.selectedMovieId; }
-    setMode(m: PoolMode): void { this.mode = m; this.saveConfig(); } setPriority(p: TestPriority): void { this.priority = p; this.saveConfig(); } setSelectedMovieId(id: string): void { this.selectedMovieId = id; this.saveConfig(); }
+    getMode(): PoolMode { return this.mode; } getSelectedMovieId(): string { return this.selectedMovieId; }
+    setMode(m: PoolMode): void { this.mode = m; this.saveConfig(); } setSelectedMovieId(id: string): void { this.selectedMovieId = id; this.saveConfig(); }
     getMovieIds(): string[] { return Array.from(this.pools.keys()); }
 
     // 跨池搜索
@@ -194,13 +191,10 @@ export class SeedValidator {
 
         const p = this.pool(movieId);
 
-        // ② 净化池同稀有度
-        const pur = p.getPurifiedSame(ri, pool);
-        if (pur !== null) return pur;
-
+        // ② 净化池（仅净化池模式生效）
         if (this.mode === 'purified') {
-            const any = p.getPurifiedAny(ri, pool);
-            if (any !== null) return any;
+            const pur = p.getPurifiedSame(ri, pool);
+            if (pur !== null) return pur;
             console.log(`[SEED] No purified ★${rarity} in [${movieId}]`);
         }
 
@@ -232,7 +226,7 @@ export class SeedValidator {
             mov_pending: p.pending.size, mov_verified: p.verified.size,
             purified_r3: all.r3, purified_r4: all.r4, purified_r5: all.r5, purified_total: all.total, hot: all.hot, normal: all.normal,
             test_seeds: this.testSeeds,
-            mode: this.mode, priority: this.priority, selectedMovieId: this.selectedMovieId, movieIds: Array.from(this.pools.keys()),
+            mode: this.mode, selectedMovieId: this.selectedMovieId, movieIds: Array.from(this.pools.keys()),
         };
     }
 

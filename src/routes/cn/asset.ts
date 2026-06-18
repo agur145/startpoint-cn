@@ -3,21 +3,26 @@ import { generateDataHeaders } from "../../utils";
 import { readdirSync, statSync } from "fs";
 import path from "path";
 
-const CN_HOST = process.env.CN_LISTEN_HOST || "localhost";
 const CN_PORT = process.env.CN_LISTEN_PORT || "8001";
-const HOST = CN_HOST === "0.0.0.0" ? "localhost" : CN_HOST;
-const CDN_BASE = process.env.CDN_BASE_URL || `http://${HOST}:${CN_PORT}/patch/cn`;
+const CDN_BASE = process.env.CDN_BASE_URL;
 
-function getVersionInfo() {
+/** Get CDN base URL from request Host header, fall back to CDN_BASE_URL env or default. */
+function getCdnBase(request: FastifyRequest): string {
+    if (CDN_BASE) return CDN_BASE;
+    const host = request.headers.host || `localhost:${CN_PORT}`;
+    return `http://${host}/patch/cn`;
+}
+
+function getVersionInfo(baseUrl: string) {
     return {
-        base_url: `${CDN_BASE}/EntityLists/`,
-        files_list: `${CDN_BASE}/EntityLists/PathFile`,
+        base_url: `${baseUrl}/EntityLists/`,
+        files_list: `${baseUrl}/EntityLists/PathFile`,
         total_size: TOTAL_SIZE,
         delayed_assets_size: 0
     };
 }
 
-function buildArchiveList(cdnDir: string, subdir: string): { location: string; size: number; sha256: string }[] {
+function buildArchiveList(baseUrl: string, cdnDir: string, subdir: string): { location: string; size: number; sha256: string }[] {
     const dir = path.join(cdnDir, subdir);
     try {
         return readdirSync(dir)
@@ -25,7 +30,7 @@ function buildArchiveList(cdnDir: string, subdir: string): { location: string; s
             .map(f => {
                 const stats = statSync(path.join(dir, f));
                 return {
-                    location: `${CDN_BASE}/${subdir}/${f}`,
+                    location: `${baseUrl}/${subdir}/${f}`,
                     size: stats.size,
                     sha256: ""
                 };
@@ -48,7 +53,7 @@ function compareVersion(a: string, b: string): number {
     return 0;
 }
 
-function buildDiffList(cdnDir: string): { original_version: string; version: string; archive: { location: string; size: number; sha256: string }[] }[] {
+function buildDiffList(baseUrl: string, cdnDir: string): { original_version: string; version: string; archive: { location: string; size: number; sha256: string }[] }[] {
     const groups = new Map<string, { original_version: string; archive: { location: string; size: number; sha256: string }[] }>();
     for (const subdir of ["archive-common-diff", "archive-medium-diff", "archive-android-diff"]) {
         const dir = path.join(cdnDir, subdir);
@@ -60,7 +65,7 @@ function buildDiffList(cdnDir: string): { original_version: string; version: str
                     const to = match[2];
                     const stats = statSync(path.join(dir, f));
                     if (!groups.has(to)) groups.set(to, { original_version: from, archive: [] });
-                    groups.get(to)!.archive.push({ location: `${CDN_BASE}/${subdir}/${f}`, size: stats.size, sha256: "" });
+                    groups.get(to)!.archive.push({ location: `${baseUrl}/${subdir}/${f}`, size: stats.size, sha256: "" });
                 }
             }
         } catch (e) {
@@ -90,22 +95,24 @@ const TOTAL_SIZE = (() => {
 })();
 
 const routes = async (fastify: FastifyInstance) => {
-    fastify.post("/version_info", async (_request: FastifyRequest, reply: FastifyReply) => {
+    fastify.post("/version_info", async (request: FastifyRequest, reply: FastifyReply) => {
+        const baseUrl = getCdnBase(request);
         reply.header("content-type", "application/x-msgpack");
         reply.status(200).send({
             data_headers: generateDataHeaders(),
-            data: getVersionInfo()
+            data: getVersionInfo(baseUrl)
         });
     });
 
     fastify.post("/get_path", async (request: FastifyRequest, reply: FastifyReply) => {
+        const baseUrl = getCdnBase(request);
         const resVer = request.headers['res_ver'] as string | undefined;
         const fullArchives = [
-            ...buildArchiveList(cdnDir, "archive-common-full"),
-            ...buildArchiveList(cdnDir, "archive-medium-full"),
-            ...buildArchiveList(cdnDir, "archive-android-full"),
+            ...buildArchiveList(baseUrl, cdnDir, "archive-common-full"),
+            ...buildArchiveList(baseUrl, cdnDir, "archive-medium-full"),
+            ...buildArchiveList(baseUrl, cdnDir, "archive-android-full"),
         ];
-        const diffArchives = buildDiffList(cdnDir);
+        const diffArchives = buildDiffList(baseUrl, cdnDir);
         const highestDiff = diffArchives.length > 0
             ? diffArchives[diffArchives.length - 1].version
             : "1.4.0";

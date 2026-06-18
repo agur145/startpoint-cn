@@ -83,8 +83,10 @@
 | F1052 种子选取优先级 | testSeed(全局) > purified(同稀有度) > testPool(UNKNOWN/PENDING/VERIFIED)，删除跨稀有度兜底 |
 | F1053 gacha.ts movieId 修复 | `movieId` 计算提到 `loadMovieSeeds` 之前，GUARANTEE 抽卡正确加载对应池 |
 | F1054 多卡池种子池 | 5 个 movie_id 各独立过滤池 + CDN 阈值提取（normal/fes/fes_guarantee/normal_guarantee/rarity_5_guarantee） |
-| ✅ 种子池 | MoviePool 独立管理，testSeeds 全局不区分 movie，purified 按卡池隔离，零跨池污染 |
-| ⚠️ 复刻卡池 UP 标记 | 复刻版（col[0] 带 `_1`/`_2`）共享原版赔率含 `odds_up=true`，客户端可能不应展示 UP；待验证 |
+| F1055 CDN URL 动态检测 | CDN 下载地址从请求 `Host` 头自动获取，不再硬编码 IP，多设备/多网段兼容 |
+| F1056 C3032 跳过补丁 | `starview/04e-skip-c3032.sh` + APK 构建，`BallMovie.as` throw→return，游戏不弹窗中断 |
+| ✅ 种子池 | MoviePool 独立管理，testSeeds 全局不区分 movie，purified 按卡池隔离 |
+| ⚠️ CDN 目录要求 | `.cdn/cn/archive-*/*.zip` 必须存在完整 CN CDN ZIP 包，服务端从 `patch/cn/` 前缀提供静态文件 |
 
 ## C3212 修复详解
 
