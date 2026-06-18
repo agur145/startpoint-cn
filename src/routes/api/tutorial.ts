@@ -135,10 +135,9 @@ const routes = async (fastify: FastifyInstance) => {
             })
 
             // perform pull
-            const drawResult: Map<number, number> = new Map()
             const randomCharacterIndex = randomInt(0, tutorialGachaCharacterIds.length)
             const randomCharacterId = tutorialGachaCharacterIds[randomCharacterIndex]
-            drawResult.set(randomCharacterId, 1)
+            const drawResult = [randomCharacterId]
 
             // reward pull
             const rewardResult = rewardPlayerGachaDrawResultSync(playerId, gachaData, drawResult)

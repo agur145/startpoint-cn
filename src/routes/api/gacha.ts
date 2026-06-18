@@ -373,8 +373,8 @@ const routes = async (fastify: FastifyInstance) => {
 
         // Log each drawn item in history
         const historyType = isCharacterGacha ? MailType.CHARACTER : MailType.EQUIPMENT
-        for (const [itemId, count] of drawResult) {
-            insertReceiveHistorySync(playerId, { type: historyType, type_id: itemId, number: count })
+        for (const itemId of drawResult) {
+            insertReceiveHistorySync(playerId, { type: historyType, type_id: itemId, number: 1 })
         }
 
         const newGachaExchangePoint = (playerGachaData.gachaExchangePoint ?? 0) + pullCount

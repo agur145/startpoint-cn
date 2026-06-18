@@ -409,7 +409,7 @@ export interface CharacterGacha extends Gacha {
 
 export type Gachas = Record<string, Gacha>
 
-export type GachaDrawResult = Map<number, number>
+export type GachaDrawResult = number[]
 
 export interface RewardPlayerGachaDrawResult {
     draw: GachaDraws,
