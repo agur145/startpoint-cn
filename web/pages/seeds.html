@@ -154,8 +154,7 @@
         var t = s.mov_total;
         document.getElementById('cfgSummary').innerHTML =
             '<span class="stat"><span class="label pur">净化</span><br><span class="value pur">'+t+'</span></span>'
-            + '<span class="stat"><span class="label ok">确认</span><br><span class="value ok">'+s.confirmed+'</span></span>'
-            + (s.purified_total > t ? '<span class="stat"><span class="label" style="color:#888">全部净化</span><br><span class="value" style="color:#888">'+s.purified_total+'</span></span>' : '');
+            + '<span class="stat"><span class="label ok">确认</span><br><span class="value ok">'+s.confirmed+'</span></span>';
 
         // Test seed bar
         var tsArr = s.test_seeds || [null,null,null];
