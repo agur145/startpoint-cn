@@ -392,15 +392,35 @@ Scanned 200001 seeds in 14s (~15K seeds/sec)
 | Web 管理 | ✅ `/seeds` 模式切换 + 三栏比例 + 标签管理 |
 | playMovie 预测 | 🔄 依赖仿真精度，客户端 beacon 上报是可靠替代方案 |
 
-### 8a. 剩余误差来源分析
+### 8a. 仿真精度分析（2026-06-19 更新）
 
-经过 RNG tempering + amulets 越界修复，整体精度 85%。剩余 15% 误差分布：
+**rarity 预测**：~85%（基于 purified ground truth 360 种子）
 
-| 误差源 | 占比 | 具体表现 |
-|--------|:---:|------|
-| ★5 护符接触漏检 | ~10% | 仿真检测不到足够护符接触 → 球停留 ★3/★4，客户端实际 ★5 |
-| ★5 受污染数据 | ~3% | 部分 purified r=5 可能来自旧 beacon 解析（0/34 匹配） |
-| ★4 边界种子 | ~2% | ballStar4 阈值边界附近的种子 |
+**playMovie 预测**：~5%（基于 18 个 `confirmed_play` 种子实测）。`playProbability` 是 RNG 最后一位——前置 `chooseNumbers()` 重试次数偏移导致 RNG 位置不同，服务端读到的值和客户端**完全不相关**。**playMovie 无法通过仿真预测，唯一可靠来源是客户端 PLAY beacon（`play=1`）。**
+
+### 8b. purified_r3 = 0 原因
+
+★3 ball + play=1 物理上极难发生：
+
+```
+moviePlayable=true (10%) → fes 7 圆形护符 + 5 全宽条形护符覆盖整个下落区域
+  → 球穿过时几乎必然碰到至少 1 个护符 → 升级到 ★4/★5
+  → 循环结束后 ball.rarity ≠ ★3
+
+moviePlayable=false (90%) → 球停在 ★3 → 但 play=0 → 进入 confirmed 而非 purified
+```
+
+**puified_r3 = 0 是物理必然，不是 bug。** ★3 可播放种子通过 `confirmed_play` 机制收集（客户端 PLAY beacon play=1 → 不区分稀有度）。
+
+### 8c. 种子池简化模型（三池）
+
+| 池 | 含义 | 来源 |
+|----|------|------|
+| unknown | 未测试 | 仿真生成（rarity 85% 准确） |
+| confirmed / confirmed_play | rarity 正确 / 确认可播放 | 发送 1 次无 C3032 / PLAY beacon play=1 |
+| purified | rarity 正确 + 可播放 | C3032 beacon + play=1（仅 ★4/★5） |
+
+选取优先级（purified mode）：testSeed > purified(r===ri) > confirmed_play > unknown
 
 修复历史：
 - RNG temering bug（2026-06-18）：`randomUInt()` 对 POST-TWIST 值做 tempering，AS3 用 PRE-TWIST 值。修复后精度飞跃 17% → 85%。

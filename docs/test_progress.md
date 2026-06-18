@@ -91,8 +91,10 @@
 | ⚠️ CDN 目录要求 | `.cdn/cn/archive-*/*.zip` 必须存在完整 CN CDN ZIP 包，服务端从 `patch/cn/` 前缀提供静态文件 |
 | ⚠️ Beacon 日语乱码 | ⚠️→✅ `CrashUtil.debugBeacon` ★→â，用 `/â(\d)/g` regex 从 garbled 字符提取数字 |
 | F1059 gacha-physics 完善 | MathCompat cos/sin 移植 + 配置深度合并 + moviePlayable=false 跳帧 + AMF3 阈值提取 |
-| ✅ gacha-physics 精度 | normal 81%, fes 85% — ★3 95%, ★4 90%, ★5 0%。fes_guarantee 90%（越界修复后） |
-| F1064 种子池简化 | 删除 pending/verified/blocked，引入 confirmed（1 次无 C3032）。purified 仅接受 play=1。三池: unknown→confirmed→purified |
+| ✅ gacha-physics 精度 | rarity ~85%, playMovie ~5%（不可预测，靠 PLAY beacon） |
+| F1064 种子池简化 | 删除 pending/verified/blocked，三池: unknown→confirmed/play→purified |
+| F1065 purified_r3=0 | ★3+play=1 物理上极难（fes 护符全覆盖，球必升级）。非 bug，confirmed_play 补充 |
+| F1066 PLAY beacon 接入 | parsePlayBeacon 在 /debug handler 中运行，confirmed_play 积累 play=1 ground truth |
 | F1060 RNG tempering 修复 | `randomUInt()` tempering 从 post-twist 值改为 pre-twist 值（匹配 AS3），精度 17% → 85% |
 | F1061 threshold.amulets 越界 | `?? 0` → `!== undefined`（匹配 AS3 Number(undefined)=NaN），fes_guarantee 37% → 90% |
 | F1062 play= beacon 字段 | APK patch: C3032 beacon 加入 `play=1|0`（client moviePlayable），服务端解析存储 |
