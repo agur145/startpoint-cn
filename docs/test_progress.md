@@ -84,9 +84,12 @@
 | F1053 gacha.ts movieId 修复 | `movieId` 计算提到 `loadMovieSeeds` 之前，GUARANTEE 抽卡正确加载对应池 |
 | F1054 多卡池种子池 | 5 个 movie_id 各独立过滤池 + CDN 阈值提取（normal/fes/fes_guarantee/normal_guarantee/rarity_5_guarantee） |
 | F1055 CDN URL 动态检测 | CDN 下载地址从请求 `Host` 头自动获取，不再硬编码 IP，多设备/多网段兼容 |
-| F1056 C3032 跳过补丁 | `starview/04e-skip-c3032.sh` + APK 构建，`BallMovie.as` throw→return，游戏不弹窗中断 |
+| F1056 C3032 跳过补丁 | `starview/04e-skip-c3032.sh` + APK 构建，`CrashUtil.debugBeacon` 替代 throw |
+| F1057 /debug GET C3032 解析 | `GET /debug` beacon 解析 C3032 → blockSeed → autoPurify，日语乱码用 placeholder rarity |
+| F1058 autoPurify 无条件 | 删除 `if (ball)` 门控，blocked 种子始终净化，无 deviceData 默认 ★3 |
 | ✅ 种子池 | MoviePool 独立管理，testSeeds 全局不区分 movie，purified 按卡池隔离 |
 | ⚠️ CDN 目录要求 | `.cdn/cn/archive-*/*.zip` 必须存在完整 CN CDN ZIP 包，服务端从 `patch/cn/` 前缀提供静态文件 |
+| ⚠️ Beacon 日语乱码 | `CrashUtil.debugBeacon` 的 UTF-8 ★ 字符在 URL 传输中损坏，无法提取设备稀有度 |
 
 ## C3212 修复详解
 

@@ -139,10 +139,14 @@ export class SeedValidator {
     blockSeed(seed: number): void { if (this.blocked.has(seed)) return; this.blocked.add(seed); this.saveBlocked(); }
     autoPurify(movieId: string): number {
         let count = 0; const toDelete: number[] = [];
-        for (const seed of this.blocked) { const ball = this.deviceData.get(seed); if (ball) { this.pool(movieId).purified.set(seed, { r: ball - 3, tag: '未测试' }); toDelete.push(seed); count++; } }
+        for (const seed of this.blocked) {
+            const ball = this.deviceData.get(seed);
+            const r = ball ? ball - 3 : 0; // default ★3 if device data unavailable
+            this.pool(movieId).purified.set(seed, { r, tag: '未测试' });
+            toDelete.push(seed); count++;
+        }
         for (const s of toDelete) {
             this.blocked.delete(s);
-            // Clear from all pools' pending/verified so selectFromTestPool doesn't re-pick it
             for (const [, p] of this.pools) { p.pending.delete(s); p.verified.delete(s); }
         }
         if (count > 0) { this.savePurified(); this.saveBlocked(); this.savePending(); this.saveVerified(); console.log(`[SEED] PURIFIED [${movieId}]: ${count} seeds`); }

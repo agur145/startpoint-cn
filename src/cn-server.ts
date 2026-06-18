@@ -161,13 +161,35 @@ fastify.get("/debug", async (request, reply) => {
     const ts = new Date().toISOString();
     const loc = (request.query as any)?.loc || "unknown";
     console.log(`[BEACON ${ts}] ${loc}`);
+    // Parse C3032 from beacon query string (04e patch sends via CrashUtil.debugBeacon)
+    try { parseC3032Beacon(loc); } catch (_) {}
     reply.status(200).send("OK");
 });
+
+// Parse C3032 from beacon loc string — Japanese text garbled, extract seed/movie_id only
+function parseC3032Beacon(loc: string): void {
+    if (!loc.includes("C3032")) return;
+    const seedMatch = loc.match(/seed=(\d+)/);
+    if (!seedMatch) return;
+    const badSeed = parseInt(seedMatch[1], 10);
+    const movieMatch = loc.match(/movie_id=(\w+)/);
+    const movieId = movieMatch ? movieMatch[1] : "normal";
+    // Japanese text is garbled in beacon, cannot extract ball rarity.
+    // Record a placeholder so autoPurify can proceed.
+    seedValidator.recordDeviceData(badSeed, 3, 0);
+    seedValidator.blockSeed(badSeed);
+    seedValidator.autoPurify(movieId);
+    console.log(`[BEACON] C3032 → purified seed ${badSeed} [${movieId}]`);
+}
 
 fastify.post("/debug", async (request, reply) => {
     const ts = new Date().toISOString();
     const loc = (request.body as any)?.loc || "unknown";
     console.log(`[BEACON ${ts}] ${loc}`);
+
+    // Parse C3032 beacons for auto-purification (04e patch skips throw but keeps beacon)
+    try { parseC3032Beacon(loc); } catch (_) {}
+
     reply.status(200).send("OK");
 });
 
