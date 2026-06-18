@@ -158,18 +158,12 @@ const routes = async (fastify: FastifyInstance) => {
             { key: 'boostPoint', label: 'Boost', value: player.boostPoint },
         ];
         let resourcesHtml = '';
-        resourcesHtml += `<div class="col-span-5 mb-2 flex flex-wrap gap-2 items-center" style="font-size:0.75rem">
-            <span class="text-on-surface-variant">低于</span>
-            <input id="refillThreshold" value="2000" style="width:60px" class="bg-surface-container rounded border border-outline-variant p-1 text-sm">
-            <span class="text-on-surface-variant">免费星导石恢复至</span>
-            <input id="refillAmount" value="999999" style="width:80px" class="bg-surface-container rounded border border-outline-variant p-1 text-sm">
-            <button class="refresh-btn" onclick="refillResources()">补充</button>
-        </div>`;
         for (const f of resourceFields) {
             resourcesHtml += `<div><label class="text-xs text-on-surface-variant">${f.label}</label>
-                <input class="bg-surface-container rounded border border-outline-variant p-1 w-24 text-sm" value="${f.value}" onchange="editField('${f.key}', this.value)"></div>`;
+                <input class="bg-surface-container rounded border border-outline-variant p-1 w-full text-sm" value="${f.value}" onchange="editField('${f.key}', this.value)"></div>`;
         }
         html = html.replace("{{resources}}", resourcesHtml);
+        html = html.replace("{{resourceCols}}", "grid-cols-4");
 
         // Character list
         const characters = getPlayerCharactersSync(parsedPlayerId);
