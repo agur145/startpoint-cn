@@ -162,6 +162,7 @@ fastify.get("/debug", async (request, reply) => {
     const loc = (request.query as any)?.loc || "unknown";
     // Parse C3032 from beacon query string (04e patch sends via CrashUtil.debugBeacon)
     try { parseC3032Beacon(loc); } catch (_) {}
+    try { parsePlayBeacon(loc); } catch (_) {}
     reply.status(200).send("OK");
 });
 
@@ -190,15 +191,19 @@ function parseC3032Beacon(loc: string): void {
 // PLAY beacon — every draw reports play=1|0 (APK 04e Patch 5)
 // Format: PLAY|play=1|seed=10000001, movie_id=fes
 function parsePlayBeacon(loc: string): void {
-    if (!loc.startsWith("PLAY|")) return;
-    const seedMatch = loc.match(/seed=(\d+)/);
-    if (!seedMatch) return;
-    const seed = parseInt(seedMatch[1], 10);
-    const movieMatch = loc.match(/movie_id=(\w+)/);
-    const movieId = movieMatch ? movieMatch[1] : "normal";
-    const playMatch = loc.match(/play=(\d)/);
-    const didPlay = playMatch ? playMatch[1] === '1' : false;
-    if (didPlay) seedValidator.confirmPlay(movieId, seed);
+    if (loc.startsWith("PLAY|")) {
+        const seedMatch = loc.match(/seed=(\d+)/);
+        if (!seedMatch) { console.log(`[PLAY] no seed in: ${loc.substring(0,80)}`); return; }
+        const seed = parseInt(seedMatch[1], 10);
+        const movieMatch = loc.match(/movie_id=(\w+)/);
+        const movieId = movieMatch ? movieMatch[1] : "normal";
+        const playMatch = loc.match(/play=(\d)/);
+        const didPlay = playMatch ? playMatch[1] === '1' : false;
+        if (didPlay) {
+            seedValidator.confirmPlay(movieId, seed);
+            console.log(`[PLAY] confirmed_play seed=${seed} movie=${movieId}`);
+        }
+    }
 }
 
 fastify.post("/debug", async (request, reply) => {
