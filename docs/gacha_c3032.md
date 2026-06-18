@@ -257,13 +257,14 @@ Scanned 200001 seeds in 14s (~15K seeds/sec)
 |------|:---:|
 | C3032 报错 | ✅ 自动净化系统 |
 | 种子表 | ✅ CN 物理引擎生成 ★3:19K ★4:60K ★5:121K |
-| 物理配置 | ✅ 从 CN CDN 提取 4 个 AMF3，字段验证完成 |
-| 物理引擎 | ✅ MT19937 int32 修复（AS3 兼容），精度 31.9% |
+| 物理配置 | ✅ 从 CN CDN 提取 5 个 AMF3 二进制，`threshold.amulets`/`ballStar4`/`isRarity5` 已重新验证 |
+| 物理引擎 | ✅ MT19937 AS3 兼容 + MathCompat cos/sin 移植 + Box2D 半隐式欧拉积分 |
+| 物理仿真精度 | ⚠️ normal 51%, fes 17% — AMF3 配置值正确，但逐帧 CCD/物理与客户端 Box2D 引擎仍有系统偏差 |
 | gacha.ts | ✅ 池模式 + 优先级 + 惊险种子 + 跨池注入 |
-| 惊险种子 | 🔄 清空重置，从头测试 |
+| 惊险种子 | 🔄 清空重置，从头测试（201 个 ground truth） |
 | 自动净化 | ✅ C3032 → recordDeviceData → autoPurify |
 | Web 管理 | ✅ `/seeds` 模式切换 + 三栏比例 + 标签管理 |
-| MT19937 精度 | ⚠️ AS3 版构造器额外 624 次 burn-in，剩余偏差在 amulet 参数
+| playMovie 预测 | 🔄 依赖仿真精度，客户端 beacon 上报是可靠替代方案 |
 
 ## 8. 自动净化流程（2026-06-15 新增，2026-06-18 修复稀有度解析）
 

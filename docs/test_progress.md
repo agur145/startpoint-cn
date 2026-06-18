@@ -90,6 +90,9 @@
 | ✅ 种子池 | MoviePool 独立管理，testSeeds 全局不区分 movie，purified 按卡池隔离 |
 | ⚠️ CDN 目录要求 | `.cdn/cn/archive-*/*.zip` 必须存在完整 CN CDN ZIP 包，服务端从 `patch/cn/` 前缀提供静态文件 |
 | ⚠️ Beacon 日语乱码 | ⚠️→✅ `CrashUtil.debugBeacon` ★→â，用 `/â(\d)/g` regex 从 garbled 字符提取数字 |
+| F1059 gacha-physics 完善 | MathCompat cos/sin 移植 + 配置深度合并 + moviePlayable=false 跳帧 + AMF3 阈值提取 |
+| 🔄 gacha-physics 精度 | normal 51%, fes 17% — 仿真天花板，需纯化池系统补足 |
+| 🔄 AMF3 配置 | 5 个 movie 的 `threshold.amulets`/`ballStar4` 已从 AMF3 二进制重新提取 |
 
 ## C3212 修复详解
 
