@@ -54,7 +54,9 @@ export class SeedValidator {
         try { if (existsSync(CONFIRMED_FILE)) { const o = JSON.parse(readFileSync(CONFIRMED_FILE, "utf-8")); for (const [mid, seeds] of Object.entries(o)) { if (mid.endsWith("_play")) { const mid2 = mid.replace("_play", ""); for (const s of seeds as any[]) this.pool(mid2).confirmedPlay.add(Number(s)); } else { const p = this.pool(mid); for (const s of seeds as any[]) p.confirmed.add(Number(s)); } } } } catch (_) {}
         try { if (existsSync(PURIFIED_FILE)) { const o = JSON.parse(readFileSync(PURIFIED_FILE, "utf-8")); for (const [mid, seeds] of Object.entries(o)) { if (typeof seeds !== 'object' || seeds === null) continue; for (const [s, e] of Object.entries(seeds as any)) this.pool(mid).purified.set(Number(s), { r: (e as any).r ?? 0, tag: (e as any).tag || '未测试', play: (e as any).play }); } } } catch (_) {}
         try { if (existsSync(TEST_SEEDS_FILE)) { const a = JSON.parse(readFileSync(TEST_SEEDS_FILE, "utf-8")); if (Array.isArray(a)) { this.testSeeds = [null, null, null]; for (let i = 0; i < 3; i++) if (typeof a[i] === 'number') this.testSeeds[i] = a[i]; } } } catch (_) {}
-        try { if (existsSync(CONFIG_FILE)) { const c = JSON.parse(readFileSync(CONFIG_FILE, "utf-8")); if (c.mode) this.mode = c.mode; if (c.selectedMovieId) this.selectedMovieId = c.selectedMovieId; } } catch (_) {}
+        try { if (existsSync(CONFIG_FILE)) { const c = JSON.parse(readFileSync(CONFIG_FILE, "utf-8")); if (c.selectedMovieId) this.selectedMovieId = c.selectedMovieId; } } catch (_) {}
+        // mode always defaults to 'purified' — not loaded from config (temporary web toggle only)
+        this.mode = 'purified';
         let t = 0; for (const m of this.pools.values()) t += m.purified.size;
         let c = 0; for (const m of this.pools.values()) c += m.confirmed.size;
         console.log(`[SEED] Confirmed:${c} Purified:${t} Mode:${this.mode}`);
@@ -62,7 +64,7 @@ export class SeedValidator {
 
     private saveConfirmed(): void { const o: any = {}; for (const [mid, p] of this.pools) { o[mid] = Array.from(p.confirmed); o[mid + "_play"] = Array.from(p.confirmedPlay); } writeFileSync(CONFIRMED_FILE, JSON.stringify(o, null, 2), "utf-8"); }
     private savePurified(): void { const o: any = {}; for (const [mid, p] of this.pools) { o[mid] = {}; for (const [s, e] of p.purified) o[mid][String(s)] = e; } writeFileSync(PURIFIED_FILE, JSON.stringify(o, null, 2), "utf-8"); }
-    private saveConfig(): void { writeFileSync(CONFIG_FILE, JSON.stringify({ mode: this.mode, selectedMovieId: this.selectedMovieId }, null, 2), "utf-8"); }
+    private saveConfig(): void { writeFileSync(CONFIG_FILE, JSON.stringify({ selectedMovieId: this.selectedMovieId }, null, 2), "utf-8"); }
     private saveTestSeeds(): void { writeFileSync(TEST_SEEDS_FILE, JSON.stringify(this.testSeeds, null, 2), "utf-8"); }
 
     // 确认种子（rarity 正确）
@@ -121,7 +123,7 @@ export class SeedValidator {
 
     // 模式
     getMode(): PoolMode { return this.mode; } getSelectedMovieId(): string { return this.selectedMovieId; }
-    setMode(m: PoolMode): void { this.mode = m; this.saveConfig(); } setSelectedMovieId(id: string): void { this.selectedMovieId = id; this.saveConfig(); }
+    setMode(m: PoolMode): void { this.mode = m; } setSelectedMovieId(id: string): void { this.selectedMovieId = id; this.saveConfig(); }
     getMovieIds(): string[] { return Array.from(this.pools.keys()); }
 
     // 种子选取
