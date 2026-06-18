@@ -257,7 +257,7 @@
     async function refillResources() {
         const threshold = document.getElementById('refillThreshold').value;
         const amount = document.getElementById('refillAmount').value;
-        if (!confirm(`星导石低于 ${threshold} 时恢复至 ${amount}？`)) return;
+        if (!confirm(`免费星导石低于 ${threshold} 时恢复至 ${amount}？`)) return;
         const r = await fetch('/api/player/' + PID + '/refill_resources', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},

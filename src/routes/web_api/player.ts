@@ -115,7 +115,7 @@ const routes = async (fastify: FastifyInstance) => {
             return reply.status(200).send({ ok: true, freeVmoney: current, refilled: false })
         }
 
-        updatePlayerSync({ id: playerId, freeVmoney: amount, vmoney: amount, freeMana: 99999999, stamina: 999 })
+        updatePlayerSync({ id: playerId, freeVmoney: amount })
         return reply.status(200).send({ ok: true, freeVmoney: amount, refilled: true, previous: current })
     })
 

@@ -161,9 +161,9 @@ const routes = async (fastify: FastifyInstance) => {
         resourcesHtml += `<div class="col-span-5 mb-2 flex flex-wrap gap-2 items-center" style="font-size:0.75rem">
             <span class="text-on-surface-variant">低于</span>
             <input id="refillThreshold" value="2000" style="width:60px" class="bg-surface-container rounded border border-outline-variant p-1 text-sm">
-            <span class="text-on-surface-variant">恢复至</span>
+            <span class="text-on-surface-variant">免费星导石恢复至</span>
             <input id="refillAmount" value="999999" style="width:80px" class="bg-surface-container rounded border border-outline-variant p-1 text-sm">
-            <button class="refresh-btn" onclick="refillResources()">补充资源</button>
+            <button class="refresh-btn" onclick="refillResources()">补充</button>
         </div>`;
         for (const f of resourceFields) {
             resourcesHtml += `<div><label class="text-xs text-on-surface-variant">${f.label}</label>
