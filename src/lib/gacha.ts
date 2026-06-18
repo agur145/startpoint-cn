@@ -5,6 +5,7 @@
 
 import { randomInt } from "crypto";
 import seedValidator from "./seed-validator";
+import { MOVIE_CONFIGS } from "./gacha-physics";
 import { PlayerBoxGachaDrawnReward } from "../data/types";
 import { givePlayerCharacterSync } from "./character";
 import { givePlayerEquipmentSync } from "./equipment";
