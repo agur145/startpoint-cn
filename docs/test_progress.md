@@ -91,9 +91,9 @@
 | ⚠️ CDN 目录要求 | `.cdn/cn/archive-*/*.zip` 必须存在完整 CN CDN ZIP 包，服务端从 `patch/cn/` 前缀提供静态文件 |
 | ⚠️ Beacon 日语乱码 | ⚠️→✅ `CrashUtil.debugBeacon` ★→â，用 `/â(\d)/g` regex 从 garbled 字符提取数字 |
 | F1059 gacha-physics 完善 | MathCompat cos/sin 移植 + 配置深度合并 + moviePlayable=false 跳帧 + AMF3 阈值提取 |
-| 🔄 gacha-physics 精度 | ✅ normal 81%, fes 85% — ★3/★4 ~93%, ★5 ~4% |
-| 🔄 AMF3 配置 | 5 个 movie 的 `threshold.amulets`/`ballStar4` 已从 AMF3 二进制重新提取 |
+| ✅ gacha-physics 精度 | normal 81%, fes 85% — ★3 95%, ★4 90%, ★5 0%。fes_guarantee 90%（越界修复后） |
 | F1060 RNG tempering 修复 | `randomUInt()` tempering 从 post-twist 值改为 pre-twist 值（匹配 AS3），精度 17% → 85% |
+| F1061 threshold.amulets 越界 | `?? 0` → `!== undefined`（匹配 AS3 Number(undefined)=NaN），fes_guarantee 37% → 90% |
 
 ## C3212 修复详解
 

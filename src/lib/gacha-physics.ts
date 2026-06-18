@@ -588,7 +588,10 @@ export class GachaSimulator {
                     // Circle amulet: can give +1 or +2
                     const twoUp = amu.twoUpProbability > threshold.amuletTwoUp ? 2 : 1;
 
-                    if (amu.probability > (threshold.amulets[i] ?? 0)) {
+                    // AS3: Number(undefined)=NaN → probability>NaN=false
+                    //      Number(null)=0 → probability>0 ~always true
+                    const tV = threshold.amulets[i];
+                    if (tV !== undefined && amu.probability > tV) {
                         if (cfg.amulet.limitTotalCount) {
                             if (cfg.amulet.decideTwoUpWhenAppear) {
                                 // Cap by remaining slots
@@ -607,8 +610,10 @@ export class GachaSimulator {
                 }
                 case AmuletPlaceId.Bar: {
                     // Bar amulet: only +1, only if ball is still ★3
+                    // AS3: Number(undefined)=NaN → probability>NaN=false
+                    const tV = threshold.amulets[i];
                     rarity = this.ballRarity === 0
-                        ? (amu.probability > (threshold.amulets[i] ?? 0) ? 1 : 0)
+                        ? (tV !== undefined && amu.probability > tV ? 1 : 0)
                         : 0;
                     break;
                 }

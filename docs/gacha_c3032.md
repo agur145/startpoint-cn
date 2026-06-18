@@ -380,7 +380,7 @@ Scanned 200001 seeds in 14s (~15K seeds/sec)
 | 种子表 | ✅ CN 物理引擎生成 ★3:19K ★4:60K ★5:121K |
 | 物理配置 | ✅ 从 CN CDN 提取 5 个 AMF3 二进制，`threshold.amulets`/`ballStar4`/`isRarity5` 已重新验证 |
 | 物理引擎 | ✅ MT19937 AS3 兼容 + MathCompat cos/sin 移植 + Box2D 半隐式欧拉积分 |
-| 物理仿真精度 | ✅ normal 81%, fes 85% — ★3/★4 预测 ~93%, ★5 预测 ~4%（护符接触检测仍有差异） |
+| 物理仿真精度 | ✅ normal 81%, fes 85% — ★3 ~95%, ★4 ~90%, ★5 ~0%。fes_guarantee 90%（越界修复后） |
 | RNG tempering | ✅ 修复：pre-twist 值 tempering（2026-06-18，从 17% → 85%） |
 | gacha.ts | ✅ 池模式 + 优先级 + 惊险种子 + 跨池注入 |
 | 惊险种子 | 🔄 清空重置，从头测试（201 个 ground truth） |
@@ -390,15 +390,17 @@ Scanned 200001 seeds in 14s (~15K seeds/sec)
 
 ### 8a. 剩余误差来源分析
 
-经过 RNG tempering 修复后，整体精度从 17% → 85%。剩余 15% 误差分布：
+经过 RNG tempering + amulets 越界修复，整体精度 85%。剩余 15% 误差分布：
 
 | 误差源 | 占比 | 具体表现 |
 |--------|:---:|------|
-| ★5 护符接触漏检 | ~12% | 仿真检测不到足够护符接触 → 球停留 ★3/★4，客户端实际 ★5 |
-| ★5 受污染数据 | ~2% | 部分 purified r=5 可能来自旧 beacon 解析 |
-| ★4 边缘种子 | ~1% | ballStar4 阈值边界附近的种子 |
+| ★5 护符接触漏检 | ~10% | 仿真检测不到足够护符接触 → 球停留 ★3/★4，客户端实际 ★5 |
+| ★5 受污染数据 | ~3% | 部分 purified r=5 可能来自旧 beacon 解析（0/34 匹配） |
+| ★4 边界种子 | ~2% | ballStar4 阈值边界附近的种子 |
 
-RNG temering bug（2026-06-18 修复）：`randomUInt()` 对 POST-TWIST 值做 tempering，AS3 用 PRE-TWIST 值。修复后精度飞跃 17% → 85%。
+修复历史：
+- RNG temering bug（2026-06-18）：`randomUInt()` 对 POST-TWIST 值做 tempering，AS3 用 PRE-TWIST 值。修复后精度飞跃 17% → 85%。
+- threshold.amulets 越界（2026-06-18）：JS `?? 0` 让越界索引激活，AS3 `Number(undefined)=NaN` 永不激活。修复后 fes_guarantee 从 37% → 90%。
 
 ## 9. 自动净化流程（2026-06-15 新增，2026-06-18 修复稀有度解析）
 
