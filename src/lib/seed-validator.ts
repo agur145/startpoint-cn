@@ -185,13 +185,13 @@ export class SeedValidator {
             return rand(candidates);
         };
 
-        // ② 优先测试队列（FIFO——跳过 sentSeeds 和不在 pool 中的种子）
+        // ② 优先测试队列（FIFO——跳过已发送的种子，仅移除不存在于当前池的种子）
         while (p.seedBacklog.length > 0) {
             const cur = p.seedBacklog[0];
-            if (!p.sentSeeds.has(cur) && pool.includes(cur)) break;
-            p.seedBacklog.shift(); // 已发送或不在池中 → 移除
+            if (!pool.includes(cur)) { p.seedBacklog.shift(); continue; } // 不在当前池 → 移除
+            if (!p.sentSeeds.has(cur)) return cur;                       // 未发送 → 选中
+            break; // 在 sentSeeds 中等待客户端反馈 → 保留不动
         }
-        if (p.seedBacklog.length > 0) return p.seedBacklog[0];
 
         if (this.mode === 'play') { const pur = withTrace(pickPlay(), 'play'); if (pur !== undefined) return pur; }
 
