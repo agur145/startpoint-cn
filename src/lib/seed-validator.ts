@@ -72,7 +72,8 @@ export class SeedValidator {
     confirm(movieId: string, seed: number): void {
         const p = this.pool(movieId);
         if (p.confirmed.has(seed) || p.purified.has(seed)) return;
-        // Remove from other pools if present
+        // Remove from pending pools if present
+        p.pendingPlay.delete(seed);
         for (const [, other] of this.pools) other.confirmed.delete(seed);
         p.confirmed.add(seed);
         this.saveConfirmed();
@@ -82,6 +83,7 @@ export class SeedValidator {
     confirmPlay(movieId: string, seed: number): void {
         const p = this.pool(movieId);
         if (p.purified.has(seed)) return;
+        p.pendingPlay.delete(seed);
         p.confirmedPlay.add(seed);
         if (!p.confirmed.has(seed)) p.confirmed.add(seed);
         this.saveConfirmed();
@@ -118,6 +120,8 @@ export class SeedValidator {
 
     // 标记种子已发送：无 crash → pendingPlay(r=null, 等后续有 beacon 确认)
     markSent(movieId: string, seed: number): void {
+        const p = this.pool(movieId);
+        if (p.pendingPlay.has(seed) || p.purified.has(seed) || p.confirmed.has(seed) || p.confirmedPlay.has(seed)) return;
         this.addPending(movieId, seed, null);
         console.log(`[SEED] PENDING [${movieId}] seed=${seed}`);
     }

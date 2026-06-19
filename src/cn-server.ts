@@ -202,6 +202,8 @@ function parsePlayBeacon(loc: string): void {
         if (didPlay) {
             seedValidator.confirmPlay(movieId, seed);
             console.log(`[PLAY] confirmed_play seed=${seed} movie=${movieId}`);
+        } else {
+            seedValidator.confirm(movieId, seed);
         }
     }
 }
