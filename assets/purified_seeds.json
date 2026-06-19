@@ -504,7 +504,7 @@
   "fes_guarantee": {},
   "normal": {
     "10000001": {
-      "r": 0,
+      "r": 1,
       "tag": "未测试",
       "play": true
     },

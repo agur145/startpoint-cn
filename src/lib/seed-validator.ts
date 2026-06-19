@@ -73,7 +73,7 @@ export class SeedValidator {
         if (p.playPool.has(seed)) return;
         if (p.confirmPool.has(seed)) {
             // If seed already confirmed with null r, update with known r
-            if (r !== undefined && r !== null) p.confirmPool.set(seed, r);
+            if (r !== undefined && r !== null) { p.confirmPool.set(seed, r); this.saveConfirm(); }
             return;
         }
         p.pendingPool.delete(seed);
