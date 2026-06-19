@@ -1,11 +1,11 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify"
 import { getAllAccountsSync, getAccountPlayersSync, insertMailSync } from "../../data/wdfpData"
 import characterData from "../../../assets/character.json"
-import itemData from "../../../assets/item_data.json"
+import itemIds from "../../../assets/item_ids.json"
 
 // Pre-built CDN validation sets
 const CDN_CHAR_IDS: Set<number> = new Set(Object.keys(characterData).map(Number))
-const CDN_ITEM_IDS: Set<number> = new Set(Object.keys(itemData).map(Number))
+const CDN_ITEM_IDS: Set<number> = new Set(itemIds as number[])
 
 interface SendMailBody {
     type: string
