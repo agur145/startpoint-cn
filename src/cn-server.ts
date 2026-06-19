@@ -45,6 +45,7 @@ import profileApiPlugin from "./routes/api/profile";
 import historyApiPlugin from "./routes/api/history";
 import comicApiPlugin from "./routes/api/comic";
 import questUnlockApiPlugin from "./routes/api/questUnlock";
+import itemApiPlugin from "./routes/api/item";
 import { startSessionServer } from "./data/sessionServer";
 
 const fastify = Fastify({
@@ -275,6 +276,7 @@ fastify.register(profileApiPlugin, { prefix: `${apiPrefix}/profile` });
 fastify.register(historyApiPlugin, { prefix: `${apiPrefix}/history` });
 fastify.register(comicApiPlugin, { prefix: `${apiPrefix}/comic` });
 fastify.register(questUnlockApiPlugin, { prefix: `${apiPrefix}/quest` });
+fastify.register(itemApiPlugin, { prefix: `${apiPrefix}/item` });
 
 // Web management panel
 fastify.register(indexWebPlugin);

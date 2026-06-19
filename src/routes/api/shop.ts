@@ -3,7 +3,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getAccountPlayers, getPlayerEquipmentSync, getPlayerItemSync, getPlayerSync, getSession, playerOwnsEquipmentSync, updatePlayerEquipmentSync, updatePlayerItemSync, updatePlayerSync, getPlayerShopPurchasesMapSync, getPlayerShopPurchaseCountSync, addPlayerShopPurchaseSync } from "../../data/wdfpData";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { getBossCoinShopItemsSync, getEventShopItemsSync, getGenericShopItemsSync, getShopItemSync } from "../../lib/assets";
+import { getBossCoinShopItemsSync, getConfigSync, getEventShopItemsSync, getGenericShopItemsSync, getShopItemSync } from "../../lib/assets";
 import { CharacterReward, CharacterShopItemReward, CurrencyReward, CurrencyShopItemReward, EquipmentItemReward, EquipmentItemShopItemReward, Reward, RewardType, ShopItemRewardType, ShopItems, ShopItemUserCostType, ShopType } from "../../lib/types";
 import { generateDataHeaders, getServerDate, getServerTime } from "../../utils";
 import { givePlayerRewardsSync } from "../../lib/quest";
@@ -516,9 +516,12 @@ const routes = async (fastify: FastifyInstance) => {
     fastify.post("/recover_stamina", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as { viewer_id: number, api_count: number }
         const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
-            "error": "Bad Request", "message": "Invalid request body."
-        })
+        if (!viewerId || isNaN(viewerId)) {
+            console.warn(`[RECOVER-STAMINA] invalid viewer_id: ${viewerId}`)
+            return reply.status(400).send({
+                "error": "Bad Request", "message": "Invalid viewer_id."
+            })
+        }
 
         const session = await getSession(viewerId.toString())
         if (!session) return reply.status(400).send({
@@ -535,15 +538,59 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Internal Server Error", "message": "Player not found."
         })
 
-        updatePlayerSync({ id: playerId, stamina: 20, staminaHealTime: getServerDate() })
+        const config = getConfigSync()
+        const recoveryCost = config.stamina_recovery_virtual_money
+        const recoveryValue = config.stamina_recovery_value
+        const recoverySeconds = config.stamina_recovery_seconds
+        const maxOverflow = config.max_stamina_overflow
+
+        // Compute real-time stamina using client formula
+        const staminaHealTimeSec = player.staminaHealTime.getTime() / 1000
+        const serverTimeSec = getServerTime()
+        const elapsed = (serverTimeSec - staminaHealTimeSec) / recoverySeconds
+        const currentStamina = Math.min(Math.max(0, player.stamina + Math.floor(elapsed)), maxOverflow)
+
+        // Already at max
+        if (currentStamina >= maxOverflow) {
+            console.log(`[RECOVER-STAMINA] player ${playerId} already at max (${currentStamina} >= ${maxOverflow})`)
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "code": 2102,
+                "message": "Already at max stamina."
+            })
+        }
+
+        // Insufficient vmoney
+        const freeVmoney = player.freeVmoney
+        if (freeVmoney < recoveryCost) {
+            console.warn(`[RECOVER-STAMINA] player ${playerId} insufficient vmoney: ${freeVmoney} < ${recoveryCost}`)
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Insufficient star diamonds."
+            })
+        }
+
+        // Calculate recovery amount (capped at overflow)
+        const afterStamina = Math.min(currentStamina + recoveryValue, maxOverflow)
+        const actualRecovery = afterStamina - currentStamina
+
+        updatePlayerSync({
+            id: playerId,
+            stamina: afterStamina,
+            staminaHealTime: getServerDate(),
+            freeVmoney: freeVmoney - recoveryCost
+        })
+
+        console.log(`[RECOVER-STAMINA] player ${playerId}: stamina ${currentStamina}->${afterStamina} (+${actualRecovery}), freeVmoney ${freeVmoney}->${freeVmoney - recoveryCost}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
                 "user_info": {
-                    "stamina": 20,
+                    "stamina": afterStamina,
                     "stamina_heal_time": getServerTime(),
+                    "free_vmoney": freeVmoney - recoveryCost
                 }
             }
         })

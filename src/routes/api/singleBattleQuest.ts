@@ -4,7 +4,7 @@ import { getQuestFromCategorySync, getRushEventFolderClearRewards } from "../../
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
 import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } from "../../lib/types";
-import { generateDataHeaders, getServerTime } from "../../utils";
+import { generateDataHeaders, getServerDate, getServerTime } from "../../utils";
 import { rushEventFolderMaxRounds } from "./rushEvent";
 import { RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -666,6 +666,34 @@ const routes = async (fastify: FastifyInstance) => {
                 })
             }
             updatePlayerItemSync(playerId, entryCost.itemId, playerItemCount - entryCost.itemCount)
+        }
+
+        // Deduct stamina cost
+        const staminaCost = entryCost?.stamina ?? 0
+        if (staminaCost > 0) {
+            const player = getPlayerSync(playerId)
+            if (!player) {
+                console.error(`[BATTLE-START] player not found: ${playerId}`)
+                return reply.status(500).send({
+                    "error": "Internal Server Error",
+                    "message": "Player not found."
+                })
+            }
+            const currentStamina = player.stamina
+            if (currentStamina < staminaCost) {
+                console.warn(`[BATTLE-START] player ${playerId} stamina insufficient: ${currentStamina} < ${staminaCost}`)
+                return reply.status(400).send({
+                    "error": "Bad Request",
+                    "message": "Insufficient stamina."
+                })
+            }
+            const newStamina = Math.max(0, currentStamina - staminaCost)
+            updatePlayerSync({
+                id: playerId,
+                stamina: newStamina,
+                staminaHealTime: getServerDate()
+            })
+            console.log(`[BATTLE-START] stamina: ${currentStamina} -> ${newStamina} (cost: ${staminaCost})`)
         }
 
         // add to active quests table

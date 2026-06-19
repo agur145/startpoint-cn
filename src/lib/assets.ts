@@ -40,7 +40,8 @@ import starGrainShopItems from "../../assets/star_grain_shop.json";
 import treasureShopItems from "../../assets/treasure_shop.json";
 import equipmentEnhancementShopItems from "../../assets/equipment_enhancement_shop.json";
 import rushEventQuestFolders from "../../assets/rush_event_quest_folder.json"
-import { AssetCharacter, BattleQuest, BossCoinShopItems, BoxGacha, ClearRewards, EventItemShopIdMapItem, EventShopItems, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, Gachas, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopItem, ShopItems, ShopType, StoryQuest } from "./types";
+import configData from "../../assets/config.json"
+import { AssetCharacter, BattleQuest, BossCoinShopItems, BoxGacha, ClearRewards, ConfigValues, EventItemShopIdMapItem, EventShopItems, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, Gachas, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopItem, ShopItems, ShopType, StoryQuest } from "./types";
 
 /**
  * Gets a clear reward from its ID.
@@ -566,4 +567,85 @@ export function getRushEventFolderClearRewards(
     }
 
     return null
+}
+
+// TODO: 待从CDN二进制 config.orderedmap 提取真实数据
+const FALLBACK_CONFIG: ConfigValues = {
+    continue_virtual_money: 50,
+    stamina_recovery_virtual_money: 50,
+    stamina_recovery_seconds: 300,
+    stamina_recovery_value: 100,
+    max_stamina_overflow: 999,
+    max_virtual_money: 999999,
+    max_mana: 99999999,
+    max_star_crumb: 9999,
+    pool_exp_gain_value: 1,
+    pool_exp_gain_seconds: 1,
+    max_pool_exp: 999999,
+    max_display_pool_exp: 999999,
+    max_follows_count: 100,
+    max_followers_count: 50,
+    max_display_followers_count: 50,
+    max_player_name_length: 12,
+    max_player_comment_length: 40,
+    overflow_exp_to_mana_conversion_rate: 0.001,
+    reward_multiplier_by_boost_point: 1.0,
+    common_reward_multiplier_by_multi_play_mode: 1.0,
+    limit_payment_under_16: 0,
+    limit_payment_16_19: 0,
+    alert_payment: 0,
+    level_correction_value_by_recommended_element: 0,
+    level_correction_value_for_moderate_level_comparison: 0,
+    unknown_loc2: 0,
+    max_bond_token: 999,
+    treasure_shop_item_number: 0,
+    special_pack_shop_days_as_new: 7,
+    support_url: "",
+    max_boss_boost_point: 3,
+    max_display_boss_boost_point: 3,
+    max_boost_point: 10,
+    max_display_boost_point: 10,
+    craft_point_item_id: 0,
+    wildcard_once_character_ticket_item_id: 0,
+    wildcard_ten_times_character_ticket_item_id: 0,
+    wildcard_once_rare4_character_ticket_item_id: 0,
+    wildcard_once_equipment_ticket_item_id: 0,
+    wildcard_ten_times_equipment_ticket_item_id: 0,
+    encyclopedia_point_item_id: 0,
+    star_grain_item_id: 0,
+    gacha_one_max_count: 999,
+    gacha_ten_max_count: 999,
+    growth_fund_unlock_chapter: 0,
+    gacha_crazy_ten_max_count: 999,
+    monthly_bonus_payment_total_requirement: 0,
+    crazygacha_ten_times_character_ticket_id: 0,
+    reward_multiplier_by_newbie: 1.0,
+    newbie_rank: 50,
+    newbie_days: 7,
+}
+
+/**
+ * Gets the config values (stamina recovery, vmoney limits, etc.).
+ * Returns fallback defaults if config.json fails to load.
+ */
+export function getConfigSync(): ConfigValues {
+    if (!configData) {
+        console.error('[CONFIG] config.json not loaded, using fallback defaults')
+        return FALLBACK_CONFIG
+    }
+    // Merge loaded data with fallback to fill any missing fields
+    const merged = { ...FALLBACK_CONFIG, ...(configData as Partial<ConfigValues>) }
+    return merged
+}
+
+/**
+ * Gets a specific stamina config value with bounds checking.
+ */
+export function getStaminaRecoverySeconds(): number {
+    const v = getConfigSync().stamina_recovery_seconds
+    if (typeof v !== 'number' || v <= 0 || !isFinite(v)) {
+        console.warn('[CONFIG] invalid stamina_recovery_seconds, fallback to 300')
+        return 300
+    }
+    return v
 }
