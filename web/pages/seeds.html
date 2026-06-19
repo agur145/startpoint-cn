@@ -157,9 +157,18 @@
         document.getElementById('cfgSelector').innerHTML = ch;
 
         var t = s.mov_play;
+        // Fetch individual movie stats for base/guarantee breakdown
+        var baseConfirm = 0, gtConfirm = 0;
+        for (var m of group.movies) {
+            var sr = await fetch('/api/seeds/stats?movieId=' + m);
+            var sd = await sr.json();
+            baseConfirm += (m.endsWith('_guarantee') ? 0 : (sd.confirm || 0));
+            gtConfirm += (m.endsWith('_guarantee') ? (sd.confirm || 0) : 0);
+        }
         document.getElementById('cfgSummary').innerHTML =
             '<span class="stat"><span class="label pur">播放池</span><br><span class="value pur">'+t+'</span></span>'
-            + '<span class="stat"><span class="label ok">确认池</span><br><span class="value ok">'+s.confirm+'</span></span>';
+            + '<span class="stat"><span class="label ok">确认·非保底</span><br><span class="value ok">'+baseConfirm+'</span></span>'
+            + '<span class="stat"><span class="label" style="color:#b0882c">确认·保底</span><br><span class="value" style="color:#b0882c">'+gtConfirm+'</span></span>';
 
         // Test seed bar
         var tsArr = s.test_seeds || [null,null,null];

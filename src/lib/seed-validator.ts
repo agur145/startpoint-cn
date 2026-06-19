@@ -29,9 +29,10 @@ interface PlayEntry { r: number; tag: SeedTag; play?: boolean }
 
 /** 每个卡池独立的状态 */
 class MoviePool {
-    confirmPool: Map<number, number | null> = new Map(); // seed → r（null=rarity unknown）
+    confirmPool: Map<number, number | null> = new Map();
     playPool: Map<number, PlayEntry> = new Map();
     pendingPool: Map<number, number | null> = new Map();
+    sentSeeds: Map<number, number | null> = new Map(); // 已发未验证（seed → r）
 }
 
 // ============================================================================
@@ -85,6 +86,7 @@ export class SeedValidator {
     // 播放（play=1，rarity 已修正）
     addPlay(movieId: string, seed: number, r: number, didPlay?: boolean | null): void {
         const p = this.pool(movieId);
+        p.sentSeeds.delete(seed);
         if (didPlay === true) {
             p.confirmPool.delete(seed);
             p.pendingPool.delete(seed);
@@ -103,6 +105,7 @@ export class SeedValidator {
     // 未校验（/crash 路径，无 patch APK）
     addPending(movieId: string, seed: number, r: number | null): void {
         const p = this.pool(movieId);
+        p.sentSeeds.delete(seed);
         // If seed is in playPool, fix its r value (from C3032 ground truth)
         const e = p.playPool.get(seed);
         if (e) {
@@ -115,13 +118,23 @@ export class SeedValidator {
         this.saveConfirm();
     }
 
-    // 种子已发送（无 crash → 默认确认，带上稀有度信息）
+    // 种子已发送（暂存 sentSeeds，等客户端反馈后再确认）
     markSent(movieId: string, seed: number, rarity?: number): void {
         const p = this.pool(movieId);
-        if (p.pendingPool.has(seed) || p.playPool.has(seed) || p.confirmPool.has(seed)) return;
         const r = rarity !== undefined ? rarity - 3 : null;
-        this.confirm(movieId, seed, r);
-        console.log(`[SEED] CONFIRM [${movieId}] seed=${seed} r=${r !== null ? '★'+(r+3) : 'null'}`);
+        p.sentSeeds.set(seed, r);
+        console.log(`[SEED] SENT [${movieId}] seed=${seed} r=${r !== null ? '★'+(r+3) : 'null'}`);
+    }
+    
+    // 10 连结束后清理 sentSeeds（等待中的种子转确认——客户端无 crash 即正确）
+    clearSent(movieId: string): void {
+        const p = this.pool(movieId);
+        for (const [seed, r] of p.sentSeeds) {
+            if (!p.playPool.has(seed) && !p.pendingPool.has(seed)) {
+                this.confirm(movieId, seed, r);
+            }
+        }
+        p.sentSeeds.clear();
     }
 
     // Tag
@@ -146,56 +159,56 @@ export class SeedValidator {
     // 种子选取
     getSeed(movieId: string, rarity: number, pool: number[], characterId: number, drawIndex?: number): number {
         const ri = rarity - 3;
-        const PURIFIED_PLAY_RATE = 0.10;
-        const isFirstDraw = drawIndex !== undefined && drawIndex === 0;
-        const randFrom = (arr: number[]) => arr.length > 0 ? arr[Math.floor(Math.random() * arr.length)] : undefined;
-
-        // ① 全局测试种子
         const ts = this.testSeeds[ri];
-        if (ts !== null) return ts;
+        if (ts !== null) return ts;                     // ① testSeed
 
         const p = this.pool(movieId);
+        const avail = pool.filter(s => !p.sentSeeds.has(s));
+        const rand = (arr: number[]) => arr.length > 0 ? arr[Math.floor(Math.random() * arr.length)] : undefined;
 
-        if (this.mode === 'play') {
-            const pur = randFrom(pool.filter(s => { const e = p.playPool.get(s); return e && e.r === ri && e.tag !== '冷血躲避球'; }));
-            if (pur !== undefined) return pur;
-        }
+        // _guarantee 池回退到基础池
+        const baseMovie = movieId.replace('_guarantee', '');
+        const base = baseMovie !== movieId ? this.pool(baseMovie) : null;
+        const confirmR = (s: number) => { let r = p.confirmPool.get(s); if (r === undefined && base) r = base.confirmPool.get(s); return r; };
+        const playHas = (s: number) => p.playPool.has(s) || (base && base.playPool.has(s));
+        const pendR = (s: number) => { let r = p.pendingPool.get(s); if (r === undefined && base) r = base.pendingPool.get(s); return r; };
+        const isUnknown = (s: number) => { const inAny = p.confirmPool.has(s) || p.playPool.has(s) || p.pendingPool.has(s); const inBase = base && (base.confirmPool.has(s) || base.playPool.has(s) || base.pendingPool.has(s)); return !inAny && !inBase; };
+
+        // 播放池查找：稀有度匹配 + 非冷血标签
+        const pickPlay = (forceAll?: boolean) => {
+            const candidates = avail.filter(s => { const e = p.playPool.get(s); return e && e.r === ri && e.tag !== '冷血躲避球'; });
+            return rand(candidates);
+        };
+
+        if (this.mode === 'play') { const pur = pickPlay(); if (pur !== undefined) return pur; }
 
         if (this.mode === 'test') {
-            const pend = randFrom(pool.filter(s => { const r = p.pendingPool.get(s); return r !== undefined && (r === null || r === ri); }));
+            const pend = rand(avail.filter(s => { const r = pendR(s); return r !== undefined && (r === null || r === ri); }));
             if (pend !== undefined) return pend;
-            const unknown = randFrom(pool.filter(s => !p.confirmPool.has(s) && !p.playPool.has(s) && !p.pendingPool.has(s)));
-            if (unknown !== undefined) return unknown;
+            const unk = rand(avail.filter(isUnknown));
+            if (unk !== undefined) return unk;
             return characterId * 1000;
         }
 
         if (this.mode === 'natural') {
-            if (isFirstDraw) {
-                const pur = randFrom(pool.filter(s => { const e = p.playPool.get(s); return e && e.r === ri && e.tag !== '冷血躲避球'; }));
-                if (pur !== undefined) return pur;
-            }
-            const pur = randFrom(pool.filter(s => { const e = p.playPool.get(s); return e && e.r === ri && e.tag !== '冷血躲避球'; }));
-            if (pur !== undefined && Math.random() < PURIFIED_PLAY_RATE) return pur;
+            const isFirstDraw = drawIndex !== undefined && drawIndex === 0;
+            if (isFirstDraw) { const pur = pickPlay(); if (pur !== undefined) return pur; }  // 第1抽强制播放池
+            const pur = pickPlay();
+            if (pur !== undefined && Math.random() < 0.10) return pur;                     // 10% 播放池
         }
 
-        // 确认池（随机选取避免同一动画）
-        const conf = randFrom(pool.filter(s => {
-            const r = p.confirmPool.get(s);
-            return r !== undefined && (r === null || r === ri);
-        }));
+        // ↓ 兜底链（所有模式共用）
+        const conf = rand(avail.filter(s => { const r = confirmR(s); return r !== undefined && (r === null || r === ri); }));
         if (conf !== undefined) return conf;
 
-        // 播放池（兜底，随机）
-        const play = randFrom(pool.filter(s => p.playPool.has(s)));
+        const play = rand(avail.filter(playHas));
         if (play !== undefined) return play;
 
-        // 未校验池（随机）
-        const pend = randFrom(pool.filter(s => { const r = p.pendingPool.get(s); return r !== undefined && (r === null || r === ri); }));
+        const pend = rand(avail.filter(s => { const r = pendR(s); return r !== undefined && (r === null || r === ri); }));
         if (pend !== undefined) return pend;
 
-        // 未知种子（随机）
-        const unknown = randFrom(pool.filter(s => !p.confirmPool.has(s) && !p.playPool.has(s) && !p.pendingPool.has(s)));
-        if (unknown !== undefined) return unknown;
+        const unk = rand(avail.filter(isUnknown));
+        if (unk !== undefined) return unk;
 
         return characterId * 1000;
     }
