@@ -211,9 +211,8 @@ function parsePlayBeacon(loc: string): void {
         if (didPlay) {
             seedValidator.addPlay(movieId, seed, 0, true);
             console.log(`[PLAY] playPool seed=${seed} movie=${movieId}`);
-        } else {
-            seedValidator.confirm(movieId, seed);
         }
+        // play=0: seed already in confirmPool via markSent — no action needed
     }
 }
 
