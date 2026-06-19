@@ -122,8 +122,8 @@ export class SeedValidator {
     markSent(movieId: string, seed: number): void {
         const p = this.pool(movieId);
         if (p.pendingPlay.has(seed) || p.purified.has(seed) || p.confirmed.has(seed) || p.confirmedPlay.has(seed)) return;
-        this.addPending(movieId, seed, null);
-        console.log(`[SEED] PENDING [${movieId}] seed=${seed}`);
+        this.confirm(movieId, seed);
+        console.log(`[SEED] CONFIRMED [${movieId}] seed=${seed}`);
     }
 
     // Tag
