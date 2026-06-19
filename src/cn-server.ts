@@ -211,8 +211,10 @@ function parsePlayBeacon(loc: string): void {
         if (didPlay) {
             seedValidator.addPlay(movieId, seed, 0, true);
             console.log(`[PLAY] playPool seed=${seed} movie=${movieId}`);
+        } else {
+            const r = seedValidator.getSentR(movieId, seed);
+            if (r !== undefined) seedValidator.confirm(movieId, seed, r);
         }
-        // play=0: seed moved from sentSeeds to confirmPool by clearSent — no action needed
     }
 }
 

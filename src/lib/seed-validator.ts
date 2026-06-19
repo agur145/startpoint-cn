@@ -126,6 +126,10 @@ export class SeedValidator {
         console.log(`[SEED] SENT [${movieId}] seed=${seed} r=${r !== null ? '★'+(r+3) : 'null'}`);
     }
 
+    getSentR(movieId: string, seed: number): number | null | undefined {
+        return this.pool(movieId).sentSeeds.get(seed);
+    }
+
     // Tag
     setTag(movieId: string, seed: number, tag: SeedTag): boolean {
         const e = this.pool(movieId).playPool.get(seed); if (!e) return false;

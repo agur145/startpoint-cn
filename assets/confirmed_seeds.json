@@ -1,14 +1,12 @@
 {
   "fes": {},
-  "fes_play": [],
   "fes_pend": {},
   "fes_guarantee": {},
-  "fes_guarantee_play": [],
   "fes_guarantee_pend": {},
-  "normal": {},
-  "normal_play": [],
+  "normal": {
+    "10187865": 0
+  },
   "normal_pend": {},
   "normal_guarantee": {},
-  "normal_guarantee_play": [],
   "normal_guarantee_pend": {}
 }
