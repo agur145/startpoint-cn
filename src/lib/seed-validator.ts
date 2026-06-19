@@ -100,6 +100,7 @@ export class SeedValidator {
         }
         p.pendingPool.delete(seed);
         p.confirmPool.set(seed, r !== undefined ? r : null);
+        if (r !== undefined) console.log(`[TRACE] confirm seed=${seed} r=${'★'+(r!+3)} confirmPool.size=${p.confirmPool.size}`);
         this.saveConfirm();
     }
 
@@ -110,6 +111,7 @@ export class SeedValidator {
             p.confirmPool.delete(seed);
             p.pendingPool.delete(seed);
             p.playPool.set(seed, { r, tag: '未测试', play: true });
+            console.log(`[TRACE] addPlay seed=${seed} r=${'★'+(r+3)} play=true playPool.size=${p.playPool.size}`);
             this.savePlay(); this.saveConfirm();
             console.log(`[SEED] PLAY [${movieId}] seed=${seed} ★${r+3} play=1`);
         } else if (didPlay === false) {
@@ -165,6 +167,8 @@ export class SeedValidator {
         const avail = pool.filter(s => !p.sentSeeds.has(s));
         const rand = (arr: number[]) => arr.length > 0 ? arr[Math.floor(Math.random() * arr.length)] : undefined;
 
+        if (avail.length < pool.length) console.log(`[TRACE] ★${rarity} avail: ${avail.length}/${pool.length} (sentSeeds blocked ${pool.length - avail.length})`);
+
         // Helpers with base fallback
         const poolGet = <T>(getter: (mp: MoviePool) => T, fallback?: T): T => { const v = getter(p); if (v === undefined && base) return getter(base); return v ?? fallback as T; };
 
@@ -172,7 +176,7 @@ export class SeedValidator {
         const blIdx = pool.findIndex(s => p.seedBacklog.includes(s) && !p.sentSeeds.has(s));
         if (blIdx === -1 && base) {
             const blIdx2 = pool.findIndex(s => base.seedBacklog.includes(s) && !p.sentSeeds.has(s));
-            if (blIdx2 >= 0) return base.seedBacklog.splice(base.seedBacklog.indexOf(pool[blIdx2]), 1)[0];
+            if (blIdx2 >= 0) { const cur = base.seedBacklog.splice(base.seedBacklog.indexOf(pool[blIdx2]), 1)[0]; console.log(`[TRACE] ★${rarity} mode=${this.mode} pool=backlog(base) seed=${cur} remaining=${p.seedBacklog.length}+${base.seedBacklog.length}`); return cur; }
         }
         if (blIdx >= 0) {
             const cur = p.seedBacklog.splice(p.seedBacklog.indexOf(pool[blIdx]), 1)[0];

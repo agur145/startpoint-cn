@@ -214,6 +214,7 @@ function parsePlayBeacon(loc: string): void {
             console.log(`[PLAY] playPool seed=${seed} movie=${movieId}`);
         } else {
             const r = seedValidator.getSentR(movieId, seed);
+            console.log(`[TRACE] PLAY|play=0 seed=${seed} getSentR=${r !== undefined && r !== null ? '★'+(r+3) : r === null ? 'null' : 'undefined'}`);
             if (r !== undefined) seedValidator.confirm(movieId, seed, r);
         }
     }
