@@ -51,7 +51,7 @@ export class SeedValidator {
 
     private load(): void {
         // Load confirm + play + pending from confirmed_seeds.json
-        try { if (existsSync(CONFIRMED_FILE)) { const o = JSON.parse(readFileSync(CONFIRMED_FILE, "utf-8")); for (const [mid, seeds] of Object.entries(o)) { if (mid.endsWith("_play")) { const mid2 = mid.replace("_play", ""); for (const s of seeds as any[]) { const e = this.pool(mid2).playPool.get(Number(s)); if (e) e.play = true; else this.pool(mid2).playPool.set(Number(s), { r: 0, tag: '未测试', play: true }); } } else if (mid.endsWith("_pend")) { const mid2 = mid.replace("_pend", ""); for (const [s, r] of Object.entries(seeds as any)) this.pool(mid2).pendingPool.set(Number(s), r as number | null); } else { const p = this.pool(mid); if (Array.isArray(seeds)) { for (const s of seeds as any[]) { if (!p.playPool.has(Number(s))) p.confirmPool.set(Number(s), null); } } else { for (const [s, r] of Object.entries(seeds as any)) { if (!p.playPool.has(Number(s))) p.confirmPool.set(Number(s), r as number | null); } } } } } } catch (_) {}
+        try { if (existsSync(CONFIRMED_FILE)) { const o = JSON.parse(readFileSync(CONFIRMED_FILE, "utf-8")); for (const [mid, seeds] of Object.entries(o)) { if (mid.endsWith("_play")) { /* skip — playPool loaded from purified_seeds.json */ } else if (mid.endsWith("_pend")) { const mid2 = mid.replace("_pend", ""); for (const [s, r] of Object.entries(seeds as any)) this.pool(mid2).pendingPool.set(Number(s), r as number | null); } else { const p = this.pool(mid); if (Array.isArray(seeds)) { for (const s of seeds as any[]) { if (!p.playPool.has(Number(s))) p.confirmPool.set(Number(s), null); } } else { for (const [s, r] of Object.entries(seeds as any)) { if (!p.playPool.has(Number(s))) p.confirmPool.set(Number(s), r as number | null); } } } } } } catch (_) {}
         // Load play pool from purified_seeds.json (legacy — now merged with _play)
         try { if (existsSync(PURIFIED_FILE)) { const o = JSON.parse(readFileSync(PURIFIED_FILE, "utf-8")); for (const [mid, seeds] of Object.entries(o)) { if (typeof seeds !== 'object' || seeds === null) continue; const p = this.pool(mid); for (const [s, e] of Object.entries(seeds as any)) { const entry: PlayEntry = { r: (e as any).r ?? 0, tag: (e as any).tag || '未测试', play: true }; p.confirmPool.delete(Number(s)); p.playPool.set(Number(s), entry); } } } } catch (_) {}
         try { if (existsSync(TEST_SEEDS_FILE)) { const a = JSON.parse(readFileSync(TEST_SEEDS_FILE, "utf-8")); if (Array.isArray(a)) { this.testSeeds = [null, null, null]; for (let i = 0; i < 3; i++) if (typeof a[i] === 'number') this.testSeeds[i] = a[i]; } } } catch (_) {}
@@ -61,7 +61,7 @@ export class SeedValidator {
         console.log(`[SEED] Play:${pl} Confirm:${cf} Mode:${this.mode}`);
     }
 
-    private saveConfirm(): void { const o: any = {}; for (const [mid, p] of this.pools) { o[mid] = Object.fromEntries(p.confirmPool); o[mid + "_play"] = Array.from(p.playPool.keys()); o[mid + "_pend"] = Object.fromEntries(p.pendingPool); } writeFileSync(CONFIRMED_FILE, JSON.stringify(o, null, 2), "utf-8"); }
+    private saveConfirm(): void { const o: any = {}; for (const [mid, p] of this.pools) { o[mid] = Object.fromEntries(p.confirmPool); o[mid + "_pend"] = Object.fromEntries(p.pendingPool); } writeFileSync(CONFIRMED_FILE, JSON.stringify(o, null, 2), "utf-8"); }
     private savePlay(): void { const o: any = {}; for (const [mid, p] of this.pools) { o[mid] = {}; for (const [s, e] of p.playPool) o[mid][String(s)] = e; } writeFileSync(PURIFIED_FILE, JSON.stringify(o, null, 2), "utf-8"); }
     private saveConfig(): void { writeFileSync(CONFIG_FILE, JSON.stringify({ selectedMovieId: this.selectedMovieId }, null, 2), "utf-8"); }
     private saveTestSeeds(): void { writeFileSync(TEST_SEEDS_FILE, JSON.stringify(this.testSeeds, null, 2), "utf-8"); }
@@ -149,11 +149,16 @@ export class SeedValidator {
     getSeed(movieId: string, rarity: number, pool: number[], characterId: number, drawIndex?: number): number {
         const ri = rarity - 3;
         const ts = this.testSeeds[ri];
-        if (ts !== null) return ts;                     // ① testSeed
+        if (ts !== null) return ts;
 
         const p = this.pool(movieId);
         const avail = pool.filter(s => !p.sentSeeds.has(s));
         const rand = (arr: number[]) => arr.length > 0 ? arr[Math.floor(Math.random() * arr.length)] : undefined;
+
+        const withTrace = (seed: number | undefined, poolName: string) => {
+            if (seed !== undefined) console.log(`[TRACE] ★${rarity} mode=${this.mode} pool=${poolName} seed=${seed}`);
+            return seed;
+        };
 
         // _guarantee 池回退到基础池
         const baseMovie = movieId.replace('_guarantee', '');
@@ -169,36 +174,33 @@ export class SeedValidator {
             return rand(candidates);
         };
 
-        if (this.mode === 'play') { const pur = pickPlay(); if (pur !== undefined) return pur; }
+        if (this.mode === 'play') { const pur = withTrace(pickPlay(), 'play'); if (pur !== undefined) return pur; }
 
         if (this.mode === 'test') {
-            const pend = rand(avail.filter(s => { const r = pendR(s); return r !== undefined && (r === null || r === ri); }));
+            const pend = withTrace(rand(avail.filter(s => { const r = pendR(s); return r !== undefined && (r === null || r === ri); })), 'pending');
             if (pend !== undefined) return pend;
-            const unk = rand(avail.filter(isUnknown));
+            const unk = withTrace(rand(avail.filter(isUnknown)), 'unknown');
             if (unk !== undefined) return unk;
             return characterId * 1000;
         }
 
         if (this.mode === 'natural') {
             const isFirstDraw = drawIndex !== undefined && drawIndex === 0;
-            if (isFirstDraw) { const pur = pickPlay(); if (pur !== undefined) return pur; }  // 第1抽强制播放池
-            const pur = pickPlay();
-            if (pur !== undefined && Math.random() < 0.10) return pur;                     // 10% 播放池
+            if (isFirstDraw) { const pur = withTrace(pickPlay(), 'play(first)'); if (pur !== undefined) return pur; }
+            const pur = withTrace(pickPlay(), 'play(10%)');
+            if (pur !== undefined && Math.random() < 0.10) return pur;
         }
 
-        // ↓ 兜底链（所有模式共用）
-        const conf = rand(avail.filter(s => { const r = confirmR(s); return r !== undefined && (r === null || r === ri); }));
+        const conf = withTrace(rand(avail.filter(s => { const r = confirmR(s); return r !== undefined && (r === null || r === ri); })), 'confirm');
         if (conf !== undefined) return conf;
-
-        const play = rand(avail.filter(playHas));
-        if (play !== undefined) return play;
-
-        const pend = rand(avail.filter(s => { const r = pendR(s); return r !== undefined && (r === null || r === ri); }));
+        const play2 = withTrace(rand(avail.filter(playHas)), 'play(fallback)');
+        if (play2 !== undefined) return play2;
+        const pend = withTrace(rand(avail.filter(s => { const r = pendR(s); return r !== undefined && (r === null || r === ri); })), 'pending');
         if (pend !== undefined) return pend;
-
-        const unk = rand(avail.filter(isUnknown));
+        const unk = withTrace(rand(avail.filter(isUnknown)), 'unknown');
         if (unk !== undefined) return unk;
 
+        console.log(`[TRACE] ★${rarity} mode=${this.mode} pool=FALLBACK seed=characterId*1000`);
         return characterId * 1000;
     }
 
