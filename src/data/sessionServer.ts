@@ -19,7 +19,7 @@ import { MultiRoom } from "../lib/types";
 import { disbandRoom, getRoom } from "./multiRoom";
 import { getSession, getAccountPlayers, getPlayerSync, getPlayerPartyGroupListSync, getPlayerCharacterSync, getPlayerCharacterManaNodesSync, getPlayerEquipmentSync, updatePlayerSync } from "./wdfpData";
 import { PartyCategory, PlayerParty, PlayerCharacter, PlayerEquipment } from "./types";
-import playerRankTable from "../../assets/player_rank.json";
+import playerRankTable from "../../assets/cdndata/player_rank.json";
 
 interface SessionClient {
     socket: net.Socket;
