@@ -1,7 +1,7 @@
 {
-  "name": "starpoint",
+  "name": "starpoint-cn",
   "version": "1.0.1",
-  "description": "A server reimplementation for the global version of World Flipper",
+  "description": "世界弹射物语(World Flipper)CN(雷霆)版本服务端模拟器",
   "main": "server.ts",
   "scripts": {
     "build": "npx tsc & npm run css",

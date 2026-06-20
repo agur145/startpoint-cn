@@ -1,59 +1,91 @@
-# Starpoint
-A work-in-progress server emulator for the global version of a mobile pinball game.
+# StarPoint CN
 
-## Implemented Features
-* Tutorial
-* Character leveling, uncapping, mana boards, & ex boosting
-* Character stories
-* Quests
-  - All main quests playable
-  - Some event/boss quests playable
-* Gacha
-  - Unit Portals
-  - Armament Portals
-  - Unit/Armament Exchanges
-* Armaments
-  - Awakening
-  - Melting
-* Most shops
-* Party organization
-* Encyclopedia
-* Time travel to past & future events.
+世界弹射物语(World Flipper)CN(雷霆 Leiting)版本的服务端模拟器。
 
-For a more in-depth view of the progress completed, visit the [API routes document](/docs/routes.md).
+## 功能状态
 
-## Installation
-1. Install the latest version of [Node.js](https://nodejs.org/en/download/prebuilt-installer).
-2. Clone the repository from the command line.
-   ```
-   git clone https://github.com/Duosion/starpoint.git
-   ```
-   - If you do not have git installed, click the green "Code" button at the top of the page and select "Download ZIP" to download a ZIP of the repository instead.
-3. Navigate to the directory where the repository was cloned/unzipped to.
-4. Place your copy of the game's CDN into the Starpoint install directory.
-   - It should be named ``.cdn``.
-5. Install mitmproxy from their [downloads page](https://mitmproxy.org/downloads/#10.4.0) [[direct Windows download](https://downloads.mitmproxy.org/10.4.0/mitmproxy-10.4.0-windows-x86_64.zip)].
-   - Extract into the ``.mitmproxy`` folder within the Starpoint install directory.
-6. Follow the guide for your phone or emulator:
-   - [Android (No Root)](/docs/connecting-android.md)
-   - [Android (Root)](/docs/connecting-android-root.md)
-   - [iOS](/docs/connecting-ios.md)
+已实现(部分端点沿用国际服设计,对 CN 的通用性尚未验证):
+
+- 账号:设备自动绑定(`device_id`)、Web 管理面板
+- 时间系统:全局 / 按存档时间偏移(默认 2024-08-14,规避 CDN 报错)
+- 关卡:主线 / 部分活动·Boss / 单人战斗结算
+- Gacha:角色·武器卡池、兑换、C3032 动画修复、抽卡种子验证
+- 多人联机(NPC 协战):Phase 2 — 建房 + NPC 招募 / 召唤 / 结算
+- 系统:狂热激战 · 体力 · 商店 · 漫画 · 邮件群发
+- 养成:升级 / 突破 / 魔晶板 / EX / 羁绊;武装:觉醒 / 熔解;编队 · 图鉴 · 教程
+
+⚠️ 已知失效 / 注意:
+
+- 存档导入 / 导出:**当前失效**。
+- 漫画资源**不随项目分发**,需自行导入。
+- 多个端点沿用国际服(global)设计,不保证对 CN 客户端通用。
+
+> 端点状态见 [docs](./docs/README.md) · [端点实现状态](./docs/reference/routes-status.md)
+
+## 环境需求
+
+- Node.js ≥ 20 · 打补丁后的 CN 客户端 APK(见"客户端改造")
+- 一份 CN CDN 资源,放入 `.cdn/cn/`
+
+### CDN 路径清单文件(PathFile)
+
+客户端经 EntityLists 的"路径清单文件"获取全部资源路径。**服务端对它使用了两套命名且不做归一处理**:
+
+- `src/routes/cn/asset.ts` 的 version_info → `EntityLists/PathFile`
+- `src/cn-server.ts` → `EntityLists/10939-android_medium.csv`
+
+不同来源的 CDN 该文件名 / 位置可能不同(内容一致)。请确保 `.cdn/cn/EntityLists/` 下**同时存在** `PathFile` 与 `10939-android_medium.csv`(复制一份改名即可),否则按命中端点不同可能出现资源 404。
+
+## 快速启动
+
+```bash
+cd starpoint-cn
+npm install
+cp .env.example .env          # 按需修改 CN_LISTEN_HOST / CDN_BASE_URL
+npm run build && npm run dev:cn   # 监听 CN_LISTEN_PORT(默认 8001)
+```
+
+一键(生产式,build + 重启 + 日志):`bash scripts/start-cn.sh`(另有 `scripts/start-cn-tmux.sh`)。
+
+`.env` 加载说明:
+
+- `npm run dev:cn` 与 `bash scripts/start-cn.sh` 经 `node --env-file=.env` **会**加载 `.env`。
+- `npm run debug:cn`(ts-node-dev)无 `--env-file`、代码也未引入 dotenv,因此**不会**自动读 `.env`;调试时需自行 export 环境变量,否则走代码默认值。
+
+## 关键配置(.env)
+
+- `CN_LISTEN_HOST` / `CN_LISTEN_PORT` — HTTP 绑定地址 + 联机 TCP 房间显示 IP;客户端在别的设备时设为你的 LAN IP(默认端口 8001)。
+- `CDN_BASE_URL` — `http://<你的LAN_IP>:<端口>/patch/cn`。
+- `CN_RES_VERSION` — 须与客户端 resourceVersion 一致(当前 1.4.54)。
+- `DROP_MULTIPLIER` / `NPC_*` — 测试与联机调参。
+
+## 客户端改造(最小功能)
+
+连接本服务需对官方 APK 打两处补丁,用 [starview](https://github.com/duosii/starview) 的最小构建:
+
+- **免登录** — `DevConfig.as` SDK dummy(step 04a)
+- **重定向到本服** — `DevConfig_gf_android.as` 把官方域名改为你的服务器(step 04b)
+
+```bash
+API_SERVER=http://<你的LAN_IP>:8001 ANDROID_SERIAL=<设备> bash ../starview/scripts/build-minimal.sh
+```
+
+完整 APK 补丁 / 反编译说明见本地 `../docs/setup/apk-patching.md`。
+
+## Web 管理面板(`http://<CN_LISTEN_HOST>:<端口>/`)
+
+`/` 时间设置 · `/player` 账号·存档·玩家 · `/player/:id` 玩家详情 · `/mail` 群发邮件
+
+> ⚠️ 面板**不做合法性校验**,误操作可能写出非法数据导致**坏档**,请先备份再操作。
 
 ## FAQ
-- **Do I have to host this on my own?**
-  - Yes. I will not be hosting this server myself.
-- **Can I import my save data?**
-  - Yes. Once you have Starpoint installed & running, visit [http://localhost:8000](http://localhost:8000) in your browser and navigate to the players page.
-  - Select a player from the page, select the save file you want to import, and click the "Upload Save" button.
-- **I am getting an 'H404' error**
-  - Receiving this error means that the feature you are trying to interact with has not been implemented yet.
 
-## Mods
-Follow the [modding guide](/docs/modding.md) to learn more about installing & creating mods.
+- `H404` = 该功能 / 端点尚未实现。
 
-## Contribution
-Interested in contributing to Starpoint? Read the [contribution guide](/docs/contributing.md) to learn more!
+## 致谢 / 相关项目
 
-## Special Thanks
-- Special thanks to [wdfp-extractor](https://github.com/ScripterSugar/wdfp-extractor) for providing the assets and knowledge required to create the ``converter.py`` script.
-- Special thanks to the [wfax tool](https://github.com/blead/wfax) for making modding possible.
+- [wdfp-extractor](https://github.com/ScripterSugar/wdfp-extractor) — 资源提取
+- [wfax](https://github.com/blead/wfax) — 资源转换 / 修改
+- 上游 [Duosion/starpoint](https://github.com/Duosion/starpoint) — 全球服模拟器基础
+- [starview](https://github.com/duosii/starview) — APK 打补丁工具
+- [wf-2.1.125-cn-decompiled](https://github.com/dennis96292/wf-2.1.125-cn-decompiled) — CN 客户端反编译参考
