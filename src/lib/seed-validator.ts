@@ -100,16 +100,19 @@ export class SeedValidator {
         return !!(e && e.r === ri && e.tag !== '冷血躲避球');
     }
 
-    /** 确认池稀有度匹配 */
-    private isConfirmMatch(ri: number, p: MoviePool, base: MoviePool | null, s: number): boolean {
-        const r = this.poolGet(p, base, mp => mp.confirmPool.get(s), undefined as (number | null | undefined));
-        return r !== undefined && (r === null || r === ri);
+    /** 确认池稀有度匹配（同池，不跨池回退） */
+    private isConfirmMatch(ri: number, p: MoviePool, _base: MoviePool | null, s: number): boolean {
+        const r = p.confirmPool.get(s);
+        const ok = r !== undefined && (r === null || r === ri);
+        return ok;
     }
 
     /** 多池检查（种子在任何已知池中） */
     private inAnyPool(p: MoviePool, s: number, base: MoviePool | null): boolean {
-        if (p.confirmPool.has(s) || p.playPool.has(s) || p.verifiedPool.has(s) || p.pendingPool.has(s)) return true;
-        return base ? (base.confirmPool.has(s) || base.playPool.has(s) || base.verifiedPool.has(s) || base.pendingPool.has(s)) : false;
+        const has = p.confirmPool.has(s) || p.playPool.has(s) || p.verifiedPool.has(s) || p.pendingPool.has(s);
+        if (base) return has || base.confirmPool.has(s) || base.playPool.has(s) || base.verifiedPool.has(s) || base.pendingPool.has(s);
+        if (!has) console.log(`[DBG] inAnyPool seed=${s} NOT in any pool (confirm/pending/play/verified all empty)`);
+        return has;
     }
 
     /** 种子被确认/播放后清理 sentSeeds */
@@ -151,7 +154,7 @@ export class SeedValidator {
         }
     }
 
-    /** 稀有度经 C3032 客户端校验后移入验证池，同时从播放池去重 */
+    /** 稀有度经 C3032 客户端校验后移入验证池，同时跨池去重 */
     moveToVerified(movieId: string, seed: number, r: number): void {
         const p = this.pool(movieId);
         this.cleanupPending(seed, p);
@@ -159,8 +162,14 @@ export class SeedValidator {
         p.pendingPool.delete(seed);
         p.confirmPool.delete(seed);
         if (p.playPool.has(seed)) {
-            p.playPool.delete(seed);  // 验证池是播放池的超集，去重
+            p.playPool.delete(seed);
             this.savePlay();
+        }
+        // 跨池清理：种子已验证，base/guarantee 池中的确认/播放旧条目不再可靠
+        const other = this.basePool(movieId) || (movieId.endsWith('_guarantee') ? null : this.pool(movieId + '_guarantee'));
+        if (other) {
+            if (other.confirmPool.has(seed)) other.confirmPool.delete(seed);
+            if (other.playPool.has(seed)) { other.playPool.delete(seed); this.savePlay(); }
         }
         this.saveVerified();
         console.log(`[SEED] VERIFY [${movieId}] seed=${seed} ★${r+3} (rarity verified by C3032)`);
@@ -179,7 +188,10 @@ export class SeedValidator {
         const p = this.pool(movieId);
         const r = rarity !== undefined ? rarity - 3 : null;
         p.sentSeeds.set(seed, r);
-        console.log(`[SEED] SENT [${movieId}] seed=${seed} r=${r !== null ? '★'+(r+3) : 'null'}`);
+        // 同时阻塞 base pool，防止同一种子在 base/guarantee 池被重复选取
+        const base = this.basePool(movieId);
+        if (base) base.sentSeeds.set(seed, r);
+        console.log(`[SEED] SENT [${movieId}] seed=${seed} r=${r !== null ? '★'+(r+3) : 'null'}  [DBG] sentSeeds.size=${p.sentSeeds.size}`);
     }
 
     getSentR(movieId: string, seed: number): number | null | undefined {
@@ -194,21 +206,24 @@ export class SeedValidator {
     /** 清理 sentSeeds：有 play 标记的按标记入池，无标记的入 pendingPool 重测 */
     flushAll(): void {
         for (const [movieId, p] of this.pools) {
-            let flushed = 0;
+            let flushed = 0, play1 = 0, play0 = 0, unmarked = 0;
             for (const [seed, r] of p.sentSeeds) {
                 const didPlay = p.sentPlayFlags.get(seed);
                 if (didPlay === true) {
                     this.addPlay(movieId, seed, r ?? 0, true);
                     this.moveToVerified(movieId, seed, r ?? 0);
+                    play1++;
                 } else if (didPlay === false) {
                     this.confirm(movieId, seed, r);
+                    play0++;
                 } else {
                     // 完全丢失：pendingPool 下次重测
                     this.addPending(movieId, seed, r);
+                    unmarked++;
                 }
                 flushed++;
             }
-            if (flushed > 0) console.log(`[SEED] flushAll [${movieId}] flushed ${flushed} stale seeds`);
+            if (flushed > 0) console.log(`[SEED] flushAll [${movieId}] flushed ${flushed} stale seeds  [DBG] play=1:${play1} play=0:${play0} unmarked:${unmarked}`);
         }
     }
 
@@ -231,7 +246,7 @@ export class SeedValidator {
 
     getSeed(movieId: string, rarity: number, pool: number[], characterId: number, drawIndex?: number): number {
         const ri = rarity - 3;
-        if (this.testSeeds[ri] !== null) return this.testSeeds[ri]!;  // ①
+        if (this.testSeeds[ri] !== null) { console.log(`[DBG] getSeed mode=${this.mode} ★${rarity} ${movieId} di=${drawIndex} → testSeed=${this.testSeeds[ri]}`); return this.testSeeds[ri]!; }  // ①
 
         const p = this.pool(movieId);
         const base = this.basePool(movieId);
@@ -240,7 +255,7 @@ export class SeedValidator {
 
         if (avail.length < pool.length) this.trace(`★${rarity} avail: ${avail.length}/${pool.length} (sentSeeds blocked ${pool.length - avail.length})`);
 
-        // ② 播放模式
+        // Natural mode: log verifiedPool match count
         if (this.mode === 'play') {
             const pur = rand(avail.filter(s => this.isPlayMatch(s, p, ri)));
             if (pur !== undefined) return pur;
@@ -256,37 +271,41 @@ export class SeedValidator {
             if (pend !== undefined) return pend;
             // 3. unknown（不在任何池的未测试种子）
             const unk = rand(avail.filter(s => !this.inAnyPool(p, s, base)));
-            if (unk !== undefined) return unk;
-            return characterId * 1000;
+            if (unk !== undefined) { console.log(`[DBG] getSeed mode=${this.mode} ★${rarity} ${movieId} → unknown=${unk}`); return unk; }
+            const fb = characterId * 1000;
+            console.log(`[DBG] getSeed mode=${this.mode} ★${rarity} ${movieId} → fallback=${fb}`);
+            return fb;
         }
 
         // ⑤ 自然模式
         if (this.mode === 'natural') {
             const isFirst = drawIndex !== undefined && drawIndex === 0;
-            // 优先选已验证池（play=1 + 稀有度校验通过）→ 播放池（play=1）→ 确认池（play=0）
+            const verList = avail.filter(s => p.verifiedPool.has(s) && p.verifiedPool.get(s) === ri);
             if (isFirst) {
-                const ver = rand(avail.filter(s => p.verifiedPool.has(s) && p.verifiedPool.get(s) === ri));
-                if (ver !== undefined) return ver;
-                const pur = rand(avail.filter(s => this.isPlayMatch(s, p, ri)));
-                if (pur !== undefined) return pur;
+                const ver = rand(verList);
+                if (ver !== undefined) { console.log(`[DBG] getSeed ★${rarity} ri=${ri} → natural:verified=★${p.verifiedPool.get(ver)!+3}`); return ver; }
             }
-            const ver = rand(avail.filter(s => p.verifiedPool.has(s) && p.verifiedPool.get(s) === ri));
-            if (ver !== undefined && Math.random() < 0.10) return ver;
-            const pur = rand(avail.filter(s => this.isPlayMatch(s, p, ri)));
-            if (pur !== undefined && Math.random() < 0.10) return pur;
+            const ver = rand(verList);
+            if (ver !== undefined && Math.random() < 0.10) { console.log(`[DBG] getSeed ★${rarity} ri=${ri} → natural:verified=★${p.verifiedPool.get(ver)!+3}`); return ver; }
+            if (verList.length > 0) console.log(`[DBG] getSeed ★${rarity} ri=${ri} verifiedPool matches=${verList.length} (none picked this time)`);
         }
 
         // ⑥ 兜底链
-        const conf = rand(avail.filter(s => this.isConfirmMatch(ri, p, base, s)));
-        if (conf !== undefined) return conf;
-        const play2 = rand(avail.filter(s => this.poolGet(p, base, mp => mp.playPool.has(s), false)));
-        if (play2 !== undefined) return play2;
+        const confList = avail.filter(s => this.isConfirmMatch(ri, p, base, s));
+        const conf = rand(confList);
+        if (conf !== undefined) {
+            const cr = p.confirmPool.get(conf);
+            console.log(`[DBG] getSeed ★${rarity} ri=${ri} mode=${this.mode} → confirm=${conf} r=${cr !== undefined && cr !== null ? '★'+(cr+3) : 'null'} (${confList.length} matches)`);
+            return conf;
+        }
         const pend = rand(avail.filter(s => this.poolGet(p, base, mp => mp.pendingPool.get(s), undefined as any) !== undefined));
-        if (pend !== undefined) return pend;
+        if (pend !== undefined) { console.log(`[DBG] getSeed ★${rarity} → pending=${pend}`); return pend; }
         const unk = rand(avail.filter(s => !this.inAnyPool(p, s, base)));
-        if (unk !== undefined) return unk;
+        if (unk !== undefined) { console.log(`[DBG] getSeed ★${rarity} mode=${this.mode} → unknown=${unk}`); return unk; }
 
-        return characterId * 1000;
+        const fb = characterId * 1000;
+        console.log(`[DBG] getSeed ★${rarity} mode=${this.mode} → fallback=${fb} charId=${characterId}`);
+        return fb;
     }
 
     getPlayForRarity(movieId: string, rarity: number): number[] {

@@ -183,6 +183,7 @@ function parseC3032Beacon(loc: string): void {
     const badSeed = parseInt(seedMatch[1], 10);
     const movieMatch = loc.match(/movie_id=(\w+)/);
     const movieId = movieMatch ? movieMatch[1] : "normal";
+    console.log(`[DBG-BCN] C3032 seed=${badSeed} movieId=${movieId}`);
     const starDigits = [...loc.matchAll(/â(\d)/g)];
     // first match = ball rarity (結果レア度), second = char rarity (キャラクターレア度)
     const ballRarity = starDigits.length > 0 ? parseInt(starDigits[0][1], 10) : 3;
@@ -192,8 +193,10 @@ function parseC3032Beacon(loc: string): void {
     const r = ballRarity - 3; // 0=★3, 1=★4, 2=★5
     if (didPlay !== null) seedValidator.recordPlay(movieId, badSeed, didPlay);  // record for flushAll
     // C3032 = client-verified rarity → verifiedPool (superset of playPool/confirmPool)
+    console.log(`[DBG-BCN] C3032 → moveToVerified [${movieId}] seed=${badSeed} ★${ballRarity}`);
     seedValidator.moveToVerified(movieId, badSeed, r);
     if (didPlay === false) {
+        console.log(`[DBG-BCN] C3032 → confirm [${movieId}] seed=${badSeed} ★${ballRarity}`);
         seedValidator.confirm(movieId, badSeed, r);  // play=0 → confirmPool
     }
     const playStr = didPlay === true ? ' play=1' : didPlay === false ? ' play=0' : '';
@@ -212,19 +215,20 @@ function parsePlayBeacon(loc: string): void {
         const movieId = movieMatch ? movieMatch[1] : "normal";
         const playMatch = loc.match(/play=(\d)/);
         const didPlay = playMatch ? playMatch[1] === '1' : false;
+        console.log(`[DBG-BCN] PLAY seed=${seed} play=${didPlay?'1':'0'} movieId=${movieId}`);
         seedValidator.recordPlay(movieId, seed, didPlay);  // record for flushAll
         if (didPlay) {
             const r = seedValidator.getSentR(movieId, seed);
             if (r !== undefined && r !== null) {
                 seedValidator.addPlay(movieId, seed, r, true);
-                seedValidator.moveToVerified(movieId, seed, r);  // PLAY beacon confirm: rarity correct (no C3032) or will be corrected
+                seedValidator.moveToVerified(movieId, seed, r);
                 console.log(`[PLAY] playPool seed=${seed} movie=${movieId}`);
             } else {
                 console.log(`[PLAY] play=1 skipped seed=${seed} getSentR=${r === null ? 'null' : 'undefined'} (already cleaned up by prior beacon)`);
             }
         } else {
             const r = seedValidator.getSentR(movieId, seed);
-            console.log(`[TRACE] PLAY|play=0 seed=${seed} getSentR=${r !== undefined && r !== null ? '★'+(r+3) : r === null ? 'null' : 'undefined'}`);
+            console.log(`[DBG-BCN] PLAY play=0 → confirm [${movieId}] seed=${seed} r=${r !== undefined && r !== null ? '★'+(r+3) : r === null ? 'null' : 'undefined'}`);
             if (r !== undefined) seedValidator.confirm(movieId, seed, r);
         }
     }
