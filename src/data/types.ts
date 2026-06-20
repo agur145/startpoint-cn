@@ -677,7 +677,7 @@ export interface ClientPlayerData {
     user_notice_list: unknown[]
     user_triggered_tutorial: number[]
     user_tutorial?: UserTutorial | null
-    tutorial_gacha?: unknown
+    tutorial_gacha?: { character_id?: number | null } | null
     cleared_regular_mission_list: Record<string, number>
     user_character_list: UserCharacterList
     user_character_mana_node_list: UserCharacterManaNodeList
@@ -752,6 +752,6 @@ export interface PlayerCarnivalEventRecord {
     folderId: number
     bestScore: number | null
     previousScore: number | null
-    previousCharacterIds: (number | null)[]
-    previousUnisonCharacterIds: (number | null)[]
+    previousCharacterIds: (number | null)[] | null
+    previousUnisonCharacterIds: (number | null)[] | null
 }

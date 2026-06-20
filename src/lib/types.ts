@@ -104,6 +104,7 @@ export enum RushEventFolder {
 export interface Reward {
     name?: string,
     type: RewardType,
+    id?: number,
 }
 
 export interface EquipmentItemReward extends Reward {

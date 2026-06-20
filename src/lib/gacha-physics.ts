@@ -335,11 +335,16 @@ export const CN_GACHA_PHYSICS_CONFIG: Omit<GachaPhysicsConfig, 'seed'> = {
     },
 };
 
+/** Deep-partial: nested config objects become optional; arrays/primitives kept intact. */
+type DeepPartial<T> = {
+    [P in keyof T]?: T[P] extends any[] ? T[P] : T[P] extends object ? DeepPartial<T[P]> : T[P]
+};
+
 /**
  * Movie-specific config overrides for different gacha animation types.
  * Extracted from CN CDN AMF3 files.
  */
-export const MOVIE_CONFIGS: Record<string, Partial<Omit<GachaPhysicsConfig, 'seed'>>> = {
+export const MOVIE_CONFIGS: Record<string, DeepPartial<Omit<GachaPhysicsConfig, 'seed'>>> = {
     normal: {
         amulet: { totalCount: 5 },
         threshold: {
@@ -410,7 +415,7 @@ export class GachaSimulator {
 
     // State
     private playProbability: number = 0;
-    private moviePlayable: boolean = false;
+    public moviePlayable: boolean = false;
     private finished: boolean = false;
     private pendingFinish: number = -1;
     private frameCount: number = 0;
@@ -591,7 +596,7 @@ export class GachaSimulator {
                     // AS3: Number(undefined)=NaN → probability>NaN=false
                     //      Number(null)=0 → probability>0 ~always true
                     const tV = threshold.amulets[i];
-                    if (tV !== undefined && amu.probability > tV) {
+                    if (tV !== undefined && amu.probability > (tV as number)) {
                         if (cfg.amulet.limitTotalCount) {
                             if (cfg.amulet.decideTwoUpWhenAppear) {
                                 // Cap by remaining slots
@@ -613,7 +618,7 @@ export class GachaSimulator {
                     // AS3: Number(undefined)=NaN → probability>NaN=false
                     const tV = threshold.amulets[i];
                     rarity = this.ballRarity === 0
-                        ? (tV !== undefined && amu.probability > tV ? 1 : 0)
+                        ? (tV !== undefined && amu.probability > (tV as number) ? 1 : 0)
                         : 0;
                     break;
                 }

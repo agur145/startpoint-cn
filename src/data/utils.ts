@@ -42,7 +42,7 @@ export function deserializeBoolean(
  * @returns A serialized string.
  */
 export function serializeNumberList(
-    toSerialize: number[]
+    toSerialize: (number | null)[]
 ): string {
     return toSerialize.join(',')
 }
@@ -487,7 +487,8 @@ export function getDefaultPlayerData(): Omit<Player, 'id'> {
         paidMana: 2000,
         enableAuto3x: false,
         tutorialStep: 0,
-        tutorialSkipFlag: null
+        tutorialSkipFlag: null,
+        tutorialGachaCharacterId: null
     }
 }
 
