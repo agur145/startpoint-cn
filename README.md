@@ -61,16 +61,18 @@ npm run build && npm run dev:cn   # 监听 CN_LISTEN_PORT(默认 8001)
 
 ## 客户端改造(最小功能)
 
-连接本服务需对官方 APK 打两处补丁,用 [starview](https://github.com/duosii/starview) 的最小构建:
+连接本服务需对官方 APK 打两处改动(免登录 + 重定向到本服),详见 [`client-patch/`](./client-patch/README.md):
 
-- **免登录** — `DevConfig.as` SDK dummy(step 04a)
-- **重定向到本服** — `DevConfig_gf_android.as` 把官方域名改为你的服务器(step 04b)
+- **免登录** — `pinball/config/core/DevConfig.as`:`sdkDummy = false` → `true`
+- **重定向到本服** — `pinball/config/gbits/DevConfig_gf_android.as`:域名 → 你的服务器,`"https"` → `"http"`
+
+用 FFDec 导出 APK 的 AS3 后执行:
 
 ```bash
-API_SERVER=http://<你的LAN_IP>:8001 ANDROID_SERIAL=<设备> bash ../starview/scripts/build-minimal.sh
+bash client-patch/apply.sh <AS3_导出目录> <你的LAN_IP>:8001
 ```
 
-完整 APK 补丁 / 反编译说明见本地 `../docs/setup/apk-patching.md`。
+再用 FFDec 回封、重打包签名。完整 APK / 反编译说明见本地环境文档 `docs/setup/`。
 
 ## Web 管理面板(`http://<CN_LISTEN_HOST>:<端口>/`)
 
@@ -87,5 +89,5 @@ API_SERVER=http://<你的LAN_IP>:8001 ANDROID_SERIAL=<设备> bash ../starview/s
 - [wdfp-extractor](https://github.com/ScripterSugar/wdfp-extractor) — 资源提取
 - [wfax](https://github.com/blead/wfax) — 资源转换 / 修改
 - 上游 [Duosion/starpoint](https://github.com/Duosion/starpoint) — 全球服模拟器基础
-- [starview](https://github.com/duosii/starview) — APK 打补丁工具
+- [starview](https://github.com/duosii/starview) — APK 打补丁工具(基础;本仓库最小补丁见 [`client-patch/`](./client-patch/README.md))
 - [wf-2.1.125-cn-decompiled](https://github.com/dennis96292/wf-2.1.125-cn-decompiled) — CN 客户端反编译参考
