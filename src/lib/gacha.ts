@@ -131,6 +131,8 @@ export function rewardPlayerGachaDrawResultSync(
     gachaDrawResult: number[]
 ): RewardPlayerGachaDrawResult {
 
+    seedValidator.flushAll();  // Clean up stale sentSeeds from previous draws
+
     const draws: GachaDraws = []
     const characters: Map<number, Object> = new Map()
     const equipment: Map<number, Object> = new Map()

@@ -34,6 +34,7 @@ class MoviePool {
     verifiedPool: Map<number, number> = new Map();
     pendingPool: Map<number, number | null> = new Map();
     sentSeeds: Map<number, number | null> = new Map();
+    sentPlayFlags: Map<number, boolean> = new Map();
 }
 
 // ============================================================================
@@ -114,6 +115,7 @@ export class SeedValidator {
     /** 种子被确认/播放后清理 sentSeeds */
     private cleanupPending(seed: number, p: MoviePool): void {
         p.sentSeeds.delete(seed);
+        p.sentPlayFlags.delete(seed);
     }
 
     // ====== 种子状态变更 ======
@@ -182,6 +184,32 @@ export class SeedValidator {
 
     getSentR(movieId: string, seed: number): number | null | undefined {
         return this.pool(movieId).sentSeeds.get(seed);
+    }
+
+    /** 记录客户端返回的 play=1/0，供 flushAll 使用 */
+    recordPlay(movieId: string, seed: number, didPlay: boolean): void {
+        this.pool(movieId).sentPlayFlags.set(seed, didPlay);
+    }
+
+    /** 清理 sentSeeds：有 play 标记的按标记入池，无标记的入 pendingPool 重测 */
+    flushAll(): void {
+        for (const [movieId, p] of this.pools) {
+            let flushed = 0;
+            for (const [seed, r] of p.sentSeeds) {
+                const didPlay = p.sentPlayFlags.get(seed);
+                if (didPlay === true) {
+                    this.addPlay(movieId, seed, r ?? 0, true);
+                    this.moveToVerified(movieId, seed, r ?? 0);
+                } else if (didPlay === false) {
+                    this.confirm(movieId, seed, r);
+                } else {
+                    // 完全丢失：pendingPool 下次重测
+                    this.addPending(movieId, seed, r);
+                }
+                flushed++;
+            }
+            if (flushed > 0) console.log(`[SEED] flushAll [${movieId}] flushed ${flushed} stale seeds`);
+        }
     }
 
     // Tag / testSeed / mode — unchanged
@@ -300,6 +328,11 @@ export class SeedValidator {
 
     getPlayList(movieId: string): { seed: number; rarity: number; tag: SeedTag; play?: boolean }[] {
         return Array.from(this.pool(movieId).playPool.entries()).map(([s, e]) => ({ seed: s, rarity: e.r + 3, tag: e.tag, play: e.play }));
+    }
+
+    getVerifiedList(movieId: string): { seed: number; rarity: number }[] {
+        return Array.from(this.pool(movieId).verifiedPool.entries())
+            .map(([s, r]) => ({ seed: s, rarity: r + 3 }));
     }
 }
 

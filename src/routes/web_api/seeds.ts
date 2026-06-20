@@ -41,6 +41,7 @@ const routes = async (fastify: FastifyInstance) => {
         const known = s.confirm_total + s.play_total + (s.verified_total || 0);
         const perMovieKnown = (s.confirm || 0) + (s.mov_play || 0) + (s.verified || 0);
         reply.status(200).send({
+            movieId: mid,
             unknown: mid ? Math.max(0, movieTotal - perMovieKnown) : totalSeeds - known,
             movie_total: movieTotal,
             confirm: s.confirm, confirm_total: s.confirm_total,
@@ -58,7 +59,11 @@ const routes = async (fastify: FastifyInstance) => {
 
     fastify.get("/list", async (request: FastifyRequest, reply: FastifyReply) => {
         const mid = (request.query as any).movieId || seedValidator.getSelectedMovieId() || 'fes';
-        reply.status(200).send({ play: seedValidator.getPlayList(mid), movieId: mid });
+        reply.status(200).send({
+            play: seedValidator.getPlayList(mid),
+            verified: seedValidator.getVerifiedList(mid),
+            movieId: mid
+        });
     });
 
     fastify.post("/mode", async (request: FastifyRequest, reply: FastifyReply) => {

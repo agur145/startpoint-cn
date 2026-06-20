@@ -190,6 +190,7 @@ function parseC3032Beacon(loc: string): void {
     const playMatch = loc.match(/play=(\d)/);
     const didPlay = playMatch ? playMatch[1] === '1' : null;
     const r = ballRarity - 3; // 0=★3, 1=★4, 2=★5
+    if (didPlay !== null) seedValidator.recordPlay(movieId, badSeed, didPlay);  // record for flushAll
     // C3032 = client-verified rarity → verifiedPool (superset of playPool/confirmPool)
     seedValidator.moveToVerified(movieId, badSeed, r);
     if (didPlay === false) {
@@ -211,6 +212,7 @@ function parsePlayBeacon(loc: string): void {
         const movieId = movieMatch ? movieMatch[1] : "normal";
         const playMatch = loc.match(/play=(\d)/);
         const didPlay = playMatch ? playMatch[1] === '1' : false;
+        seedValidator.recordPlay(movieId, seed, didPlay);  // record for flushAll
         if (didPlay) {
             const r = seedValidator.getSentR(movieId, seed);
             if (r !== undefined && r !== null) {

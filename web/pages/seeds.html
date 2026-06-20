@@ -23,12 +23,11 @@
         .test-btn { padding: 0.1rem 0.5rem; border-radius: 0.75rem; border: 1px solid var(--color-outline-variant); cursor: pointer; font-size: 0.7rem; background: transparent; color: var(--color-on-surface); }
         .test-btn.active { background: #a371f7; color: #fff; border-color: #a371f7; }
         .clear { cursor: pointer; color: #f85149; font-size: 0.8rem; }
-        .col3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
         .col5 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 1rem; }
-        @media(max-width:900px){.col3{grid-template-columns:1fr} .col5{grid-template-columns:1fr}}
+        @media(max-width:900px){.col5{grid-template-columns:1fr}}
         .progress { height: 6px; background: var(--color-surface-container-high); border-radius: 3px; overflow: hidden; max-width: 400px; margin: 0.25rem 0; }
         .progress div { height: 100%; float: left; }
-        .bar-ok{background:#d29922} .bar-p1{background:#d29922} .bar-unk{background:#6e7681} .bar-play{background:#3fb950}
+        .bar-ok{background:#d29922} .bar-play{background:#d29922} .bar-unk{background:#6e7681} .bar-pend{background:#3fb950}
     </style>
 </head>
 <body class="bg-background text-on-surface relative mt-16 m-auto max-w-screen-2xl min-h-screen box-border flex flex-col items-start px-3 pb-3">
@@ -56,30 +55,42 @@
                 <div id="cfgSummary" class="flex flex-wrap gap-3"></div>
             </div>
 
+            <!-- ====== 验证池 ====== -->
+            <div class="card" id="verifiedSection">
+                <h2 class="text-lg font-semibold mb-2" style="color:#a371f7">验证池 <span class="text-xs" style="color:#888">（play=1 ✓ + 稀有度 ✓，自然模式优先使用）</span></h2>
+                <div id="testSeedBar" class="flex flex-wrap gap-3 items-center mb-3" style="font-size:0.85rem"></div>
+                <div class="col5" id="verifiedColumns" style="display:none">
+                    <div><h3 class="text-sm font-semibold mb-1" style="color:#f85149">★3 <span id="vr3Count">(0)</span></h3><div id="vr3"></div></div>
+                    <div><h3 class="text-sm font-semibold mb-1" style="color:#d29922">★4 <span id="vr4Count">(0)</span></h3><div id="vr4"></div></div>
+                    <div><h3 class="text-sm font-semibold mb-1" style="color:#b0882c">★4保底 <span id="vr4bCount">(0)</span></h3><div id="vr4b"></div></div>
+                    <div><h3 class="text-sm font-semibold mb-1" style="color:#3fb950">★5 <span id="vr5Count">(0)</span></h3><div id="vr5"></div></div>
+                    <div><h3 class="text-sm font-semibold mb-1" style="color:#2ea043">★5保底 <span id="vr5bCount">(0)</span></h3><div id="vr5b"></div></div>
+                </div>
+                <div id="verifiedEmpty" class="text-xs text-on-surface-variant">暂无已验证种子</div>
+            </div>
+
             <!-- ====== 播放池 ====== -->
             <div class="card" id="playSection">
-                <h2 class="text-lg font-semibold text-on-surface-variant mb-2">播放池 <span class="text-xs" style="color:#888">（testSeed > 同稀有度）</span></h2>
-                <div id="testSeedBar" class="flex flex-wrap gap-3 items-center mb-3" style="font-size:0.85rem"></div>
+                <h2 class="text-lg font-semibold mb-2" style="color:#d29922">播放池 <span class="text-xs" style="color:#888">（play=1 ✓，稀有度 ⚠️ 待 C3032 校验，自动移入验证池）</span></h2>
                 <div class="col5" id="playColumns" style="display:none">
-                    <div><h3 class="text-sm font-semibold mb-1" style="color:#f85149">★3 <span id="col3Count">(0)</span></h3><div id="col3"></div></div>
-                    <div><h3 class="text-sm font-semibold mb-1" style="color:#d29922">★4 <span id="col4Count">(0)</span></h3><div id="col4"></div></div>
-                    <div><h3 class="text-sm font-semibold mb-1" style="color:#b0882c">★4保底 <span id="col4bCount">(0)</span></h3><div id="col4b"></div></div>
-                    <div><h3 class="text-sm font-semibold mb-1" style="color:#3fb950">★5 <span id="col5Count">(0)</span></h3><div id="col5"></div></div>
-                    <div><h3 class="text-sm font-semibold mb-1" style="color:#2ea043">★5保底 <span id="col5bCount">(0)</span></h3><div id="col5b"></div></div>
+                    <div><h3 class="text-sm font-semibold mb-1" style="color:#f85149">★3 <span id="p3Count">(0)</span></h3><div id="p3"></div></div>
+                    <div><h3 class="text-sm font-semibold mb-1" style="color:#d29922">★4 <span id="p4Count">(0)</span></h3><div id="p4"></div></div>
+                    <div><h3 class="text-sm font-semibold mb-1" style="color:#b0882c">★4保底 <span id="p4bCount">(0)</span></h3><div id="p4b"></div></div>
+                    <div><h3 class="text-sm font-semibold mb-1" style="color:#3fb950">★5 <span id="p5Count">(0)</span></h3><div id="p5"></div></div>
+                    <div><h3 class="text-sm font-semibold mb-1" style="color:#2ea043">★5保底 <span id="p5bCount">(0)</span></h3><div id="p5b"></div></div>
                 </div>
                 <div id="playEmpty" class="text-xs text-on-surface-variant">暂无播放种子</div>
             </div>
 
             <!-- ====== 测试池 ====== -->
             <div class="card" id="testSection">
-                <h2 class="text-lg font-semibold text-on-surface-variant mb-2">测试池 <span class="text-xs" style="color:#888">（确认池 > 等待校验 > 测试池）</span></h2>
+                <h2 class="text-lg font-semibold text-on-surface-variant mb-2">测试池 <span class="text-xs" style="color:#888">（确认池 ≥ 等待校验 ≥ 测试池）</span></h2>
                 <div class="progress"><div class="bar-ok" id="barOk" style="width:0"></div><div class="bar-play" id="barPlay" style="width:0"></div><div class="bar-unk" id="barUnk" style="width:0"></div></div>
                 <div id="testStats"></div><p id="testSummary" class="text-xs text-on-surface-variant mt-1"></p>
             </div>
         </article>
     </div>
     <script>
-    var currentMovieId = null;
     function fmt(n) { return n.toLocaleString(); }
     async function setMode(m) { await fetch('/api/seeds/mode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:m})});load(); }
     async function selectCfg(id) { currentGroup = GROUPS.find(g => g.id === id) || GROUPS[0]; load(); }
@@ -90,12 +101,12 @@
     var TAG = ['未测试','热血躲避球','普通躲避球','冷血躲避球'];
     var TAG_S = ['未','热','普','冷'];
     var TAG_C = ['t0','t1','t2','t3'];
-    var C_NAMES = {fes:'流星祭',normal:'普通'};
     var GROUPS = [
         { id: 'fes', name: '流星祭', movies: ['fes', 'fes_guarantee'], poolSize: 200000 },
         { id: 'normal', name: '普通', movies: ['normal', 'normal_guarantee'], poolSize: 200000 }
     ];
     var currentGroup = null;
+    var currentMovieId = null;
 
     function tagBtns(seed, currentTag) {
         var h = '';
@@ -103,48 +114,63 @@
         return h;
     }
 
-    function renderSeedRow(p, rarity, isTestSeed) {
+    function renderSeedRow(p, rarity, isTestSeed, showTestBtn) {
+        var tag = p.tag||'未测试', cold = tag==='冷血躲避球';
+        var h = '<div class="seed-row'+(cold?' cold':'')+'">'
+            + '<span class="'+(cold?'':'pur')+'" style="width:70px">'+p.seed+'</span>'
+            + '<span class="text-on-surface-variant" style="font-size:0.7rem;width:16px">'+TAG_S[TAG.indexOf(tag)]+'</span>'
+            + tagBtns(p.seed, tag);
+        if (showTestBtn) {
+            h += '<button class="test-btn '+(isTestSeed?'active':'')+'" onclick="setTestSeed('+p.seed+','+rarity+')" '+(cold?'disabled':'')+'>★'+rarity+'测试</button>';
+        }
+        h += '</div>';
+        return h;
+    }
+
+    function renderSeedRowSimple(p) {
         var tag = p.tag||'未测试', cold = tag==='冷血躲避球';
         return '<div class="seed-row'+(cold?' cold':'')+'">'
             + '<span class="'+(cold?'':'pur')+'" style="width:70px">'+p.seed+'</span>'
             + '<span class="text-on-surface-variant" style="font-size:0.7rem;width:16px">'+TAG_S[TAG.indexOf(tag)]+'</span>'
             + tagBtns(p.seed, tag)
-            + '<button class="test-btn '+(isTestSeed?'active':'')+'" onclick="setTestSeed('+p.seed+','+rarity+')" '+(cold?'disabled':'')+'>★'+rarity+'测试</button>'
             + '</div>';
+    }
+
+    function fillColumns(list, rarity, isGuarantee, colPrefix, tsArr, showTestBtn) {
+        var items = list.filter(function(p){ return p.rarity===rarity && (rarity===3 || p._isGuarantee===isGuarantee); });
+        var countEl = document.getElementById(colPrefix+'Count');
+        if (countEl) countEl.textContent = '('+items.length+')';
+        var el = document.getElementById(colPrefix);
+        if (!el) return;
+        el.innerHTML = items.length>0
+            ? items.map(function(p){
+                return showTestBtn
+                    ? renderSeedRow(p, rarity, tsArr[rarity-3]===p.seed, true)
+                    : renderSeedRowSimple(p);
+            }).join('')
+            : '<div class="text-xs text-on-surface-variant" style="padding:0.25rem 0">暂无</div>';
     }
 
     async function load() {
         if (!currentGroup) currentGroup = GROUPS[0];
         var group = currentGroup;
 
-        // Fetch stats for each movie in group and aggregate
         var allStats = [];
         for (var m of group.movies) {
             var res = await fetch('/api/seeds/stats?movieId=' + m);
             allStats.push(await res.json());
         }
 
-        // Aggregate stats
         var s = {
-            mode: allStats[0].mode,
-            test_seeds: allStats[0].test_seeds,
-            movieIds: allStats[0].movieIds,
+            mode: allStats[0].mode, test_seeds: allStats[0].test_seeds, movieIds: allStats[0].movieIds,
             confirm: 0, play_total: 0, unknown: 0, mov_play: 0, pending: 0, verified: 0,
-            total: 0, tested: 0, coverage: 0,
-            play_r3: 0, play_r4: 0, play_r5: 0
+            total: 0, tested: 0, coverage: 0, play_r3: 0, play_r4: 0, play_r5: 0
         };
         for (var st of allStats) {
-            s.confirm += st.confirm || 0;
-            s.play_total += st.play_total || 0;
-            s.unknown += st.unknown || 0;
-            s.mov_play += st.mov_play || 0;
-            s.pending += st.pending || 0;
-            s.verified += st.verified || 0;
-            s.play_r3 += st.play_r3 || 0;
-            s.play_r4 += st.play_r4 || 0;
-            s.play_r5 += st.play_r5 || 0;
-            s.total += st.movie_total || st.total || 0;
-            s.tested += st.tested || 0;
+            s.confirm += st.confirm || 0; s.play_total += st.play_total || 0; s.unknown += st.unknown || 0;
+            s.mov_play += st.mov_play || 0; s.pending += st.pending || 0; s.verified += st.verified || 0;
+            s.play_r3 += st.play_r3 || 0; s.play_r4 += st.play_r4 || 0; s.play_r5 += st.play_r5 || 0;
+            s.total += st.movie_total || st.total || 0; s.tested += st.tested || 0;
         }
         s.coverage = s.total > 0 ? Math.round(s.tested / s.total * 100) : 0;
 
@@ -152,20 +178,29 @@
         document.getElementById('btnPlay').className = 'mode-btn'+(s.mode==='play'?' active':'');
         document.getElementById('btnTest').className = 'mode-btn'+(s.mode==='test'?' active':'');
 
-        // Config selector
         var ch = '';
         GROUPS.forEach(function(g){ ch += '<button class="cfg-btn'+(g.id===group.id?' active':'')+'" onclick="selectCfg(\''+g.id+'\')">'+g.name+'</button> '; });
         document.getElementById('cfgSelector').innerHTML = ch;
 
-        var t = s.mov_play;
-        var v = s.verified || 0;
-        // Fetch individual movie stats for base/guarantee breakdown
-        var baseConfirm = 0, gtConfirm = 0;
+        // Fetch verified + play lists for each movie
+        var allVerified = [], allPlay = [];
         for (var m of group.movies) {
-            var sr = await fetch('/api/seeds/stats?movieId=' + m);
-            var sd = await sr.json();
-            baseConfirm += (m.endsWith('_guarantee') ? 0 : (sd.confirm || 0));
-            gtConfirm += (m.endsWith('_guarantee') ? (sd.confirm || 0) : 0);
+            var listRes = await fetch('/api/seeds/list?movieId=' + m);
+            var data = await listRes.json();
+            (data.verified || []).forEach(function(p){ p._movie = m; p._isGuarantee = m.endsWith('_guarantee'); allVerified.push(p); });
+            (data.play || []).forEach(function(p){ p._movie = m; p._isGuarantee = m.endsWith('_guarantee'); allPlay.push(p); });
+        }
+        var verifiedList = allVerified;
+        var playList = allPlay;
+        var pMap = {}; playList.forEach(function(p){pMap[p.seed]=p;});
+
+        // CfgSummary — use allStats from first fetch, no second fetch
+        var v = s.verified || 0, t = s.mov_play;
+        var baseConfirm = 0, gtConfirm = 0;
+        for (var st of allStats) {
+            var isGuarantee = (st.movieId || '').endsWith('_guarantee');
+            if (isGuarantee) gtConfirm += st.confirm || 0;
+            else baseConfirm += st.confirm || 0;
         }
         document.getElementById('cfgSummary').innerHTML =
             '<span class="stat"><span class="label" style="color:#a371f7">验证池</span><br><span class="value" style="color:#a371f7">'+v+'</span></span>'
@@ -173,17 +208,8 @@
             + '<span class="stat"><span class="label ok">确认·非保底</span><br><span class="value ok">'+baseConfirm+'</span></span>'
             + '<span class="stat"><span class="label" style="color:#b0882c">确认·保底</span><br><span class="value" style="color:#b0882c">'+gtConfirm+'</span></span>';
 
-        // Test seed bar
+        // TestSeed bar (in verified card)
         var tsArr = s.test_seeds || [null,null,null];
-        var allPlay = [];
-        for (var m of group.movies) {
-            var listRes = await fetch('/api/seeds/list?movieId=' + m);
-            var data = await listRes.json();
-            (data.play || []).forEach(function(p){ p._movie = m; allPlay.push(p); });
-        }
-        var playList = allPlay;
-        var pMap = {}; playList.forEach(function(p){pMap[p.seed]=p;});
-
         var tsH = '<span class="text-xs text-on-surface-variant">testSeed:</span> ';
         [3,4,5].forEach(function(r){
             var ts = tsArr[r-3];
@@ -198,26 +224,33 @@
         });
         document.getElementById('testSeedBar').innerHTML = tsH;
 
-        // Play columns (5 columns: ★3 ★4 ★4保底 ★5 ★5保底)
+        // Verified columns (+ testBtn)
+        if (v > 0) {
+            document.getElementById('verifiedColumns').style.display = '';
+            document.getElementById('verifiedEmpty').style.display = 'none';
+            [{col:'vr3',r:3,g:false},{col:'vr4',r:4,g:false},{col:'vr4b',r:4,g:true},{col:'vr5',r:5,g:false},{col:'vr5b',r:5,g:true}].forEach(function(cfg){
+                fillColumns(verifiedList, cfg.r, cfg.g, cfg.col, tsArr, true);
+            });
+        } else {
+            document.getElementById('verifiedColumns').style.display = 'none';
+            document.getElementById('verifiedEmpty').style.display = '';
+        }
+
+        // Play columns (no testBtn)
         if (t > 0) {
             document.getElementById('playColumns').style.display = '';
             document.getElementById('playEmpty').style.display = 'none';
-            [{col:'col3',r:3,g:false},{col:'col4',r:4,g:false},{col:'col4b',r:4,g:true},{col:'col5',r:5,g:false},{col:'col5b',r:5,g:true}].forEach(function(cfg){
-                var items = playList.filter(function(p){ return p.rarity===cfg.r && p._movie.endsWith('_guarantee')===cfg.g; });
-                document.getElementById(cfg.col+'Count').textContent = '('+items.length+')';
-                document.getElementById(cfg.col).innerHTML = items.length>0
-                    ? items.map(function(p){return renderSeedRow(p, cfg.r, tsArr[cfg.r-3]===p.seed);}).join('')
-                    : '<div class="text-xs text-on-surface-variant" style="padding:0.25rem 0">暂无</div>';
+            [{col:'p3',r:3,g:false},{col:'p4',r:4,g:false},{col:'p4b',r:4,g:true},{col:'p5',r:5,g:false},{col:'p5b',r:5,g:true}].forEach(function(cfg){
+                fillColumns(playList, cfg.r, cfg.g, cfg.col, tsArr, false);
             });
         } else {
             document.getElementById('playColumns').style.display = 'none';
             document.getElementById('playEmpty').style.display = '';
         }
 
-        // Test pool
+        // Test pool stats
         document.getElementById('testStats').innerHTML =
-            '<span class="stat"><span class="label" style="color:#a371f7">验证池</span><br><span class="value" style="color:#a371f7">'+fmt(v)+'</span></span>'
-            + '<span class="stat"><span class="label ok">确认池</span><br><span class="value ok">'+fmt(s.confirm)+'</span></span>'
+            '<span class="stat"><span class="label ok">确认池</span><br><span class="value ok">'+fmt(s.confirm)+'</span></span>'
             + '<span class="stat"><span class="label" style="color:#3fb950">等待校验</span><br><span class="value" style="color:#3fb950">'+fmt(s.pending||0)+'</span></span>'
             + '<span class="stat"><span class="label unk">测试池</span><br><span class="value unk">'+fmt(s.unknown)+'</span></span>';
         document.getElementById('testSummary').textContent = '已测 '+fmt(s.tested)+' | 覆盖率 '+s.coverage+'%';
