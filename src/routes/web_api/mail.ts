@@ -2,10 +2,14 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify"
 import { getAllAccountsSync, getAccountPlayersSync, insertMailSync } from "../../data/wdfpData"
 import characterData from "../../../assets/character.json"
 import itemIds from "../../../assets/item_ids.json"
+import equipmentIds from "../../../assets/equipment_ids.json"
 
 // Pre-built CDN validation sets
 const CDN_CHAR_IDS: Set<number> = new Set(Object.keys(characterData).map(Number))
 const CDN_ITEM_IDS: Set<number> = new Set(itemIds as number[])
+const CDN_EQUIP_IDS: Set<number> = new Set(equipmentIds as number[])
+const VALID_MAIL_TYPES: Set<number> = new Set([1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15])
+const MAX_INT = 2147483647
 
 interface SendMailBody {
     type: string
@@ -20,6 +24,9 @@ const routes = async (fastify: FastifyInstance) => {
         const body = request.body as SendMailBody
 
         const mailType = parseInt(body.type || "0")
+        if (!VALID_MAIL_TYPES.has(mailType)) {
+            return reply.redirect("/mail?error=" + encodeURIComponent(`无效的附件类型：${mailType}`))
+        }
         const typeId = body.type_id ? parseInt(body.type_id) : null
 
         // Validate type_id fits in 32-bit signed integer (client Int limit)
@@ -35,6 +42,9 @@ const routes = async (fastify: FastifyInstance) => {
             if (mailType === 1 && !CDN_ITEM_IDS.has(typeId)) {
                 return reply.redirect("/mail?error=" + encodeURIComponent(`道具 ID ${typeId} 不存在于 CDN 数据中`))
             }
+            if (mailType === 6 && !CDN_EQUIP_IDS.has(typeId)) {
+                return reply.redirect("/mail?error=" + encodeURIComponent(`装备 ID ${typeId} 不存在于 CDN 数据中`))
+            }
         }
         const count = parseInt(body.number || "1")
         const subject = body.subject && body.subject.trim() ? body.subject.trim() : null
@@ -47,6 +57,19 @@ const routes = async (fastify: FastifyInstance) => {
 
         if (isNaN(count) || count < 1) {
             return reply.redirect("/mail?error=" + encodeURIComponent("数量必须大于 0"))
+        }
+        if (count > MAX_INT) {
+            return reply.redirect("/mail?error=" + encodeURIComponent(`数量超出范围（需 ≤ ${MAX_INT}）`))
+        }
+        // 角色 / 装备每封邮件仅可发送 1 个
+        if ((mailType === 5 || mailType === 6) && count !== 1) {
+            return reply.redirect("/mail?error=" + encodeURIComponent("角色 / 装备每封邮件仅可发送 1 个"))
+        }
+        if (subject !== null && subject.length > 64) {
+            return reply.redirect("/mail?error=" + encodeURIComponent("标题过长（最多 64 字符）"))
+        }
+        if (desc !== null && desc.length > 512) {
+            return reply.redirect("/mail?error=" + encodeURIComponent("正文过长（最多 512 字符）"))
         }
 
         const accounts = getAllAccountsSync()

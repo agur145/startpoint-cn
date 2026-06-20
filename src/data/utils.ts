@@ -1020,3 +1020,68 @@ export function getClientSerializedData(
         rushEventPlayedPartyList: doSerializeRushEventData ? getPlayerRushEventListPlayedPartiesSync(playerId) : undefined
     }, options)
 }
+
+/**
+ * Assembles a player's full server-side MergedPlayerData (no client serialization).
+ * Used by the admin save export/import (snapshot round-trip).
+ */
+export function getMergedPlayerDataSync(
+    playerId: number
+): MergedPlayerData | null {
+    const playerData = getPlayerSync(playerId)
+    if (playerData === null) return null
+
+    return {
+        player: playerData,
+        dailyChallengePointList: getPlayerDailyChallengePointListSync(playerId),
+        triggeredTutorial: getPlayerTriggeredTutorialsSync(playerId),
+        clearedRegularMissionList: getPlayerClearedRegularMissionListSync(playerId),
+        characterList: getPlayerCharactersSync(playerId),
+        characterManaNodeList: getPlayerCharactersManaNodesSync(playerId),
+        partyGroupList: getPlayerPartyGroupListSync(playerId),
+        itemList: getPlayerItemsSync(playerId),
+        equipmentList: getPlayerEquipmentListSync(playerId),
+        questProgress: getPlayerQuestProgressSync(playerId),
+        gachaInfoList: getPlayerGachaInfoListSync(playerId),
+        gachaCampaignList: getPlayerGachaCampaignListSync(playerId),
+        drawnQuestList: getPlayerDrawnQuestsSync(playerId),
+        periodicRewardPointList: getPlayerPeriodicRewardPointsSync(playerId),
+        allActiveMissionList: getPlayerActiveMissionsSync(playerId),
+        boxGachaList: getPlayerBoxGachasSync(playerId),
+        purchasedTimesList: {},
+        startDashExchangeCampaignList: getPlayerStartDashExchangeCampaignsSync(playerId),
+        multiSpecialExchangeCampaignList: getPlayerMultiSpecialExchangeCampaignsSync(playerId),
+        userOption: getPlayerOptionsSync(playerId),
+        rushEventList: getPlayerRushEventListSync(playerId),
+        rushEventClearedFolderList: getPlayerRushEventListClearedFoldersSync(playerId),
+        rushEventPlayedPartyList: getPlayerRushEventListPlayedPartiesSync(playerId)
+    }
+}
+
+/**
+ * Revives Date fields in a MergedPlayerData parsed from JSON (where Dates are ISO strings)
+ * back into Date objects, so the restore/insert path receives the expected types.
+ * Mutates and returns the same object.
+ */
+export function reviveMergedPlayerDates(
+    data: MergedPlayerData
+): MergedPlayerData {
+    const toDate = (v: any): any => (v === null || v === undefined) ? v : new Date(v)
+
+    if (data.player) {
+        data.player.staminaHealTime = toDate(data.player.staminaHealTime)
+        data.player.lastLoginTime = toDate(data.player.lastLoginTime)
+        data.player.expPooledTime = toDate(data.player.expPooledTime)
+    }
+    for (const c of Object.values(data.characterList || {})) {
+        if (!c) continue
+        c.joinTime = toDate(c.joinTime)
+        c.updateTime = toDate(c.updateTime)
+    }
+    for (const c of (data.startDashExchangeCampaignList || [])) {
+        if (!c) continue
+        c.periodStartTime = toDate(c.periodStartTime)
+        c.periodEndTime = toDate(c.periodEndTime)
+    }
+    return data
+}

@@ -150,6 +150,17 @@ export function receiveAllMailsSync(
 }
 
 /**
+ * Deletes all mail for a player (admin recovery: clear mailbox).
+ * @returns number of mail rows deleted.
+ */
+export function deleteAllPlayerMailSync(
+    playerId: number
+): number {
+    const result = getDb().prepare(`DELETE FROM players_mails WHERE player_id = ?`).run(playerId)
+    return result.changes
+}
+
+/**
  * Receipt/History tracking — logs every reward claim for the 领取记录 feature.
  */
 

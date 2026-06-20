@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { deserializePlayerData, getClientSerializedData } from "../../data/utils";
-import { getAllPlayersSync, replacePlayerDataSync, getPlayerSync, updatePlayerSync, getPlayerCharactersSync, getPlayerItemsSync, getPlayerEquipmentListSync, insertPlayerCharacterSync, insertDefaultPlayerCharacterSync, updatePlayerItemSync, getPlayerDailyChallengePointListSync, insertPlayerDailyChallengePointListSync, updatePlayerDailyChallengePointSync, getDb } from "../../data/wdfpData";
+import { getMergedPlayerDataSync, reviveMergedPlayerDates } from "../../data/utils";
+import { validatePlayerField, VALID_CHARACTER_IDS, VALID_ITEM_IDS, MAX_INT } from "./validation";
+import { getAllPlayersSync, replacePlayerDataSync, getPlayerSync, updatePlayerSync, getPlayerCharactersSync, getPlayerItemsSync, getPlayerEquipmentListSync, insertPlayerCharacterSync, insertDefaultPlayerCharacterSync, updatePlayerItemSync, getPlayerDailyChallengePointListSync, insertPlayerDailyChallengePointListSync, updatePlayerDailyChallengePointSync, deleteAllPlayerMailSync, getDb } from "../../data/wdfpData";
 import dailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
 
 interface SaveQuery {
@@ -33,30 +34,54 @@ const routes = async (fastify: FastifyInstance) => {
         const playerId = Number(id)
         if (isNaN(playerId)) return reply.redirect("/player");
 
-        const data = getClientSerializedData(playerId, { serializeRushEventData: true })
+        const data = getMergedPlayerDataSync(playerId)
         if (data === null) return reply.redirect("/player");
 
-        reply.header("content-disposition", "attachment; save.json")
-        reply.type('application/json').send(data)
+        const snapshot = {
+            schema: "starpoint-cn-save",
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            playerId,
+            data
+        }
+        reply.header("content-disposition", `attachment; filename="save_${playerId}.json"`)
+        reply.type('application/json').send(JSON.stringify(snapshot))
     })
 
     fastify.post("/save", async (request: FastifyRequest, reply: FastifyReply) => {
         const { id } = request.query as SaveQuery
         const playerId = Number(id)
+        const fail = (msg: string) => reply.redirect(`/player/${id}?error=${encodeURIComponent(msg)}`)
         if (isNaN(playerId)) return reply.redirect("/player");
-        
+
         try {
             const file = await (request as any).file()
-            if (file === undefined) return reply.redirect(`/player/${id}`);
+            if (file === undefined) return fail("未选择文件")
 
             const text = (await file.toBuffer()).toString('utf-8')
-            const json = JSON.parse(text)
+            let parsed: any
+            try {
+                parsed = JSON.parse(text)
+            } catch {
+                return fail("文件不是有效的 JSON")
+            }
 
-            const saveData = json['data'] === undefined ? json : json['data']
-            const parsedData = deserializePlayerData(playerId, saveData)
-            replacePlayerDataSync(parsedData)
-        } catch (error) {
-            return reply.redirect(`/player/${id}?error=${error}`);
+            if (parsed === null || typeof parsed !== 'object' || parsed.schema !== 'starpoint-cn-save') {
+                return fail("不是有效的存档快照（schema 不符，请使用本面板导出的存档）")
+            }
+            if (parsed.version !== 1) {
+                return fail(`不支持的存档版本：${parsed.version}`)
+            }
+            const data = parsed.data
+            if (!data || typeof data !== 'object' || !data.player) {
+                return fail("存档数据缺失 player 字段")
+            }
+
+            reviveMergedPlayerDates(data)
+            data.player.id = playerId
+            replacePlayerDataSync(data)
+        } catch (error: any) {
+            return fail(`恢复失败：${error?.message ?? error}`)
         }
         return reply.redirect(`/player/${id}`);
     })
@@ -77,20 +102,9 @@ const routes = async (fastify: FastifyInstance) => {
         const rawValue = body.value
         if (!field || rawValue === undefined) return reply.status(400).send({ error: "Missing field or value" })
 
-        // Convert value based on field type
-        let value: any = rawValue
-        const stringFields = ['name', 'comment']
-        const booleanFields = ['enableAuto3x', 'tutorialSkipFlag']
-        const nullFields = ['tutorialSkipFlag', 'tutorialStep']
-
-        if (booleanFields.includes(field)) {
-            value = rawValue === true || rawValue === 'true' || rawValue === '1'
-        } else if (nullFields.includes(field) && (rawValue === '' || rawValue === 'null' || rawValue === null)) {
-            value = null
-        } else if (!stringFields.includes(field)) {
-            value = Number(rawValue)
-            if (isNaN(value)) return reply.status(400).send({ error: `Invalid number for ${field}` })
-        }
+        const result = validatePlayerField(field, rawValue)
+        if (!result.ok) return reply.status(400).send({ error: result.error })
+        const value = result.value
 
         try {
             updatePlayerSync({ id: playerId, [field]: value })
@@ -106,6 +120,9 @@ const routes = async (fastify: FastifyInstance) => {
         if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid player ID" })
         const threshold = Number((request.body as any).threshold) || 2000
         const amount = Number((request.body as any).amount) || 999999
+        if (!Number.isFinite(amount) || amount < 0 || amount > 99999999) {
+            return reply.status(400).send({ error: "amount 超出范围（需 0 ~ 99999999）" })
+        }
 
         const player = getPlayerSync(playerId)
         if (!player) return reply.status(404).send({ error: "Player not found" })
@@ -128,6 +145,7 @@ const routes = async (fastify: FastifyInstance) => {
         const body = request.body as Record<string, any> || {}
         const code = Number(body.code || body.character_id)
         if (isNaN(code)) return reply.status(400).send({ error: "Missing code (business code)" })
+        if (!VALID_CHARACTER_IDS.has(code)) return reply.status(400).send({ error: `角色 ID ${code} 不存在于资源表中` })
 
         try {
             insertDefaultPlayerCharacterSync(playerId, code)
@@ -171,6 +189,8 @@ const routes = async (fastify: FastifyInstance) => {
         const itemId = Number(body.id || body.itemId)
         const count = Number(body.count || 1)
         if (isNaN(itemId) || isNaN(count)) return reply.status(400).send({ error: "Missing id or count" })
+        if (!VALID_ITEM_IDS.has(itemId)) return reply.status(400).send({ error: `道具 ID ${itemId} 不存在于资源表中` })
+        if (count < 0 || count > MAX_INT) return reply.status(400).send({ error: `count 超出范围（需 0 ~ ${MAX_INT}）` })
 
         try {
             updatePlayerItemSync(playerId, itemId, count)
@@ -267,6 +287,19 @@ const routes = async (fastify: FastifyInstance) => {
             }
             return reply.status(200).send({ ok: true, count: entries.length })
         } catch (e: any) { return reply.status(500).send({ error: e.message }) }
+    })
+
+    // Clear mailbox (admin recovery for crash-causing illegal mail)
+    fastify.delete("/:id/mail", async (request: FastifyRequest, reply: FastifyReply) => {
+        const playerId = Number((request.params as any).id)
+        if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid player ID" })
+        if (!getPlayerSync(playerId)) return reply.status(404).send({ error: "Player not found" })
+        try {
+            const deleted = deleteAllPlayerMailSync(playerId)
+            return reply.status(200).send({ ok: true, deleted })
+        } catch (e: any) {
+            return reply.status(500).send({ error: e.message })
+        }
     })
 }
 

@@ -185,6 +185,9 @@
                 <button onclick="resetChallenge()" class="text-sm border border-primary text-primary h-[40px] px-[24px] rounded-full flex items-center justify-center hover:bg-primary hover:text-on-primary transition-colors">
                     恢复挑战次数
                 </button>
+                <button onclick="clearMailbox()" class="text-sm border border-error text-error h-[40px] px-[24px] rounded-full flex items-center justify-center hover:bg-error hover:text-on-error transition-colors">
+                    清空邮件箱
+                </button>
             </section>
         </article>
     </div>
@@ -265,7 +268,15 @@
         if (!confirm('将所有每日挑战次数恢复至 CDN 默认值？')) return;
         const r = await fetch('/api/player/' + PID + '/reset_challenge', { method: 'POST' });
         if (r.ok) { alert('已恢复'); location.reload(); }
-        else { alert('恢复失败'); }
+        else { const d = await r.json().catch(() => ({})); alert('恢复失败：' + (d.error || r.status)); }
+    }
+
+    async function clearMailbox() {
+        if (!confirm('清空该存档的全部邮件？此操作不可撤销（用于误发非法邮件导致游戏崩溃时恢复）。')) return;
+        const r = await fetch('/api/player/' + PID + '/mail', { method: 'DELETE' });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok) { alert('已清空 ' + (d.deleted ?? 0) + ' 封邮件'); location.reload(); }
+        else { alert('清空失败：' + (d.error || r.status)); }
     }
 
     let autoTimer = null;
@@ -279,8 +290,8 @@
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: 'threshold=' + threshold + '&amount=' + amount
         });
-        const d = await r.json();
-        if (!r.ok) return;
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) { if (!autoTimer) alert('恢复失败：' + (d.error || r.status)); return; }
         const ts = new Date().toLocaleTimeString();
         if (d.refilled) {
             document.getElementById('autoStatus').textContent = ts + ' 已恢复 ' + (d.previous||0).toLocaleString() + ' → ' + d.freeVmoney.toLocaleString();
