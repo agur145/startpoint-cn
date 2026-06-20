@@ -1,4 +1,5 @@
 # 商店系统修复文档
+> 状态: 已修复   关键文件: src/data/domains/*, assets/general_shop.json   相关端点: /shop/buy, /shop/get_sales_list
 
 本次修复解决了三个独立但相关的商店问题。
 
