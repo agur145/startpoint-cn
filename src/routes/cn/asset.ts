@@ -16,7 +16,7 @@ function getCdnBase(request: FastifyRequest): string {
 function getVersionInfo(baseUrl: string) {
     return {
         base_url: `${baseUrl}/EntityLists/`,
-        files_list: `${baseUrl}/EntityLists/PathFile`,
+        files_list: `${baseUrl}/EntityLists/10939-android_medium.csv`,
         total_size: TOTAL_SIZE,
         delayed_assets_size: 0
     };
