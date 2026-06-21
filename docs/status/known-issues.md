@@ -316,8 +316,18 @@ Player 页面 `/player/:id` → 「恢复挑战次数」按钮：
 重进 → /event/raid/party → 读 NORMAL → 编辑持久 ✅
 打关 → /finish → played party 记录 ✅
 ```
+---
+
+## 关卡高分显示截顶（>2,147,483,647） 🔧 待修复
+
+**根因**: MsgPack `uint32(0xCE)→int32(0xD2)` 溢出 —— 服务端 `onSend` 钩子把 uint32 超限值转 int32 标签时,bit31=1 的 4 字节载荷被解释为负数,触发客户端 `C2375 (Score < 0)` 崩溃。经全面验证:MsgPack 规范本身/msgpackr 库/客户端 Typepacker **三方均不支持**在 `2^31~2^32` 区间内做无缓冲扩展的 float64/扩展类型/字符串传输。当前通过 `serializePlayerData` 截顶解决。
+
+**影响**: 仅关卡详情页最高分显示。分数 ≤21.5 亿 → 无影响;21.5 亿~43 亿 → 显示 21.5 亿(误差 <43%);>43 亿 → **不受影响**(msgpackr 天然用 float64 编码)。DB 原值、存档导出/导入、战斗结算完全保留。
+
+**待解**: 寻找 MsgPack `2^31~2^32` 整数区间的无损传输方案。
 
 ---
 
 ---
+
 **最后更新：2026-06-14**（详细变更见 [CHANGELOG.md](./CHANGELOG.md)）

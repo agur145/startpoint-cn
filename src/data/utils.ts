@@ -231,7 +231,13 @@ export function serializePlayerData(
                 "best_elapsed_time_ms": progress.bestElapsedTimeMs,
                 "clear_rank": progress.clearRank,
                 "finished": progress.finished,
-                "high_score": progress.highScore ?? 0,
+                // FIXME: MsgPack uint32(0xCE) → int32(0xD2) converts values ≥2^31 to negative
+                // because the 4-byte payload interpreted as signed int overflows at the sign bit.
+                // The client does not support uint32 or extension types, and msgpackr has no
+                // force-float option.  Until a protocol-level solution is found, cap at 2^31-1.
+                // Only affects the quest-detail display; the DB and export/import preserve the
+                // full value.
+                "high_score": (progress.highScore ?? 0) > 2147483647 ? 2147483647 : (progress.highScore ?? 0),
                 "quest_id": progress.questId,
                 "unlocked": progress.unlocked
             })
