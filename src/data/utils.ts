@@ -175,11 +175,13 @@ export function serializePlayerData(
 
     // convert userCharacterList (k_id → business code)
     const userCharacterList: Record<string, UserCharacter> = {}
+    const diagWarnings: string[] = []
     for (const [characterId, character] of Object.entries(toSerialize.characterList)) {
         const kId = parseInt(characterId);
         const code = kIdToBusinessCode(kId);
         const codeKey = String(code);
         // convert bond tokens
+        const bondTokenList = serializeBondTokenStatuses(character.bondTokenList);
         const converted_character: UserCharacter = {
             "entry_count": character.entryCount,
             "evolution_level": character.evolutionLevel,
@@ -189,8 +191,18 @@ export function serializePlayerData(
             "update_time": getServerTime(character.updateTime),
             "exp": character.exp,
             "stack": character.stack,
-            "bond_token_list": serializeBondTokenStatuses(character.bondTokenList),
+            "bond_token_list": bondTokenList,
             "mana_board_index": character.manaBoardIndex
+        }
+
+        // DIAGNOSTIC: check mana_board_index vs bond_token_list consistency
+        if (character.manaBoardIndex > bondTokenList.length) {
+            diagWarnings.push(`[DIAG] char ${codeKey} manaBoardIndex=${character.manaBoardIndex} but bondTokenList.length=${bondTokenList.length} (list=${JSON.stringify(bondTokenList)})`)
+        }
+
+        // DIAGNOSTIC: check for invalid mana_board_index
+        if (character.manaBoardIndex < 1 || character.manaBoardIndex > 10) {
+            diagWarnings.push(`[DIAG] char ${codeKey} has suspicious manaBoardIndex=${character.manaBoardIndex}`)
         }
 
         const exBoost = character.exBoost
@@ -199,10 +211,14 @@ export function serializePlayerData(
                 "status_id": exBoost.statusId,
                 "ability_id_list": exBoost.abilityIdList
             }
+        } else {
+            diagWarnings.push(`[DIAG] char ${codeKey} missing ex_boost field`)
         }
 
         if (character.illustrationSettings !== undefined) {
             converted_character['illustration_settings'] = character.illustrationSettings
+        } else {
+            diagWarnings.push(`[DIAG] char ${codeKey} missing illustration_settings field`)
         }
 
         userCharacterList[codeKey] = converted_character
@@ -231,13 +247,7 @@ export function serializePlayerData(
                 "best_elapsed_time_ms": progress.bestElapsedTimeMs,
                 "clear_rank": progress.clearRank,
                 "finished": progress.finished,
-                // FIXME: MsgPack uint32(0xCE) → int32(0xD2) converts values ≥2^31 to negative
-                // because the 4-byte payload interpreted as signed int overflows at the sign bit.
-                // The client does not support uint32 or extension types, and msgpackr has no
-                // force-float option.  Until a protocol-level solution is found, cap at 2^31-1.
-                // Only affects the quest-detail display; the DB and export/import preserve the
-                // full value.
-                "high_score": (progress.highScore ?? 0) > 2147483647 ? 2147483647 : (progress.highScore ?? 0),
+                "high_score": progress.highScore ?? 0,
                 "quest_id": progress.questId,
                 "unlocked": progress.unlocked
             })
@@ -327,7 +337,13 @@ export function serializePlayerData(
         "user_character_mana_node_list": (() => {
                 const list: Record<string, { multiplied_id: number, awake_level: number }[]> = {}
                 for (const [charId, nodeIds] of Object.entries(toSerialize.characterManaNodeList)) {
-                    list[charId] = nodeIds.map(id => ({ multiplied_id: id, awake_level: 0 }))
+                    // DIAGNOSTIC: check for orphaned mana nodes (character not in characterList)
+                    if (!(charId in userCharacterList)) {
+                        diagWarnings.push(`[DIAG] ORPHAN mana nodes for char ${charId}: ${nodeIds.length} nodes, but char NOT in characterList!`)
+                    }
+                    if (nodeIds.length > 0) {
+                        list[charId] = nodeIds.map(id => ({ multiplied_id: id, awake_level: 0 }))
+                    }
                 }
                 return list
             })(),
@@ -454,6 +470,13 @@ export function serializePlayerData(
                 userRushEventPlayedPartyList[eventId] = battleTypeBuckets as Record<RushEventBattleType, Record<string, UserRushEventPlayedParty>>
             }
             clientData.user_rush_event_played_party_list = userRushEventPlayedPartyList
+        }
+    }
+
+    if (diagWarnings.length > 0) {
+        console.log(`[DIAG] serializePlayerData: ${diagWarnings.length} warnings for player ${toSerialize.player.id}`)
+        for (const w of diagWarnings) {
+            console.log(`  ${w}`)
         }
     }
 
