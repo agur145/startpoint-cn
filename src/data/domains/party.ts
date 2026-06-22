@@ -125,8 +125,8 @@ export function updatePlayerPartySync(playerId: number, slot: number, party: Pla
         // Ensure group exists
         const groupExists = db.prepare('SELECT id FROM players_party_groups WHERE id = ? AND player_id = ? AND category = ?').get(groupId, playerId, party.category)
         if (!groupExists) {
-            console.log(`[PARTY-DB] new group: player=${playerId} id=${groupId}`)
-            db.prepare('INSERT INTO players_party_groups (id, color_id, player_id, category) VALUES (?, ?, ?, ?)').run(groupId, 0, playerId, party.category)
+                console.log(`[PARTY-DB] new group: player=${playerId} id=${groupId}`)
+                    db.prepare('INSERT INTO players_party_groups (id, color_id, player_id, category) VALUES (?, ?, ?, ?)').run(groupId, 15, playerId, party.category)
         }
         insertPlayerPartySync(playerId, slot, groupId, party)
     } else {

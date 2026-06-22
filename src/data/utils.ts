@@ -710,7 +710,9 @@ export function deserializePlayerData(
                 // check lengths
                 if (characterIds.length > 3 || unisonCharacterIds.length > 3 || equipmentIds.length > 3 || abilitySoulIds.length > 3) throw new Error(`Invalid array lengths for party with id "${partyId}" in group with id "${groupId}"`);
 
-                list[partyId] = {
+                // Convert globalPartyId back to group-local slot: slot = (globalId - 1) % 10 + 1
+                const localSlot = String((Number(partyId) - 1) % 10 + 1)
+                list[localSlot] = {
                     name: name,
                     characterIds: characterIds?.map((id: number | null) => id != null ? businessCodeToKId(id) : 0),
                     unisonCharacterIds: unisonCharacterIds?.map((id: number | null) => id != null ? businessCodeToKId(id) : 0),
