@@ -826,7 +826,11 @@ const routes = async (fastify: FastifyInstance) => {
                 "drop_rare_reward_ids": scoreRewardsResult.drop_rare_reward_ids,
                 "drop_additional_reward_ids": [],
                 "drop_periodic_reward_ids": [],
-                "equipment_list": scoreRewardsResult.equipment_list,
+                "equipment_list": [
+                    ...scoreRewardsResult.equipment_list,
+                    ...(clearReward?.equipment_list || []),
+                    ...(sPlusClearReward?.equipment_list || [])
+                ],
                 "category_id": questCategory,
                 "start_time": dataHeaders['servertime'],
                 "is_multi": "multi",
