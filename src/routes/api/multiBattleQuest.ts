@@ -6,6 +6,7 @@ import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync
 import { BattleQuest, EquipmentItemReward, MultiMate, MultiMateParty, PlayerRewardResult, QuestCategory } from "../../lib/types";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { createRoom, disbandRoom, getDisplayHost, getNpcMates, getRoom, getRoomByToken, getRooms, serializeRoom, serializeRoomConnection, updateHostEntryTime, updateRoomState } from "../../data/multiRoom";
+import { hasRoomClients } from "../../data/sessionServer";
 import { insertActiveQuest, activeQuests } from "./singleBattleQuest";
 import { RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -217,7 +218,7 @@ const routes = async (fastify: FastifyInstance) => {
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": { "rooms": getRooms(body.category_id, body.event_id).map(serializeRoom) }
+            "data": { "rooms": getRooms(body.category_id, body.event_id).filter(r => hasRoomClients(r.room_number)).map(serializeRoom) }
         })
     })
 
@@ -316,10 +317,16 @@ const routes = async (fastify: FastifyInstance) => {
         console.log(`[MULTI] select_room: room found, raising_state=${room.raising_state}`)
         updateHostEntryTime(room.room_number)
 
+        const selectData = serializeRoomConnection(room)
+        // Host always sees Ready; guests see true state (2=Waiting, 1=Ready, etc.)
+        if (viewerId === room.host_viewer_id) {
+            selectData.raising_state = 1
+            console.log(`[MULTI] select_room: host override raising_state → 1`)
+        }
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": serializeRoomConnection(room)
+            "data": selectData
         })
     })
 
@@ -362,10 +369,15 @@ const routes = async (fastify: FastifyInstance) => {
         console.log(`[MULTI] prepare: room found, raising_state=${room.raising_state}`)
         updateHostEntryTime(room.room_number)
 
+        const prepareData = serializeRoomConnection(room)
+        if (viewerId === room.host_viewer_id) {
+            prepareData.raising_state = 1
+            console.log(`[MULTI] prepare: host override raising_state → 1`)
+        }
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": serializeRoomConnection(room)
+            "data": prepareData
         })
     })
 
@@ -442,10 +454,15 @@ const routes = async (fastify: FastifyInstance) => {
 
         if (room) {
             console.log(`[MULTI] restore_room: room found, raising_state=${room.raising_state} host=${room.host_viewer_id}`)
+            const restoreData = serializeRoomConnection(room)
+            if (viewerId === room.host_viewer_id) {
+                restoreData.raising_state = 1
+                console.log(`[MULTI] restore_room: host override raising_state → 1`)
+            }
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-                "data": serializeRoomConnection(room)
+                "data": restoreData
             })
         }
 

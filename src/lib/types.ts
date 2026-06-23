@@ -535,6 +535,7 @@ export interface MultiRoom {
     host_entry_time: number
     mates: Array<{ viewer_id: number | null, com_id: number, player_id?: number }>
     share_room_options: number
+    is_npc_mode: boolean
 }
 
 export interface NpcMateTemplate {

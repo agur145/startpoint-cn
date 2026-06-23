@@ -1,5 +1,4 @@
 // Multi battle TCP session server
-// Phase 1: Room creation only (no NPCs, no auto-start)
 // Protocol: JSON messages delimited by null byte (\0)
 // Post-handshake messages use typepacker format with useEnumIndex=true:
 //   [index, param1, param2, ...]
@@ -13,8 +12,10 @@
 //   Client2Server: Notify=0, Broadcast=1, Send=2
 //   ReadyState: Preparation=0, Ready=1
 //   HandshakeResult: Accept=0, Denied=1, Reconnect=2, Exception=3, Complete=4
+//   BattleServer2Client: Message=1
 //   BattleNotifyMessage: SceneReady=0, Finalize=1, Measurement=2, LineSpeedWarning=3, Heartbeat=4
 //   BattleServerMessage: Leave=0, BattleStart=1, Finalized=2, Measurement=3, LineSpeedWarning=4
+//   BattleSocketCommand: User=0, Speed=1, Heartbeat=2 (via Broadcast/Send, echoed as Measurement)
 
 import * as net from "net";
 import { MultiRoom } from "../lib/types";
@@ -46,10 +47,19 @@ const SESSION_HOST = process.env.SESSION_HOST || "0.0.0.0";
 // NPC recruit timing (env-configurable, defaults)
 const NPC_JOIN_DELAY_MS = parseInt(process.env.NPC_JOIN_DELAY_MS || "2000");
 const NPC_READY_DELAY_MS = parseInt(process.env.NPC_READY_DELAY_MS || "500");
-// NPC auto-join on Enter (0 = disabled)
-const NPC_AUTO_JOIN_DELAY_MS = parseInt(process.env.NPC_AUTO_JOIN_DELAY_MS || "1000");
 // Host ready countdown after NPCs are ready (0 = instant ready)
 const NPC_HOST_READY_COUNTDOWN_MS = parseInt(process.env.NPC_HOST_READY_COUNTDOWN_MS || "3000");
+
+// CDN room_config.json: quest_result_room_auto_disband_delay = 60000ms
+const QUEST_RESULT_DISBAND_DELAY_MS = parseInt(process.env.QUEST_RESULT_DISBAND_DELAY_MS || "60000");
+
+// Pending room disband timers (for finish → wait-for-return window)
+const roomDisbandTimers = new Map<string, NodeJS.Timeout>();
+
+export function hasRoomClients(roomNumber: string): boolean {
+    const set = roomClients.get(roomNumber)
+    return !!set && set.size > 0
+}
 
 // Calculate rank level from rankPoint using CDN threshold table
 function getRankLevel(rankPoint: number): number {
@@ -87,12 +97,25 @@ function removeClient(client: SessionClient) {
         const remaining = set.size
         if (remaining === 0) {
             roomClients.delete(client.roomNumber);
-            // Battle TCP disconnect alone does not end the room
-            if (!client.isBattle) {
+            const room = getRoom(client.roomNumber)
+            // Battle client: keep room; if state=1 (after finish), start return window
+            if (client.isBattle) {
+                if (room?.raising_state === 1) {
+                    console.log(`[SESSION] battle disconnect after finish, room ${client.roomNumber} kept for ${QUEST_RESULT_DISBAND_DELAY_MS / 1000}s return window`)
+                    const timer = setTimeout(() => {
+                        roomDisbandTimers.delete(client.roomNumber)
+                        if (getRoom(client.roomNumber)) {
+                            disbandRoom(client.roomNumber)
+                            console.log(`[SESSION] room ${client.roomNumber} disbanded (return window expired)`)
+                        }
+                    }, QUEST_RESULT_DISBAND_DELAY_MS)
+                    roomDisbandTimers.set(client.roomNumber, timer)
+                } else {
+                    console.log(`[SESSION] battle disconnected from room ${client.roomNumber} (room kept, state=${room?.raising_state})`)
+                }
+            } else {
                 disbandRoom(client.roomNumber);
                 console.log(`[SESSION] room ${client.roomNumber} disbanded (all clients disconnected)`);
-            } else {
-                console.log(`[SESSION] battle disconnected from room ${client.roomNumber} (room kept)`);
             }
         } else {
             console.log(`[SESSION] client removed: viewer=${client.viewerId} room=${client.roomNumber} remaining=${remaining}`);
@@ -144,10 +167,20 @@ function handleClient2Server(client: SessionClient, msg: any[]) {
             }
             break;
         case 1: // Broadcast
-            console.log(`[SESSION] Broadcast from viewer=${client.viewerId}`);
+            if (client.isBattle) {
+                // Echo as Measurement to keep battle socket alive (client timeout: 1800 frames/~30s)
+                sendJson(client.socket, [1, [3, 0, 0, Date.now()]]);
+            } else {
+                console.log(`[SESSION] Broadcast from viewer=${client.viewerId}`);
+            }
             break;
         case 2: // Send
-            console.log(`[SESSION] Send from viewer=${client.viewerId}`);
+            if (client.isBattle) {
+                // Echo as Measurement to keep battle socket alive
+                sendJson(client.socket, [1, [3, 0, 0, Date.now()]]);
+            } else {
+                console.log(`[SESSION] Send from viewer=${client.viewerId}`);
+            }
             break;
         default:
             console.log(`[SESSION] unhandled Client2Server: ${tag}`);
@@ -166,20 +199,6 @@ function handleNotify(client: SessionClient, msg: any[]) {
                 // Relay the client's OWN party (serialized from OwnedCharacterLogic via getMate())
                 yours.party = ed.party;
                 console.log(`[SESSION] host party from client Enter: chars=${ed.party?.characters?.map((c: any) => c?.[0] === 0 ? c[1]?.id : 'none')?.join(',')}`);
-                // Log relay party detail for AB comparison with buildRealParty
-                if (ed.party?.characters?.[0]) {
-                    const rChar = ed.party.characters[0]
-                    const rInner = rChar?.[0] === 0 && rChar[1] ? rChar[1] : rChar
-                    console.log(`[RELAY-DIFF] relay char[0] keys: ${JSON.stringify(Object.keys(rInner || {}).sort())}`)
-                    console.log(`[RELAY-DIFF] relay char[0]: ${JSON.stringify(rInner)}`)
-                }
-                if (ed.party?.equipments?.[0]) {
-                    const rEquip = ed.party.equipments[0]
-                    const rEqInner = rEquip?.[0] === 0 && rEquip[1] ? rEquip[1] : rEquip
-                    console.log(`[RELAY-DIFF] relay equip[0] keys: ${JSON.stringify(Object.keys(rEqInner || {}).sort())}`)
-                    console.log(`[RELAY-DIFF] relay equip[0]: ${JSON.stringify(rEqInner)}`)
-                }
-                console.log(`[RELAY-DIFF] relay abilitySoulIds[0]: ${JSON.stringify(ed.party?.abilitySoulIds?.[0])}`)
                 // Sync settings from Enter data
                 if (ed.autoplayMode !== undefined) yours.autoplayMode = ed.autoplayMode;
                 if (ed.autoskillMode !== undefined) yours.autoskillMode = ed.autoskillMode;
@@ -192,11 +211,12 @@ function handleNotify(client: SessionClient, msg: any[]) {
                 // Send Welcome + Mates with client's own party
                 sendJson(client.socket, [1, [0, yours, [yours]]]);
                 setTimeout(() => sendJson(client.socket, [1, [1, [yours]]]), 100);
-                // Auto-join NPCs in NPC-only mode (only host, no other players)
-                if (NPC_AUTO_JOIN_DELAY_MS > 0 && client.mates.length === 1) {
+                // Auto-join NPCs in NPC-only mode
+                const room = getRoom(client.roomNumber)
+                if (room?.is_npc_mode && client.mates.length === 1) {
                     setTimeout(() => {
                         handleEnterComs(client, [{ name: "开心超人" }, { name: "名字真难取" }])
-                    }, NPC_AUTO_JOIN_DELAY_MS)
+                    }, 500)
                 }
             }
             break;
@@ -326,8 +346,8 @@ function handleBattleNotify(client: SessionClient, msg: any[]) {
                 sendJson(client.socket, [1, [3, frame, clientTime, serverTime]]);
             }
             break;
-        case 4: // Heartbeat
-            sendJson(client.socket, [1, [10, String(client.roomNumber)]]);
+        case 4: // Heartbeat → echo back a valid BattleServerMessage (client expects BattleServer2Client)
+            sendJson(client.socket, [1, [3, 0, 0, Date.now()]]);
             break;
         default:
             console.log(`[SESSION] battle unhandled Notify: ${tag}`, JSON.stringify(msg).substring(0, 100));
@@ -335,6 +355,10 @@ function handleBattleNotify(client: SessionClient, msg: any[]) {
 }
 
 function handleEnterComs(client: SessionClient, coms: any[]) {
+    // Mark as NPC room — only triggered by 随机招募 (type 3), not 互相关注/关注者
+    const room = getRoom(client.roomNumber)
+    if (room) room.is_npc_mode = true
+
     // Get host mate (already built from real data)
     const host = client.mates[0]
     if (!host) {
@@ -356,20 +380,6 @@ function handleEnterComs(client: SessionClient, coms: any[]) {
                             const brp = buildRealParty(client.playerId, party)
                             npcParties.push(brp)
                             console.log(`[SESSION] EnterComs: NPC party "${party.name}" slot=${Object.keys(g.list).find(k => g.list[k] === party)}`)
-                            // Log buildRealParty output for AB comparison with relay
-                            if (brp?.characters?.[0]) {
-                                const bChar = brp.characters[0]
-                                const bInner = bChar?.[0] === 0 && bChar[1] ? bChar[1] : bChar
-                                console.log(`[BUILD-DIFF] build char[0] keys: ${JSON.stringify(Object.keys(bInner || {}).sort())}`)
-                                console.log(`[BUILD-DIFF] build char[0]: ${JSON.stringify(bInner)}`)
-                            }
-                            if (brp?.equipments?.[0]) {
-                                const bEquip = brp.equipments[0]
-                                const bEqInner = bEquip?.[0] === 0 && bEquip[1] ? bEquip[1] : bEquip
-                                console.log(`[BUILD-DIFF] build equip[0] keys: ${JSON.stringify(Object.keys(bEqInner || {}).sort())}`)
-                                console.log(`[BUILD-DIFF] build equip[0]: ${JSON.stringify(bEqInner)}`)
-                            }
-                            console.log(`[BUILD-DIFF] build abilitySoulIds[0]: ${JSON.stringify(brp?.abilitySoulIds?.[0])}`)
                         }
                     }
                 }
@@ -413,6 +423,8 @@ function handleEnterComs(client: SessionClient, coms: any[]) {
     // Update mates: [host, npc1, npc2, ...]
     client.mates = [host, ...npcMates]
     console.log(`[SESSION] EnterComs: room=${client.roomNumber} total mates=${client.mates.length}`)
+    // Room is now full → state=3 (Filled)
+    updateRoomState(client.roomNumber, 3)
 
     // 1. Send Mates update after configured join delay (NPCs join, state=[0] Preparation)
     setTimeout(() => {
@@ -647,6 +659,13 @@ async function handleHandshake(socket: net.Socket, data: string, remoteAddr: str
     };
 
     const isReconnect = (roomClients.get(String(roomNumber))?.size ?? 0) > 0
+    // Cancel any pending return-window disband timer
+    const existingTimer = roomDisbandTimers.get(String(roomNumber))
+    if (existingTimer) {
+        clearTimeout(existingTimer)
+        roomDisbandTimers.delete(String(roomNumber))
+        console.log(`[SESSION] room ${roomNumber} return window cancelled, new client connecting`)
+    }
     addClient(client);
     console.log(`[SESSION] client added: viewer=${viewerId} room=${roomNumber} total=${roomClients.get(roomNumber)?.size} ${isReconnect ? '[RECONNECT]' : '[NEW]'}`);
 

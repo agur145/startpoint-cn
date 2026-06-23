@@ -28,7 +28,7 @@ let roomSequence = 1;
 
 // Room expiry time: configurable via env, default 10 minutes
 const ROOM_EXPIRY_MS = parseInt(process.env.MULTI_ROOM_EXPIRY_MS || "600000");
-const BATTLE_ROOM_EXPIRY_MS = parseInt(process.env.MULTI_BATTLE_ROOM_EXPIRY_MS || "300000");
+const BATTLE_ROOM_EXPIRY_MS = parseInt(process.env.MULTI_BATTLE_ROOM_EXPIRY_MS || "600000");
 const CLEAN_INTERVAL_MS = parseInt(process.env.MULTI_ROOM_CLEAN_INTERVAL_MS || "60000");
 
 // Clean up expired rooms periodically
@@ -39,7 +39,7 @@ function cleanExpiredRooms() {
     for (const [roomNumber, room] of rooms) {
         const age = now - room.created_at;
         // Idle rooms (Ready/Recruiting): expire by creation time (both real ms)
-        if (age > ROOM_EXPIRY_MS && room.raising_state <= 2) {
+        if (age > ROOM_EXPIRY_MS && room.raising_state <= 3) {
             rooms.delete(roomNumber);
             cleaned++;
             continue;
@@ -166,14 +166,15 @@ export function createRoom(
         host_main_character_id: hostMainCharacterId,
         accepted_type: acceptedType,
         created_at: Date.now(),
-        raising_state: 1, // Ready
+        raising_state: 2, // Waiting for host to enter TCP
         room_sequence: nextRoomSequence(),
         host_entry_time: getServerTime(),
         mates: [
             { viewer_id: null, com_id: 1 },
             { viewer_id: null, com_id: 2 }
         ],
-        share_room_options: 0
+        share_room_options: 0,
+        is_npc_mode: false
     };
     rooms.set(roomNumber, room);
     console.log(`[MULTI] room created: ${roomNumber} host=${hostViewerId} category=${category} quest=${questId}`);
