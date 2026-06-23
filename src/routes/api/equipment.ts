@@ -1,7 +1,7 @@
 // Handles the insertion of mana into characters.
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { deletePlayerEquipmentSync, getAccountPlayers, getPlayerEquipmentSync, getPlayerItemSync, getPlayerSync, getSession, givePlayerItemSync, playerOwnsEquipmentSync, updatePlayerEquipmentSync, updatePlayerItemSync, updatePlayerPartyGroupSync } from "../../data/wdfpData";
+import { deletePlayerEquipmentSync, getAccountPlayers, getPlayerEquipmentListSync, getPlayerEquipmentSync, getPlayerItemSync, getPlayerSync, getSession, givePlayerItemSync, playerOwnsEquipmentSync, updatePlayerEquipmentSync, updatePlayerItemSync, updatePlayerPartyGroupSync } from "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
 import { clientSerializeEquipment } from "../../lib/equipment";
 import { UserEquipment } from "../../data/types";
@@ -37,15 +37,46 @@ interface SellBody {
     api_count: number
 }
 
-const wrightpieceItemId = 100000
+interface BulkUpgradeBody {
+    viewer_id: number
+    api_count: number
+    equipment_ids: number[]
+}
 
-// wrightpiece cost for each rank of weapon
+interface BulkSellStackBody {
+    viewer_id: number
+    api_count: number
+    equipment_ids: number[]
+}
+
+const wrightpieceItemId = 100000
+const starGrainItemId = 990008
+
+// wrightpiece cost for each rank of weapon (awakening)
 const equipmentUpgradeCost = [
     5,
     10,
     15,
     20,
     25
+]
+
+// wrightpiece reward for dissolving each rank of weapon
+const dissolvingCraftPoints = [
+    1,
+    2,
+    3,
+    4,
+    5
+]
+
+// star grain reward for dissolving each rank of weapon
+const dissolvingStarGrains = [
+    0,
+    0,
+    1,
+    5,
+    15
 ]
 
 // wrightpiece reward for selling each rank of weapon
@@ -297,6 +328,218 @@ const routes = async (fastify: FastifyInstance) => {
                 "equipment_list": [
                     clientSerializeEquipment(equipmentId, equipment)
                 ],
+                "item_list": returnItemList,
+                "mail_arrived": false
+            }
+        })
+    })
+
+    fastify.post("/bulk_upgrade", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as BulkUpgradeBody
+
+        const viewerId = body.viewer_id
+        const equipmentIds = body.equipment_ids
+        if (isNaN(viewerId) || !equipmentIds || !Array.isArray(equipmentIds) || equipmentIds.length === 0) {
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Invalid request body."
+            })
+        }
+
+        const session = await getSession(viewerId.toString())
+        if (!session) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Invalid viewer id."
+        })
+
+        const playerId = resolvePlayerIdSync(session.accountId)!
+        if (playerId === null) return reply.status(500).send({
+            "error": "Internal Server Error",
+            "message": "No players bound to account."
+        })
+
+        const player = getPlayerSync(playerId)
+        if (!player) return reply.status(500).send({
+            "error": "Internal Server Error",
+            "message": "Player not found."
+        })
+
+        // Phase 1: calculate upgrade counts and total cost
+        const upgrades: Array<{ equipmentId: number, upgradeCount: number }> = []
+        let totalCraftPointCost = 0
+        const seen = new Set<number>()
+
+        for (const equipmentId of equipmentIds) {
+            if (seen.has(equipmentId)) continue
+            seen.add(equipmentId)
+
+            const equipment = getPlayerEquipmentSync(playerId, equipmentId)
+            if (!equipment) continue
+
+            const upgradeCount = Math.min(5 - equipment.level, equipment.stack)
+            if (upgradeCount <= 0) continue
+
+            const rarity = Math.floor(equipmentId / 1000000) - 1
+            totalCraftPointCost += equipmentUpgradeCost[rarity] * upgradeCount
+            upgrades.push({ equipmentId, upgradeCount })
+        }
+
+        if (upgrades.length === 0) {
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+                "data": {
+                    "equipment_list": [],
+                    "item_list": {},
+                    "mail_arrived": false
+                }
+            })
+        }
+
+        // Check craft point balance
+        const currentCraftPoints = getPlayerItemSync(playerId, wrightpieceItemId) ?? 0
+        if (totalCraftPointCost > currentCraftPoints) {
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Not enough craft points."
+            })
+        }
+
+        // Phase 2: apply upgrades
+        const returnEquipmentList: Object[] = []
+        const returnItemList: Record<number, number> = {}
+
+        for (const { equipmentId, upgradeCount } of upgrades) {
+            const equipment = getPlayerEquipmentSync(playerId, equipmentId)!
+
+            equipment.level += upgradeCount
+            equipment.stack -= upgradeCount
+            updatePlayerEquipmentSync(playerId, equipmentId, {
+                level: equipment.level,
+                stack: equipment.stack
+            })
+
+            returnEquipmentList.push(clientSerializeEquipment(equipmentId, equipment))
+            returnItemList[equipmentId] = givePlayerItemSync(playerId, equipmentId, upgradeCount)
+        }
+
+        // Deduct craft points
+        const newCraftPoints = currentCraftPoints - totalCraftPointCost
+        updatePlayerItemSync(playerId, wrightpieceItemId, newCraftPoints)
+        returnItemList[wrightpieceItemId] = newCraftPoints
+
+        console.log(`[BULK_UPGRADE] player ${playerId}: ${upgrades.length} equipment upgraded, craft points ${currentCraftPoints} -> ${newCraftPoints}`)
+
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+            "data": {
+                "equipment_list": returnEquipmentList,
+                "item_list": returnItemList,
+                "mail_arrived": false
+            }
+        })
+    })
+
+    fastify.post("/bulk_sell_stack", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as BulkSellStackBody
+
+        const viewerId = body.viewer_id
+        const equipmentIds = body.equipment_ids
+        if (isNaN(viewerId) || !equipmentIds || !Array.isArray(equipmentIds) || equipmentIds.length === 0) {
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Invalid request body."
+            })
+        }
+
+        const session = await getSession(viewerId.toString())
+        if (!session) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Invalid viewer id."
+        })
+
+        const playerId = resolvePlayerIdSync(session.accountId)!
+        if (playerId === null) return reply.status(500).send({
+            "error": "Internal Server Error",
+            "message": "No players bound to account."
+        })
+
+        const player = getPlayerSync(playerId)
+        if (!player) return reply.status(500).send({
+            "error": "Internal Server Error",
+            "message": "Player not found."
+        })
+
+        // Phase 1: calculate rewards per equipment
+        let totalCraftPoints = 0
+        let totalStarGrains = 0
+        const abilitySoulCounts: Record<number, number> = {}
+        const toSell: Array<{ equipmentId: number, stack: number }> = []
+        const seen = new Set<number>()
+
+        for (const equipmentId of equipmentIds) {
+            if (seen.has(equipmentId)) continue
+            seen.add(equipmentId)
+
+            const equipment = getPlayerEquipmentSync(playerId, equipmentId)
+            if (!equipment) continue
+
+            const stack = equipment.stack
+            if (stack <= 0) continue
+
+            const rarity = Math.floor(equipmentId / 1000000) - 1
+            totalCraftPoints += dissolvingCraftPoints[rarity] * stack
+            totalStarGrains += dissolvingStarGrains[rarity] * stack
+            abilitySoulCounts[equipmentId] = (abilitySoulCounts[equipmentId] ?? 0) + stack
+            toSell.push({ equipmentId, stack })
+        }
+
+        if (toSell.length === 0) {
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+                "data": {
+                    "equipment_list": [],
+                    "item_list": {},
+                    "mail_arrived": false
+                }
+            })
+        }
+
+        // Phase 2: delete equipment, give items
+        for (const { equipmentId } of toSell) {
+            deletePlayerEquipmentSync(playerId, equipmentId)
+        }
+
+        const returnItemList: Record<number, number> = {}
+
+        if (totalCraftPoints > 0) {
+            returnItemList[wrightpieceItemId] = givePlayerItemSync(playerId, wrightpieceItemId, totalCraftPoints)
+        }
+        if (totalStarGrains > 0) {
+            returnItemList[starGrainItemId] = givePlayerItemSync(playerId, starGrainItemId, totalStarGrains)
+        }
+        for (const [equipmentId, count] of Object.entries(abilitySoulCounts)) {
+            returnItemList[parseInt(equipmentId)] = givePlayerItemSync(playerId, parseInt(equipmentId), count)
+        }
+
+        // Get full remaining equipment list
+        const allEquipment = getPlayerEquipmentListSync(playerId)
+        const returnEquipmentList: Object[] = []
+        for (const [equipId, equip] of Object.entries(allEquipment)) {
+            returnEquipmentList.push(clientSerializeEquipment(parseInt(equipId), equip))
+        }
+
+        const craftPointLog = totalCraftPoints > 0 ? `craft +${totalCraftPoints} ` : ""
+        const starGrainLog = totalStarGrains > 0 ? `star +${totalStarGrains} ` : ""
+        console.log(`[BULK_SELL] player ${playerId}: ${toSell.length} equipment dissolved, ${craftPointLog}${starGrainLog}ability souls: ${Object.keys(abilitySoulCounts).length} types`)
+
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+            "data": {
+                "equipment_list": returnEquipmentList,
                 "item_list": returnItemList,
                 "mail_arrived": false
             }

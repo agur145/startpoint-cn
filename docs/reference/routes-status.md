@@ -35,6 +35,8 @@ Endpoint | Status
 [/equipment/set_protection](../routes/equipment_set_protection.md) | :white_check_mark:
 [/equipment/sell_equipment](../routes/equipment_sell_equipment.md) | :white_check_mark:
 [/equipment/sell_stack](../routes/equipment_sell_stack.md) | :white_check_mark:
+[/equipment/bulk_sell_stack](../routes/equipment_bulk_sell_stack.md) | :white_check_mark:
+[/equipment/bulk_upgrade](../routes/equipment_bulk_upgrade.md) | :white_check_mark:
 [/equipment/upgrade](../routes/equipment_upgrade.md) | :white_check_mark:
 ``/event/rush/summary`` | :white_check_mark:
 ``/event/rush/select_folder`` | :white_check_mark:
@@ -49,6 +51,7 @@ Endpoint | Status
 [/ex_boost/select](../routes/ex_boost_select.md) | :white_check_mark:
 [/expod/inject_exp](../routes/expod_inject_exp.md) | :white_check_mark:
 [/expod/stack_to_exp](../routes/expod_stack_to_exp.md) | :white_check_mark:
+[/expod/bulk_stack_to_exp](../routes/expod_bulk_stack_to_exp.md) | :white_check_mark:
 [/follow/lists](../routes/follow_lists.md) | :no_entry:
 [/gacha/exchange_character](../routes/gacha_exchange_character.md) | :white_check_mark:
 ``/gacha/exchange_equipment`` | :white_check_mark:

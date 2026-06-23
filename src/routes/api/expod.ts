@@ -1,7 +1,8 @@
 // Handles the insertion of mana into characters.
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getAccountPlayers, getPlayerCharacterSync, getPlayerSync, getSession, givePlayerItemSync, updatePlayerSync } from "../../data/wdfpData";
+import { getAccountPlayers, getPlayerCharacterSync, getPlayerCharactersSync, getPlayerItemsSync, getPlayerSync, getSession, givePlayerItemSync, updatePlayerCharacterSync, updatePlayerSync } from "../../data/wdfpData";
+import { characterMaxOverLimits } from "./character";
 import { givePlayerCharactersExpSync } from "../../lib/character";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { getCharacterDataSync } from "../../lib/assets";
@@ -20,6 +21,11 @@ interface StackToExpBody {
     api_count: number,
     number: number,
     viewer_id: number
+}
+
+interface BulkStackToExpBody {
+    viewer_id: number
+    api_count: number
 }
 
 const rarityStackConvertItemCount: Record<number, number> = {
@@ -129,6 +135,117 @@ const routes = async (fastify: FastifyInstance) => {
                 },
                 "item_list": {
                     [rewardItemId]: afterItemCount
+                },
+                "mail_arrived": false
+            }
+        })
+    })
+
+    fastify.post("/bulk_stack_to_exp", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as BulkStackToExpBody
+
+        const viewerId = body.viewer_id
+        if (isNaN(viewerId)) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Invalid request body."
+        })
+
+        const session = await getSession(viewerId.toString())
+        if (!session) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Invalid viewer id."
+        })
+
+        const playerId = resolvePlayerIdSync(session.accountId)!
+        const player = playerId !== null ? getPlayerSync(playerId) : null
+        if (player === null) return reply.status(500).send({
+            "error": "Internal Server Error",
+            "message": "No players bound to account."
+        })
+
+        const allCharacters = getPlayerCharactersSync(playerId)
+        const modifiedCharacters: Object[] = []
+        let totalExp = 0
+        let totalStarGrains = 0
+        let processedCount = 0
+
+        for (const [characterIdStr, character] of Object.entries(allCharacters)) {
+            const characterId = parseInt(characterIdStr)
+            if (character.stack <= 0) continue
+
+            const charAsset = getCharacterDataSync(characterId)
+            if (!charAsset) continue
+
+            const rarity = charAsset.rarity
+            const maxOver = characterMaxOverLimits[rarity] ?? 0
+            if (character.overLimitStep < maxOver) continue
+
+            const stack = character.stack
+            const addExp = (rarityStackConvertExp[rarity] ?? 0) * stack
+            const addStarGrain = (rarityStackConvertItemCount[rarity] ?? 0) * stack
+
+            totalExp += addExp
+            totalStarGrains += addStarGrain
+
+            updatePlayerCharacterSync(playerId, characterId, { stack: 0 })
+            character.stack = 0
+
+            modifiedCharacters.push({
+                "viewer_id": viewerId,
+                "character_id": characterId,
+                "stack": 0,
+                "over_limit_step": character.overLimitStep,
+                "exp": character.exp,
+                "exp_total": character.exp,
+                "create_time": clientSerializeDate(character.joinTime),
+                "update_time": clientSerializeDate(character.updateTime),
+                "join_time": clientSerializeDate(character.joinTime)
+            })
+            processedCount++
+        }
+
+        if (processedCount === 0) {
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+                "data": {
+                    "character_list": [],
+                    "converted_exp_info": { "add_exp": 0 },
+                    "item_list": getPlayerItemsSync(playerId),
+                    "user_info": {
+                        "exp_pool": player.expPool,
+                        "exp_pooled_time": getServerTime(player.expPooledTime)
+                    },
+                    "mail_arrived": false
+                }
+            })
+        }
+
+        const newExpPool = player.expPool + totalExp
+        updatePlayerSync({ id: playerId, expPool: newExpPool })
+
+        let newStarGrainTotal = 0
+        if (totalStarGrains > 0) {
+            newStarGrainTotal = givePlayerItemSync(playerId, rewardItemId, totalStarGrains)
+        }
+
+        const items = getPlayerItemsSync(playerId)
+        if (totalStarGrains > 0) {
+            items[String(rewardItemId)] = newStarGrainTotal
+        }
+
+        console.log(`[BULK_STACK_EXP] player ${playerId}: ${processedCount} characters converted, exp +${totalExp}, starGrain +${totalStarGrains}, expPool ${player.expPool}→${newExpPool}`)
+
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+            "data": {
+                "character_list": modifiedCharacters,
+                "converted_exp_info": { "add_exp": totalExp },
+                "item_list": items,
+                "user_info": {
+                    "exp_pool": newExpPool,
+                    "exp_pooled_time": getServerTime(player.expPooledTime)
                 },
                 "mail_arrived": false
             }
