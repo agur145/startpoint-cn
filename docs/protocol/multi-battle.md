@@ -794,30 +794,88 @@ const NPC_TEMPLATES = {
 | `SESSION_PORT` | 8003 | TCP 会话端口 |
 | `SESSION_HOST` | 0.0.0.0 | TCP 绑定地址 |
 | `MULTI_ROOM_EXPIRY_MS` | 600000 | 空闲房间过期（ms），默认 10min |
-| `MULTI_BATTLE_ROOM_EXPIRY_MS` | 300000 | 战斗中房间无活动过期（ms），默认 5min |
+| `MULTI_BATTLE_ROOM_EXPIRY_MS` | 600000 | 战斗中房间无活动过期（ms），默认 10min |
 | `MULTI_ROOM_CLEAN_INTERVAL_MS` | 60000 | 过期检查间隔（ms） |
+| `QUEST_RESULT_DISBAND_DELAY_MS` | 60000 | 结算后返回房间等待窗口（ms），对齐 CDN `room_config.json` |
 | `NPC_JOIN_DELAY_MS` | 2000 | NPC 加入房间延迟（ms） |
 | `NPC_READY_DELAY_MS` | 500 | NPC 准备延迟（ms） |
-| `NPC_AUTO_JOIN_DELAY_MS` | 1000 | 进房后自动招募 NPC 延迟（ms），0=关闭 |
 | `NPC_HOST_READY_COUNTDOWN_MS` | 3000 | 房主准备倒计时（ms），0=立即准备 |
 
-### 9.4 房间生命周期
+### 9.4 房间完整生命周期
 
 ```
-create_room → raising_state=1 (Ready)
-  → TCP 握手 → room TCP 连接
-     → 自动招募 NPC (NPC_AUTO_JOIN_DELAY_MS)
-        → NPC 加入 + Ready
-           → 房主准备倒计时 (NPC_HOST_READY_COUNTDOWN_MS)
-              → 房主 Ready → 客户端 autoStart ~2s → 开战 raising_state=4
-                 ├─ finish → raising_state=1 (room TCP 存活, 可再战)
-                 ├─ abort → disbandRoom()
-                 └─ TCP 断线 → disbandRoom() (官方行为)
-
-清理: MULTI_ROOM_EXPIRY_MS 空闲超时 + MULTI_BATTLE_ROOM_EXPIRY_MS 战斗超时
+create_room → state=2 (Waiting: 房主未进TCP)
+  ↓ 房主 prepare/select_room → host override → state=1
+  ↓ 客端 prepare/select_room → state=2 → 轮询等待（未来联机）
+TCP handshake → updateRoomState(1) （幂等确保）
+  ↓
+state=1 (Ready: 可加入/可招募)
+  ├─ 点[随机招募] → is_npc_mode=true → EnterComs → state=3 (Filled)
+  │     ↓
+  │   NPC Ready → 房主倒计时 → start → state=4 (Battle)
+  │     ↓
+  │   finish → state=1, 删 ActiveQuest → battle TCP 断开
+  │     ├─ 60s 内 prepare/select_room → 新 TCP → 取消定时器 → 回到 state=1
+  │     └─ 60s 无人 → disband
+  │     ↓
+  │   abort → disbandRoom, 删 ActiveQuest
+  │
+  ├─ 不招募 → is_npc_mode=false → 等待
+  │
+  └─ TCP 断线（非 battle）→ disbandRoom
 ```
 
-### 9.5 战斗恢复数据层（Phase 3 基础）
+**状态变更矩阵：**
+
+| 触发操作 | 条件 | 从 | 到 |
+|------|------|:---:|:---:|
+| `create_room` | — | — | 2 |
+| TCP handshake | — | 2 | 1（幂等） |
+| `select_room`/`prepare` | host | 2 | 返回 1（override） |
+| `select_room`/`prepare` | guest | 2 | 返回 2（真实值） |
+| `start` | — | 1 | 4 |
+| `finish` | host | 4 | 1 |
+| `abort` | host | 4 | disband |
+| `disband_room` | — | any | disband |
+| TCP 断线 | isBattle + state=1 | 1 | 60s 后 disband |
+| TCP 断线 | isBattle + state=4 | 4 | 保留（过期清理） |
+| TCP 断线 | !isBattle | 1/2 | disband |
+| 空闲过期 | 10min + state≤3 | 1/2/3 | disband |
+| 战斗过期 | 10min + state=4 | 4 | disband |
+
+**raising_state 完整枚举：**
+
+| 值 | 名称 | 使用 | 说明 |
+|:---:|------|:---:|------|
+| 1 | Ready | ✅ | 可加入/招募 |
+| 2 | Waiting | ✅ | 房主未进 TCP |
+| 3 | Filled | ✅ | NPC 加入后满员 |
+| 4 | Battle | ✅ | 战斗中 |
+| 7-13 | — | — | 多人联机时使用 |
+
+### 9.5 已知桩值/假值
+
+| 位置 | 值 | 说明 |
+|------|------|------|
+| `sessionServer.ts` | NPC viewerId `900000001/2` | 虚拟 ID，仅用于结算验证 |
+| `sessionServer.ts` | NPC `playerRoleKind: 99` | NPC 标识 |
+| `attention.ts` `/action` | `priority_action_score: 0` | NPC 模式桩，无人匹配 |
+| `attention.ts` `/logger` | `data: {}` | 丢弃日志 |
+| `attention.ts` `/check` | 静态 config | 硬编码，未来应从 CDN 读取 |
+| `multiBattleQuest.ts` `/micro_community` | `micro_community_list: []` | CN 桩 |
+| `multiBattleQuest.ts` `/publish_room` | `data: {}` | CN 桩 |
+
+### 9.6 战斗协议
+
+| 消息 | 通道 | 服务端处理 |
+|------|------|------|
+| `BattleNotifyMessage.SceneReady(0)` | Notify | → `BattleStart(1)` |
+| `BattleNotifyMessage.Finalize(1)` | Notify | → `Finalized(2)` |
+| `BattleNotifyMessage.Measurement(2)` | Notify | → 回显 `Measurement(3)` |
+| `BattleNotifyMessage.Heartbeat(4)` | Notify | → 回显 `Measurement(3)` |
+| `BattleSocketCommand.Heartbeat(2)` | Broadcast/Send | → 回显 `Measurement(3)` |
+
+### 9.7 战斗恢复数据层（Phase 3 基础）
 
 | 功能 | 状态 | 说明 |
 |------|:---:|------|
@@ -826,14 +884,14 @@ create_room → raising_state=1 (Ready)
 | `/load` 返回 `unfinished_quest_list` | ✅ | 客户端启动时检测未完成战斗 |
 | `unfinished_multi_quest_list` | ✅ | 多人战斗独立列表 |
 
-### 9.6 已知限制
+### 9.8 已知限制
 
 | 问题 | 状态 | 说明 |
 |------|:---:|------|
-| C8700 stale room | ⚠️ | 残留房间导致 get_rooms 崩溃，重启即清理 |
+| C8700 stale room | ✅ 已修复 | `hasRoomClients` 过滤 + 60s return window 清理 |
 | 消息 TCP 合并 | ⚠️ | 100ms/200ms 延迟规避 |
-| raising_state=2 未启用 | — | NPC 单人模式不需要，等多人联机时加入 |
-| 战斗恢复（RestoreState.Battle） | 待测 | DB 层已就绪，客户端 UI 流程待验证 |
+| `get_rooms` 返回无 TCP 客户端的房间 | ✅ 已修复 | `hasRoomClients` 防御过滤 |
+| 战斗恢复 UI（RestoreState.Battle） | 待测 | DB 层已就绪，客户端恢复弹窗流程待验证 |
 
 ---
 
