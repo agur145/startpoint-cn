@@ -124,13 +124,7 @@ export function serializePartyGroupList(
                 "current_battle_power": party.currentBattlePower ?? 0,
                 "before_battle_power": party.beforeBattlePower ?? 0
             }
-            // Debug: log first party's character_ids format
-            if (Number(groupId) === 1 && Number(slot) === 1) {
-                const charIds = list[globalPartyId].character_ids
-                console.log(`[PARTY-DEBUG] group=${groupId} slot=${slot} globalId=${globalPartyId} character_ids=${JSON.stringify(charIds)} types=${charIds?.map(c => typeof c + ':' + c).join(',')}`)
-            }
         }
-        console.log(`[PARTY-SER] group=${groupId} slots=${Object.keys(group.list).length} keys=${Object.keys(list).slice(0,3).join(',')}...`)
         serialized[groupId] = {
             "list": list,
             "color_id": group.colorId
@@ -175,7 +169,6 @@ export function serializePlayerData(
 
     // convert userCharacterList (k_id → business code)
     const userCharacterList: Record<string, UserCharacter> = {}
-    const diagWarnings: string[] = []
     for (const [characterId, character] of Object.entries(toSerialize.characterList)) {
         const kId = parseInt(characterId);
         const code = kIdToBusinessCode(kId);
@@ -195,30 +188,16 @@ export function serializePlayerData(
             "mana_board_index": character.manaBoardIndex
         }
 
-        // DIAGNOSTIC: check mana_board_index vs bond_token_list consistency
-        if (character.manaBoardIndex > bondTokenList.length) {
-            diagWarnings.push(`[DIAG] char ${codeKey} manaBoardIndex=${character.manaBoardIndex} but bondTokenList.length=${bondTokenList.length} (list=${JSON.stringify(bondTokenList)})`)
-        }
-
-        // DIAGNOSTIC: check for invalid mana_board_index
-        if (character.manaBoardIndex < 1 || character.manaBoardIndex > 10) {
-            diagWarnings.push(`[DIAG] char ${codeKey} has suspicious manaBoardIndex=${character.manaBoardIndex}`)
-        }
-
         const exBoost = character.exBoost
         if (exBoost !== undefined) {
             converted_character['ex_boost'] = {
                 "status_id": exBoost.statusId,
                 "ability_id_list": exBoost.abilityIdList
             }
-        } else {
-            diagWarnings.push(`[DIAG] char ${codeKey} missing ex_boost field`)
         }
 
         if (character.illustrationSettings !== undefined) {
             converted_character['illustration_settings'] = character.illustrationSettings
-        } else {
-            diagWarnings.push(`[DIAG] char ${codeKey} missing illustration_settings field`)
         }
 
         userCharacterList[codeKey] = converted_character
@@ -337,10 +316,6 @@ export function serializePlayerData(
         "user_character_mana_node_list": (() => {
                 const list: Record<string, { multiplied_id: number, awake_level: number }[]> = {}
                 for (const [charId, nodeIds] of Object.entries(toSerialize.characterManaNodeList)) {
-                    // DIAGNOSTIC: check for orphaned mana nodes (character not in characterList)
-                    if (!(charId in userCharacterList)) {
-                        diagWarnings.push(`[DIAG] ORPHAN mana nodes for char ${charId}: ${nodeIds.length} nodes, but char NOT in characterList!`)
-                    }
                     if (nodeIds.length > 0) {
                         list[charId] = nodeIds.map(id => ({ multiplied_id: id, awake_level: 0 }))
                     }
@@ -470,13 +445,6 @@ export function serializePlayerData(
                 userRushEventPlayedPartyList[eventId] = battleTypeBuckets as Record<RushEventBattleType, Record<string, UserRushEventPlayedParty>>
             }
             clientData.user_rush_event_played_party_list = userRushEventPlayedPartyList
-        }
-    }
-
-    if (diagWarnings.length > 0) {
-        console.log(`[DIAG] serializePlayerData: ${diagWarnings.length} warnings for player ${toSerialize.player.id}`)
-        for (const w of diagWarnings) {
-            console.log(`  ${w}`)
         }
     }
 

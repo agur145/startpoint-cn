@@ -392,7 +392,70 @@ Player 页面 `/player/:id` → 「恢复挑战次数」按钮：
 
 ---
 
-**最后更新：2026-06-23**
+## Mana Board F1009 崩溃（服务时间 vs Board2 解锁窗口） 🔧 已知局限
+
+**症状**: 打开部分角色的玛纳板时 `F1009: TypeError #1009`，崩溃点 `ManaNodeTreeChartView/changeActiveManaBoard()`。
+
+**崩溃角色特征**:
+- 已学完 board 1 全部节点（23 个），角色 `mana_board_index >= 1`
+- `evolution_level = 1`
+- board 2 节点 ID 均为 int32 大数（>3 亿，非 int16 的 2xxx）
+
+**正常角色**:
+- Albus(1)：节点 ID 2201~2418（int16），board 2 开放时间 2015-03-01（永远有效）
+- 未学任何节点的角色：无 mana_node_ids → 不访问 board 2 层
+
+### 根因
+
+`ManaBoard2OpenConditionTable` 中不同角色的 board 2 开放时间不同：
+
+| 角色 | board 2 开放时间 |
+|------|-----------------|
+| 1 (Albus) | 2015-03-01 15:00 |
+| 151165 | 2025-04-03 12:00 |
+| 153001, 151147 | 较晚日期 |
+
+当服务时间 < board 2 开放时间时，客户端 `canManaBoard2Open()` 返回 false：
+
+```
+canManaBoard2Open(151165) = false (时间未到)
+  → allBoardIndexes = [1]          ← 只渲染板1
+  → run() 只创建 boardLayers[1]
+  
+但存档中 mana_board_index = 2     ← 板2已学完
+  → initialize() → changeActiveManaBoard()
+  → 尝试访问 boardLayers[2]       ← null!
+  → F1009
+```
+
+源码证据：`GeneralCharacterLogic.as:970-1017` `canManaBoard2Open()`，通过 `ManaBoard2OpenConditionTable` 的 `start_time/end_time` 与 `AppTimeConfig.currentServerTime` 比较。
+
+### 为什么是客户端 bug（非服务端 bug）
+
+服务端数据完全正确——`bond_token_list`, `mana_board_index`, `evolution_level` 均合法。客户端在时间锁定时应优雅降级（显示板1 + 板2锁定提示），但实际抛出了空指针。
+
+### 兼容方案
+
+| 方案 | 操作 | 优劣 |
+|------|------|------|
+| **A: 对齐时间** | 服务时间调到 ≥ 2025-04-03 | ✅ 最简单，所有角色 board 2 均开放 |
+| **B: 服务端过滤** | load 响应中，若时间 < board2_start，将 `mana_board_index` 降为 1 | 需查 CDN 表获取每个角色的开放时间，维护成本高 |
+| **C: 客户端修复** | 修改 CN 客户端 APK（starview patch） | 技术上可行但需额外开发 |
+| **D: 标记已知** | 接受当前限制，告知玩家调时间 | 零开发成本 |
+
+**当前采用方案 A**（已在服务时间设置中体现）。
+
+### 相关角色排查方法
+
+```sql
+-- 查所有角色的 board2 开放时间
+-- 数据在 wf-assets-cn/orderedmap/mana_board/mana_board2_open_condition.json
+-- 字段：[0]=start_time, [1]=end_time
+```
+
+---
+
+**最后更新：2026-06-24**（详细变更见 [CHANGELOG.md](./CHANGELOG.md)）
 
 ## 参考文档
 
