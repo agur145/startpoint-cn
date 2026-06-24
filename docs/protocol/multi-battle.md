@@ -889,7 +889,7 @@ state=1 (Ready: 可加入/可招募)
 | 功能 | 状态 | 说明 |
 |------|:---:|------|
 | `broadcastToRoom()` | ✅ | 消息广播给房间所有客户端 |
-| `relayToBattleRoom()` | ✅ | 战斗帧命令中继 |
+| `relayToBattleRoom()` | ✅ | 战斗帧命令中继（connectionId 标识） |
 | Guest Enter 通知 | ✅ | 新玩家加入时广播 Mates 给已有客户端 |
 | Ready 广播 | ✅ | StateChanged 发给所有客户端 |
 | ChangeParty 广播 | ✅ | 队伍变更通知 |
@@ -899,7 +899,19 @@ state=1 (Ready: 可加入/可招募)
 | Battle TCP 握手注册 | ✅ | `cidToBattleClient` + `battleExpectedCount` |
 | `get_rooms` 可见性 | ✅ | `host_viewer_id === viewerId` 过滤 |
 | `search_room` 类型修复 | ✅ | `establisher_follow: false→0` |
-| 战斗帧同步 | ⚠️ | 帧命令 relay 已实现，但客户端还未真正同步战斗 |
+| 战斗帧同步 | ✅ | Broadcast 帧命令双向 relay，typepacker 格式对齐 |
+| NPC/真人模式解耦 | ✅ | NPC: battleExpectedCount=1, 真人: mates.length |
+
+### 9.7.6 帧 relay 架构
+
+```
+Client A → Broadcast(frameCmd) → Server → relayToBattleRoom → BattleServer2Client.Messages(2, cid, cmd)
+                                                                  → Client B 接收
+Client B → Broadcast(frameCmd) → Server → relayToBattleRoom → BattleServer2Client.Messages(2, cid, cmd)
+                                                                  → Client A 接收
+```
+
+所有战斗命令（移动、技能、FEVER、协力球、自动战斗）走 `Client2Server.Broadcast(1)` → 服务端 relay 为 `BattleServer2Client.Messages(2)` → 对方 client 接收。协议层覆盖全部战斗场景。
 
 ### 9.8 已知限制
 
