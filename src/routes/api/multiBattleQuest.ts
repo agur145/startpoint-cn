@@ -218,7 +218,10 @@ const routes = async (fastify: FastifyInstance) => {
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": { "rooms": getRooms(body.category_id, body.event_id).filter(r => hasRoomClients(r.room_number)).map(serializeRoom) }
+            "data": { "rooms": getRooms(body.category_id, body.event_id)
+                .filter(r => r.host_viewer_id === viewerId)
+                .filter(r => hasRoomClients(r.room_number))
+                .map(serializeRoom) }
         })
     })
 
@@ -274,7 +277,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "quest_id": room?.quest_id ?? 0,
                 "room_number": room?.room_number ?? body.room_number,
                 "establisher_viewer_id": room?.host_viewer_id ?? 0,
-                "establisher_follow": false
+                "establisher_follow": 0
             }
         })
     })
@@ -529,7 +532,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "quest_id": room?.quest_id ?? 0,
                 "room_number": room?.room_number ?? "",
                 "establisher_viewer_id": room?.host_viewer_id ?? 0,
-                "establisher_follow": false
+                "establisher_follow": 0
             }
         })
     })

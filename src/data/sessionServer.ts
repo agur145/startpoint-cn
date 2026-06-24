@@ -18,42 +18,40 @@
 //   BattleSocketCommand: User=0, Speed=1, Heartbeat=2 (via Broadcast/Send, echoed as Measurement)
 
 import * as net from "net";
-import { MultiRoom } from "../lib/types";
 import { disbandRoom, getRoom, updateRoomState } from "./multiRoom";
 import { getSession, getAccountPlayers, getPlayerSync, getPlayerPartyGroupListSync, getPlayerCharacterSync, getPlayerCharacterManaNodesSync, getPlayerEquipmentSync, updatePlayerSync } from "./wdfpData";
-import { PartyCategory, PlayerParty, PlayerCharacter, PlayerEquipment } from "./types";
+import { PartyCategory, PlayerParty } from "./types";
 import playerRankTable from "../../assets/cdndata/player_rank.json";
 
 interface SessionClient {
     socket: net.Socket;
     viewerId: number;
     roomNumber: string;
+    connectionId: string;
     isReady: boolean;
     buffer: string;
     mates: any[];
     enterData: any;
     playerId: number | null;
     isBattle: boolean;
-    yourself?: any;  // pre-built host mate, sent on Enter (official relay mode)
+    yourself?: any;
 }
 
 const clients = new Map<string, SessionClient>();
 const roomClients = new Map<string, Set<string>>();
+const battleClients = new Map<string, Set<string>>();
+const cidToBattleClient = new Map<string, SessionClient>();
+const sceneReadyClients = new Map<string, Set<string>>();
+const battleExpectedCount = new Map<string, number>();
 
 let server: net.Server | null = null;
 const SESSION_PORT = parseInt(process.env.SESSION_PORT || "8003");
 const SESSION_HOST = process.env.SESSION_HOST || "0.0.0.0";
 
-// NPC recruit timing (env-configurable, defaults)
 const NPC_JOIN_DELAY_MS = parseInt(process.env.NPC_JOIN_DELAY_MS || "2000");
 const NPC_READY_DELAY_MS = parseInt(process.env.NPC_READY_DELAY_MS || "500");
-// Host ready countdown after NPCs are ready (0 = instant ready)
 const NPC_HOST_READY_COUNTDOWN_MS = parseInt(process.env.NPC_HOST_READY_COUNTDOWN_MS || "3000");
-
-// CDN room_config.json: quest_result_room_auto_disband_delay = 60000ms
 const QUEST_RESULT_DISBAND_DELAY_MS = parseInt(process.env.QUEST_RESULT_DISBAND_DELAY_MS || "60000");
-
-// Pending room disband timers (for finish → wait-for-return window)
 const roomDisbandTimers = new Map<string, NodeJS.Timeout>();
 
 export function hasRoomClients(roomNumber: string): boolean {
@@ -61,7 +59,6 @@ export function hasRoomClients(roomNumber: string): boolean {
     return !!set && set.size > 0
 }
 
-// Calculate rank level from rankPoint using CDN threshold table
 function getRankLevel(rankPoint: number): number {
     let level = 1
     for (const [lvl, data] of Object.entries(playerRankTable as Record<string, any>)) {
@@ -78,19 +75,19 @@ function getAddress(client: SessionClient): string {
 function addClient(client: SessionClient) {
     const addr = getAddress(client);
     clients.set(addr, client);
-
     let set = roomClients.get(client.roomNumber);
-    if (!set) {
-        set = new Set();
-        roomClients.set(client.roomNumber, set);
-    }
+    if (!set) { set = new Set(); roomClients.set(client.roomNumber, set); }
     set.add(addr);
 }
 
 function removeClient(client: SessionClient) {
     const addr = getAddress(client);
     clients.delete(addr);
-
+    if (client.isBattle) {
+        battleClients.get(client.roomNumber)?.delete(client.connectionId)
+        cidToBattleClient.delete(client.connectionId)
+        sceneReadyClients.get(client.roomNumber)?.delete(client.connectionId)
+    }
     const set = roomClients.get(client.roomNumber);
     if (set) {
         set.delete(addr);
@@ -98,7 +95,6 @@ function removeClient(client: SessionClient) {
         if (remaining === 0) {
             roomClients.delete(client.roomNumber);
             const room = getRoom(client.roomNumber)
-            // Battle client: keep room; if state=1 (after finish), start return window
             if (client.isBattle) {
                 if (room?.raising_state === 1) {
                     console.log(`[SESSION] battle disconnect after finish, room ${client.roomNumber} kept for ${QUEST_RESULT_DISBAND_DELAY_MS / 1000}s return window`)
@@ -119,6 +115,7 @@ function removeClient(client: SessionClient) {
             }
         } else {
             console.log(`[SESSION] client removed: viewer=${client.viewerId} room=${client.roomNumber} remaining=${remaining}`);
+            if (!client.isBattle) checkHostAutoReady(client.roomNumber)
         }
     }
 }
@@ -126,26 +123,69 @@ function removeClient(client: SessionClient) {
 function sendJson(socket: net.Socket, obj: any) {
     const json = JSON.stringify(obj);
     socket.write(json + "\0");
-    const tag = Array.isArray(obj) && Array.isArray(obj[1]) && Array.isArray(obj[1][1]) ? ` [1][${obj[1][0]}][N=${obj[1][1].length}]` : '';
-    // Log full JSON for Start messages to debug F1009
     const isStart = Array.isArray(obj) && obj[1] && obj[1][0] === 5
-    if (isStart) {
-        console.log(`[SESSION] START full: ${json}`)
+    if (isStart) console.log(`[SESSION] START full: ${json}`)
+}
+
+function broadcastToRoom(roomNumber: string, obj: any, exceptViewerId?: number) {
+    const set = roomClients.get(roomNumber)
+    if (!set) return
+    for (const addr of set) {
+        const c = clients.get(addr)
+        if (c && c.viewerId !== exceptViewerId) sendJson(c.socket, obj)
+    }
+}
+
+function relayToBattleRoom(roomNumber: string, fromViewerId: number, obj: any) {
+    const set = battleClients.get(roomNumber)
+    if (!set) return
+    for (const cid of set) {
+        const c = cidToBattleClient.get(cid)
+        if (c && c.viewerId !== fromViewerId && c.isBattle) sendJson(c.socket, obj)
+    }
+}
+
+function getHostClient(roomNumber: string): SessionClient | null {
+    const room = getRoom(roomNumber)
+    if (!room) return null
+    const set = roomClients.get(roomNumber)
+    if (!set) return null
+    for (const addr of set) {
+        const c = clients.get(addr)
+        if (c && c.viewerId === room.host_viewer_id && !c.isBattle) return c
+    }
+    return null
+}
+
+function checkHostAutoReady(roomNumber: string) {
+    const room = getRoom(roomNumber)
+    if (!room || room.is_npc_mode) return
+    const hostClient = getHostClient(roomNumber)
+    if (!hostClient) return
+    const hostMate = hostClient.mates.find(m => m.viewerId === hostClient.viewerId)
+    if (!hostMate) return
+    const nonHostReady = hostClient.mates.every(m =>
+        m.viewerId === hostClient.viewerId || m.state?.[0] === 1
+    )
+    if (nonHostReady && hostClient.mates.length > 1) {
+        if (hostMate.state?.[0] !== 1) {
+            hostMate.state = [1]
+            broadcastToRoom(roomNumber, [1, [2, hostMate.connectionId, [1]]])
+            console.log(`[SESSION] host auto-ready: room=${roomNumber}`)
+        }
     } else {
-        console.log(`[SESSION] sent to ${(socket as any).remoteAddress}:${(socket as any).remotePort}${tag}:`, json.substring(0, 200));
+        if (hostMate.state?.[0] === 1) {
+            hostMate.state = [0]
+            broadcastToRoom(roomNumber, [1, [2, hostMate.connectionId, [0]]])
+            console.log(`[SESSION] host auto-ready cancelled: room=${roomNumber}`)
+        }
     }
 }
 
 function handleMessage(client: SessionClient, data: string) {
     try {
         const msg = JSON.parse(data);
-        console.log(`[SESSION] recv from viewer=${client.viewerId}: ${data.substring(0, 150)}`);
-
-        if (Array.isArray(msg)) {
-            handleClient2Server(client, msg);
-            return;
-        }
-
+        if (Array.isArray(msg)) { handleClient2Server(client, msg); return; }
         console.log(`[SESSION] unknown message:`, data.substring(0, 100));
     } catch (e) {
         console.log(`[SESSION] parse error:`, (e as Error).message, data.substring(0, 100));
@@ -157,29 +197,21 @@ function handleClient2Server(client: SessionClient, msg: any[]) {
     switch (tag) {
         case 0: // Notify
             if (msg.length > 1 && Array.isArray(msg[1])) {
-                const notifyTag = msg[1][0]
-                console.log(`[SESSION] Notify tag=${notifyTag} from viewer=${client.viewerId} ${client.isBattle ? '[BATTLE]' : ''}`)
-                if (client.isBattle) {
-                    handleBattleNotify(client, msg[1]);
-                } else {
-                    handleNotify(client, msg[1]);
-                }
+                if (client.isBattle) handleBattleNotify(client, msg[1]);
+                else handleNotify(client, msg[1]);
             }
             break;
         case 1: // Broadcast
             if (client.isBattle) {
-                // Echo as Measurement to keep battle socket alive (client timeout: 1800 frames/~30s)
+                relayToBattleRoom(client.roomNumber, client.viewerId, [2, [String(client.viewerId), msg[1]]])
                 sendJson(client.socket, [1, [3, 0, 0, Date.now()]]);
-            } else {
-                console.log(`[SESSION] Broadcast from viewer=${client.viewerId}`);
             }
             break;
         case 2: // Send
             if (client.isBattle) {
-                // Echo as Measurement to keep battle socket alive
+                const subTag = msg[1]?.[0]
+                if (subTag !== 2) relayToBattleRoom(client.roomNumber, client.viewerId, [3, [String(client.viewerId), msg[1]]])
                 sendJson(client.socket, [1, [3, 0, 0, Date.now()]]);
-            } else {
-                console.log(`[SESSION] Send from viewer=${client.viewerId}`);
             }
             break;
         default:
@@ -190,16 +222,13 @@ function handleClient2Server(client: SessionClient, msg: any[]) {
 function handleNotify(client: SessionClient, msg: any[]) {
     const tag = msg[0];
     switch (tag) {
-        case 0: // Enter — client sends own party data (official relay mode)
+        case 0: { // Enter
             client.enterData = msg[1];
             console.log(`[SESSION] client ${client.viewerId} entered room ${client.roomNumber}`);
             if (client.mates[0] && client.yourself && msg[1]?.party) {
                 const yours = client.yourself;
                 const ed = msg[1];
-                // Relay the client's OWN party (serialized from OwnedCharacterLogic via getMate())
                 yours.party = ed.party;
-                console.log(`[SESSION] host party from client Enter: chars=${ed.party?.characters?.map((c: any) => c?.[0] === 0 ? c[1]?.id : 'none')?.join(',')}`);
-                // Sync settings from Enter data
                 if (ed.autoplayMode !== undefined) yours.autoplayMode = ed.autoplayMode;
                 if (ed.autoskillMode !== undefined) yours.autoskillMode = ed.autoskillMode;
                 if (ed.autoSpeedLevel !== undefined) yours.autoSpeedLevel = ed.autoSpeedLevel;
@@ -207,108 +236,78 @@ function handleNotify(client: SessionClient, msg: any[]) {
                 if (ed.skillAbilityBehaviorMode !== undefined) yours.skillAbilityBehaviorMode = ed.skillAbilityBehaviorMode;
                 if (ed.dashBehaviorMode !== undefined) yours.dashBehaviorMode = ed.dashBehaviorMode;
                 if (ed.allowHealFromOtherPlayers !== undefined) yours.allowHealFromOtherPlayers = ed.allowHealFromOtherPlayers;
-                console.log(`[SESSION] host synced: auto=${yours.autoplayMode} speed=${yours.autoSpeedLevel} allowHeal=${yours.allowHealFromOtherPlayers}`);
-                // Send Welcome + Mates with client's own party
-                sendJson(client.socket, [1, [0, yours, [yours]]]);
-                setTimeout(() => sendJson(client.socket, [1, [1, [yours]]]), 100);
-                // Auto-join NPCs in NPC-only mode
                 const room = getRoom(client.roomNumber)
-                if (room?.is_npc_mode && client.mates.length === 1) {
-                    setTimeout(() => {
-                        handleEnterComs(client, [{ name: "开心超人" }, { name: "名字真难取" }])
-                    }, 500)
+                const isHost = client.viewerId === room?.host_viewer_id
+                if (room && !isHost) {
+                    const hostClient = getHostClient(client.roomNumber)
+                    if (hostClient && hostClient.mates[0]) {
+                        const hostMate = hostClient.mates[0]
+                        client.mates = [hostMate, yours]
+                        sendJson(client.socket, [1, [0, yours, [yours]]])
+                        setTimeout(() => sendJson(client.socket, [1, [1, client.mates]]), 100)
+                        hostClient.mates = [hostMate, yours]
+                        broadcastToRoom(client.roomNumber, [1, [1, hostClient.mates]], client.viewerId)
+                        room.is_npc_mode = false
+                        console.log(`[SESSION] guest ${client.viewerId} joined room ${client.roomNumber}, mates=${client.mates.length} is_npc_mode=false`)
+                        checkHostAutoReady(client.roomNumber)
+                    }
+                } else {
+                    client.mates = [yours]
+                    console.log(`[SESSION] host party from client Enter: chars=${ed.party?.characters?.map((c: any) => c?.[0] === 0 ? c[1]?.id : 'none')?.join(',')}`);
+                    sendJson(client.socket, [1, [0, yours, [yours]]]);
+                    setTimeout(() => sendJson(client.socket, [1, [1, [yours]]]), 100);
+                    if (room?.is_npc_mode && client.mates.length === 1) {
+                        setTimeout(() => handleEnterComs(client, [{ name: "开心超人" }, { name: "名字真难取" }]), 500)
+                    }
                 }
             }
             break;
-
+        }
         case 4: // Heartbeat
             sendJson(client.socket, [1, [10, String(client.viewerId)]]);
             break;
-
-        case 2: // ChangeParty
-            console.log(`[SESSION] client ${client.viewerId} changed party`);
-            // Rebuild host party from ChangeParty data
+        case 2: { // ChangeParty
             const pd = msg[1]
             if (pd?.party && client.mates[0] && pd.currentPartyId !== undefined) {
-                const host = client.mates[0]
-                // Extract IDs: characters → .id, equipment → .equipmentId, souls → bare number
-                const getOptVal = (arr: any) => (Array.isArray(arr) && arr[0] === 0 && arr[1]) ? arr[1] : null
-                const getCharIds = (arr: any) => Array.isArray(arr) ? arr.map((c: any) => { const v = getOptVal(c); return v?.id ?? null }) : []
-                const getEquipIds = (arr: any) => Array.isArray(arr) ? arr.map((e: any) => { const v = getOptVal(e); return v?.equipmentId ?? null }) : []
-                const getSoulIds = (arr: any) => Array.isArray(arr) ? arr.map((s: any) => { const v = getOptVal(s); return v ?? null }) : []
-                const charIds = getCharIds(pd.party.characters)
-                const unisonIds = getCharIds(pd.party.unison_characters)
-                const equipIds = getEquipIds(pd.party.equipments)
-                const soulIds = getSoulIds(pd.party.abilitySoulIds)
-                const newParty: PlayerParty = {
-                    name: pd.name ?? host.name,
-                    characterIds: [charIds[0] ?? null, charIds[1] ?? null, charIds[2] ?? null],
-                    unisonCharacterIds: [unisonIds[0] ?? null, unisonIds[1] ?? null, unisonIds[2] ?? null],
-                    equipmentIds: [equipIds[0] ?? null, equipIds[1] ?? null, equipIds[2] ?? null],
-                    abilitySoulIds: [soulIds[0] ?? null, soulIds[1] ?? null, soulIds[2] ?? null],
-                    edited: true,
-                    options: { allowOtherPlayersToHealMe: true },
-                    category: PartyCategory.NORMAL
-                }
-                host.party = buildRealParty(client.playerId!, newParty)
-                host.currentPartyId = pd.currentPartyId
-                // Sync party slot to DB + room so re-entry uses correct party
-                if (client.playerId) {
-                    try {
-                        updatePlayerSync({ id: client.playerId, partySlot: pd.currentPartyId })
-                    } catch (e) {
-                        console.log(`[SESSION] failed to sync partySlot to DB:`, (e as Error).message)
+                const mate = client.mates.find(m => m.viewerId === client.viewerId)
+                if (mate) {
+                    mate.party = pd.party
+                    mate.currentPartyId = pd.currentPartyId
+                    if (client.playerId) {
+                        try { updatePlayerSync({ id: client.playerId, partySlot: pd.currentPartyId }) } catch (e) {}
                     }
+                    const room = getRoom(client.roomNumber)
+                    if (room) room.host_party_id = pd.currentPartyId
+                    broadcastToRoom(client.roomNumber, [1, [1, client.mates]])
+                    console.log(`[SESSION] client ${client.viewerId} changed party to slot=${pd.currentPartyId}`)
                 }
-                const room = getRoom(client.roomNumber)
-                if (room) room.host_party_id = pd.currentPartyId
-                const gIdx = Math.floor((pd.currentPartyId - 1) / 10)
-                const s = ((pd.currentPartyId - 1) % 10) + 1
-                console.log(`[SESSION] party changed: partyId=${pd.currentPartyId} group=${gIdx+1} slot=${s} chars=${charIds.filter(Boolean)}`)
-                sendJson(client.socket, [1, [1, client.mates]])
             }
             break;
-
-        case 3: // Ready
-            console.log(`[SESSION] client ${client.viewerId} ready state=`, msg[1])
+        }
+        case 3: { // Ready
             const mate = client.mates.find(m => m.viewerId === client.viewerId)
             if (mate) {
                 mate.state = msg[1] ?? [1]
-                sendJson(client.socket, [1, [2, mate.connectionId, mate.state]])
+                broadcastToRoom(client.roomNumber, [1, [2, mate.connectionId, mate.state]])
                 console.log(`[SESSION] client ${client.viewerId} ready via cid=${mate.connectionId}`)
+                checkHostAutoReady(client.roomNumber)
             }
             break;
-
+        }
         case 1: // Bye
             console.log(`[SESSION] client ${client.viewerId} leaving room ${client.roomNumber}`);
             disconnectClient(client);
             break;
-
-        case 6: // StartBattle (CN index 6)
+        case 6: // StartBattle
             console.log(`[SESSION] client ${client.viewerId} StartBattle, mates=${client.mates.length}`)
-            // Send Start(members) to all mates
-            sendJson(client.socket, [1, [5, client.mates]])
+            battleExpectedCount.set(client.roomNumber, client.mates.length)
+            broadcastToRoom(client.roomNumber, [1, [5, client.mates]])
             break;
-
-        case 5: // Suspend (CN index 5)
-            console.log(`[SESSION] client ${client.viewerId} suspended`);
+        case 5: case 7: case 8: case 9:
             break;
-
-        case 9: // Log
-            console.log(`[SESSION] client ${client.viewerId} log:`, typeof msg[1] === 'string' ? (msg[1] as string).substring(0, 100) : msg[1]);
+        case 10: // EnterComs
+            handleEnterComs(client, msg[1] as any[])
             break;
-
-        case 10: // EnterComs (NPC recruitment)
-            const coms = msg[1] as any[]
-            console.log(`[SESSION] client ${client.viewerId} EnterComs: ${coms.length} NPCs`)
-            handleEnterComs(client, coms)
-            break;
-
-        case 7: // ChangeAutoplayMode
-        case 8: // ChangeAutoStart
-            console.log(`[SESSION] client ${client.viewerId}: notify=${tag}`);
-            break;
-
         default:
             console.log(`[SESSION] unhandled Notify: ${tag}`, JSON.stringify(msg).substring(0, 100));
     }
@@ -319,34 +318,40 @@ function disconnectClient(client: SessionClient) {
     try { client.socket.destroy(); } catch (e) {}
 }
 
-// Battle protocol (cooperation_battle socklet)
-// BattleNotifyMessage: SceneReady=0, Finalize=1, Measurement=2, LineSpeedWarning=3, Heartbeat=4
-// BattleServerMessage: Leave=0, BattleStart=1, Finalized=2, Measurement=3, LineSpeedWarning=4
 function handleBattleNotify(client: SessionClient, msg: any[]) {
     const tag = msg[0];
     switch (tag) {
-        case 0: // SceneReady → respond with BattleStart
-            console.log(`[SESSION] battle SceneReady: room=${client.roomNumber}`)
-            // BattleServer2Client.Message(BattleServerMessage.BattleStart=1)
-            sendJson(client.socket, [1, [1]]);
-            break;
-        case 1: // Finalize → respond with Finalized
-            console.log(`[SESSION] battle Finalize: room=${client.roomNumber}`)
-            // BattleServer2Client.Message(BattleServerMessage.Finalized=2)
-            sendJson(client.socket, [1, [2]]);
-            break;
-        case 2: // Measurement → echo back
-            {
-                const params = msg[1];
-                const frame = params?.[0] ?? 0;
-                const clientTime = params?.[1] ?? 0;
-                const serverTime = Date.now();
-                console.log(`[SESSION] battle Measurement: room=${client.roomNumber} frame=${frame}`)
-                // BattleServer2Client.Message(BattleServerMessage.Measurement=3)
-                sendJson(client.socket, [1, [3, frame, clientTime, serverTime]]);
+        case 0: { // SceneReady → wait for ALL battle clients
+            const expected = battleExpectedCount.get(client.roomNumber) ?? 0
+            if (expected <= 0) break
+            console.log(`[SESSION] battle SceneReady: room=${client.roomNumber} cid=${client.connectionId}`)
+            let readySet = sceneReadyClients.get(client.roomNumber)
+            if (!readySet) { readySet = new Set(); sceneReadyClients.set(client.roomNumber, readySet) }
+            readySet.add(client.connectionId)
+            const connected = battleClients.get(client.roomNumber)?.size ?? 0
+            if (readySet.size >= expected && readySet.size >= connected) {
+                console.log(`[SESSION] battle all SceneReady (${readySet.size}/${expected}): room=${client.roomNumber}, broadcasting BattleStart`)
+                battleExpectedCount.set(client.roomNumber, 0)
+                const set = battleClients.get(client.roomNumber)
+                if (set) for (const cid of set) {
+                    const c = cidToBattleClient.get(cid)
+                    if (c) sendJson(c.socket, [1, [1]])
+                }
             }
             break;
-        case 4: // Heartbeat → echo back a valid BattleServerMessage (client expects BattleServer2Client)
+        }
+        case 1: // Finalize
+            console.log(`[SESSION] battle Finalize: room=${client.roomNumber}`)
+            sendJson(client.socket, [1, [2]]);
+            break;
+        case 2: { // Measurement
+            const params = msg[1];
+            const frame = params?.[0] ?? 0;
+            const clientTime = params?.[1] ?? 0;
+            sendJson(client.socket, [1, [3, frame, clientTime, Date.now()]]);
+            break;
+        }
+        case 4: // Heartbeat
             sendJson(client.socket, [1, [3, 0, 0, Date.now()]]);
             break;
         default:
@@ -355,21 +360,12 @@ function handleBattleNotify(client: SessionClient, msg: any[]) {
 }
 
 function handleEnterComs(client: SessionClient, coms: any[]) {
-    // Mark as NPC room — only triggered by 随机招募 (type 3), not 互相关注/关注者
     const room = getRoom(client.roomNumber)
     if (room) room.is_npc_mode = true
-
-    // Get host mate (already built from real data)
     const host = client.mates[0]
-    if (!host) {
-        console.log(`[SESSION] EnterComs error: no host mate found`)
-        return
-    }
-
-    // Build NPC parties from real DB data — find parties named with "NPC"
+    if (!host) return
     const npcParties: any[] = []
-    const hostParty = host.party  // fallback: use host party if no NPC parties
-
+    const hostParty = host.party
     if (client.playerId) {
         try {
             for (const category of [PartyCategory.NORMAL, PartyCategory.EVENT]) {
@@ -377,80 +373,38 @@ function handleEnterComs(client: SessionClient, coms: any[]) {
                 for (const g of Object.values(groups)) {
                     for (const party of Object.values(g.list)) {
                         if (party.name && party.name.includes("NPC")) {
-                            const brp = buildRealParty(client.playerId, party)
-                            npcParties.push(brp)
-                            console.log(`[SESSION] EnterComs: NPC party "${party.name}" slot=${Object.keys(g.list).find(k => g.list[k] === party)}`)
+                            npcParties.push(buildRealParty(client.playerId, party))
                         }
                     }
                 }
             }
-        } catch (e) {
-            console.log(`[SESSION] EnterComs: failed to read parties:`, (e as Error).message)
-        }
+        } catch (e) {}
     }
-
-    // Build NPC mates
     const npcMates: any[] = []
     for (let i = 0; i < 2; i++) {
         const party = npcParties[i] ?? (npcParties[0] ?? hostParty)
         const comId = i + 1
-        const mate = {
-            viewerId: 900000000 + comId,  // dummy positive IDs for NPC finish validation
-            comId: comId,
-            name: coms[i]?.name ?? `NPC${comId}`,
-            rank: host.rank,  // use host's rank level
-            degreeId: host.degreeId,  // use host's degree
-            playerRoleKind: 99,
-            party: party,
-            connectionId: `${client.roomNumber}-npc-${comId}`,
-            autoplayMode: false,
-            autoskillMode: 1,
-            autoSpeedLevel: 1,
-            autoStart: false,
-            skillAbilityBehaviorMode: 1,
-            dashBehaviorMode: 1,
-            allowHealFromOtherPlayers: true,
-            state: [0],
-            entryTime: Date.now(),
-            isNewbie: false,
-            isHost: false
-        }
-        npcMates.push(mate)
+        npcMates.push({
+            viewerId: 900000000 + comId, comId, name: coms[i]?.name ?? `NPC${comId}`,
+            rank: host.rank, degreeId: host.degreeId, playerRoleKind: 99,
+            party, connectionId: `${client.roomNumber}-npc-${comId}`,
+            autoplayMode: false, autoskillMode: 1, autoSpeedLevel: 1, autoStart: false,
+            skillAbilityBehaviorMode: 1, dashBehaviorMode: 1, allowHealFromOtherPlayers: true,
+            state: [0], entryTime: Date.now(), isNewbie: false, isHost: false
+        })
     }
-
-    console.log(`[SESSION] EnterComs: room=${client.roomNumber} npcParties=${npcParties.length} fromDB`)
-
-    // Update mates: [host, npc1, npc2, ...]
     client.mates = [host, ...npcMates]
     console.log(`[SESSION] EnterComs: room=${client.roomNumber} total mates=${client.mates.length}`)
-    // Room is now full → state=3 (Filled)
     updateRoomState(client.roomNumber, 3)
-
-    // 1. Send Mates update after configured join delay (NPCs join, state=[0] Preparation)
+    setTimeout(() => { sendJson(client.socket, [1, [1, client.mates]]) }, NPC_JOIN_DELAY_MS)
     setTimeout(() => {
-        sendJson(client.socket, [1, [1, client.mates]])
-        console.log(`[SESSION] EnterComs: NPCs joined room=${client.roomNumber} mates=${client.mates.length}`)
-    }, NPC_JOIN_DELAY_MS)
-
-    // 2. NPCs transition to Ready state
-    setTimeout(() => {
-        for (const npc of npcMates) {
-            npc.state = [1]
-            sendJson(client.socket, [1, [2, npc.connectionId, [1]]])
-            console.log(`[SESSION] NPC ready: cid=${npc.connectionId} name=${npc.name}`)
-        }
+        for (const npc of npcMates) { npc.state = [1]; sendJson(client.socket, [1, [2, npc.connectionId, [1]]]) }
     }, NPC_JOIN_DELAY_MS + NPC_READY_DELAY_MS)
-
-    // 3. Host ready after countdown (internal delay, no TCP notifications during countdown)
     const hostReadyAt = NPC_JOIN_DELAY_MS + NPC_READY_DELAY_MS + NPC_HOST_READY_COUNTDOWN_MS
-    if (NPC_HOST_READY_COUNTDOWN_MS > 0) {
-        console.log(`[SESSION] EnterComs: host ready in ${Math.round(NPC_HOST_READY_COUNTDOWN_MS / 1000)}s room=${client.roomNumber}`)
-    }
+    if (NPC_HOST_READY_COUNTDOWN_MS > 0) console.log(`[SESSION] host ready in ${NPC_HOST_READY_COUNTDOWN_MS / 1000}s room=${client.roomNumber}`)
     setTimeout(() => {
-        host.state = [1]
-        client.isReady = true
+        host.state = [1]; client.isReady = true
         sendJson(client.socket, [1, [2, host.connectionId, [1]]])
-        console.log(`[SESSION] host auto-ready: viewer=${client.viewerId} cid=${host.connectionId}`)
     }, hostReadyAt)
 }
 
@@ -459,278 +413,120 @@ export function startSessionServer(): Promise<void> {
         server = net.createServer((socket) => {
             const remoteAddr = `${socket.remoteAddress}:${socket.remotePort}`;
             console.log(`[SESSION] new connection from ${remoteAddr}`);
-
-            let buffer = "";
-            let handledHandshake = false;
-            let sessionClient: SessionClient | null = null;
-
+            let buffer = ""; let handledHandshake = false; let sessionClient: SessionClient | null = null;
             socket.on("data", (chunk: Buffer) => {
                 buffer += chunk.toString("utf-8");
-
                 while (buffer.includes("\0")) {
                     const idx = buffer.indexOf("\0");
                     const data = buffer.substring(0, idx);
                     buffer = buffer.substring(idx + 1);
-
                     if (data.trim().length === 0) continue;
-
                     if (!handledHandshake) {
-                        handleHandshake(socket, data, remoteAddr).then((client) => {
-                            sessionClient = client;
-                            handledHandshake = true;
-                        }).catch((err) => {
-                            console.log(`[SESSION] handshake failed from ${remoteAddr}:`, err);
-                            socket.destroy();
-                        });
+                        handleHandshake(socket, data, remoteAddr).then((cl) => { sessionClient = cl; handledHandshake = true; }).catch((err) => { console.log(`[SESSION] handshake failed:`, err); socket.destroy(); });
                     } else if (sessionClient) {
                         handleMessage(sessionClient, data);
                     }
                 }
             });
-
-            socket.on("close", () => {
-                console.log(`[SESSION] disconnect from ${remoteAddr}`);
-                if (sessionClient) removeClient(sessionClient);
-            });
-
-            socket.on("error", (err) => {
-                console.log(`[SESSION] socket error from ${remoteAddr}:`, err.message);
-                if (sessionClient) removeClient(sessionClient);
-            });
+            socket.on("close", () => { if (sessionClient) removeClient(sessionClient); });
+            socket.on("error", (err) => { if (sessionClient) removeClient(sessionClient); });
         });
-
-        server.listen(SESSION_PORT, SESSION_HOST, () => {
-            console.log(`[SESSION] TCP session server listening on ${SESSION_HOST}:${SESSION_PORT}`);
-            resolve();
-        });
+        server.listen(SESSION_PORT, SESSION_HOST, () => { console.log(`[SESSION] TCP session server listening on ${SESSION_HOST}:${SESSION_PORT}`); resolve(); });
     });
 }
 
 export function stopSessionServer(): Promise<void> {
     return new Promise((resolve) => {
-        if (server) {
-            clients.clear();
-            roomClients.clear();
-            server.close(() => resolve());
-        } else {
-            resolve();
-        }
+        if (server) { clients.clear(); roomClients.clear(); server.close(() => resolve()); } else resolve();
     });
 }
 
 function buildDefaultParty(): any {
-    const emptyChar = [0, {
-        id: 0, evolution_level: 0, exp: 0, over_limit_step: 0,
-        mana_node_ids: [], ex_boost: [1], illustration_settings: [1]
-    }]
-    return {
-        characters: [emptyChar, emptyChar, emptyChar],
-        unison_characters: [emptyChar, emptyChar, emptyChar],
-        equipments: [[1], [1], [1]],
-        abilitySoulIds: [[1], [1], [1]]
-    }
+    const emptyChar = [0, { id: 0, evolution_level: 0, exp: 0, over_limit_step: 0, mana_node_ids: [], ex_boost: [1], illustration_settings: [1] }]
+    return { characters: [emptyChar, emptyChar, emptyChar], unison_characters: [emptyChar, emptyChar, emptyChar], equipments: [[1], [1], [1]], abilitySoulIds: [[1], [1], [1]] }
 }
 
 function buildRealParty(playerId: number, party: PlayerParty): any {
     const buildChar = (charId: number | null) => {
-        if (!charId) return [1]  // Option None
+        if (!charId) return [1]
         const dbChar = getPlayerCharacterSync(playerId, charId)
         if (!dbChar) return [1]
-        // mana_node_ids in IntMap format {"multiplied_id": 0, ...} to match client OwnedCharacterLogic serialization
         const rawNodes = getPlayerCharacterManaNodesSync(playerId, charId)
         const manaNodeMap: Record<string, number> = {}
         for (const id of rawNodes) manaNodeMap[String(id)] = 0
-        // ex boost from DB
         let exBoost: any = [1]
         if (dbChar.exBoost && dbChar.exBoost.abilityIdList && dbChar.exBoost.abilityIdList.length > 0) {
             exBoost = [0, { ability_id_list: dbChar.exBoost.abilityIdList, status_id: dbChar.exBoost.statusId }]
         }
-        // illustration_settings
         let illustration: any = [1]
-        if (dbChar.illustrationSettings && dbChar.illustrationSettings.length > 0) {
-            illustration = [0, dbChar.illustrationSettings]
-        }
-        return [0, {
-            id: charId,
-            evolution_level: dbChar.evolutionLevel,
-            exp: dbChar.exp,
-            over_limit_step: dbChar.overLimitStep,
-            mana_node_ids: manaNodeMap,
-            ex_boost: exBoost,
-            illustration_settings: illustration
-        }]
+        if (dbChar.illustrationSettings && dbChar.illustrationSettings.length > 0) illustration = [0, dbChar.illustrationSettings]
+        return [0, { id: charId, evolution_level: dbChar.evolutionLevel, exp: dbChar.exp, over_limit_step: dbChar.overLimitStep, mana_node_ids: manaNodeMap, ex_boost: exBoost, illustration_settings: illustration }]
     }
-
     const buildEquip = (equipId: number | null) => {
         if (!equipId) return [1]
         const dbEquip = getPlayerEquipmentSync(playerId, equipId)
         if (!dbEquip) return [1]
-        return [0, {
-            equipmentId: equipId,
-            level: dbEquip.level,
-            enhancementLevel: dbEquip.enhancementLevel
-        }]
+        return [0, { equipmentId: equipId, level: dbEquip.level, enhancementLevel: dbEquip.enhancementLevel }]
     }
-
-    return {
-        characters: party.characterIds.map(buildChar),
-        unison_characters: party.unisonCharacterIds.map(buildChar),
-        equipments: party.equipmentIds.map(buildEquip),
-        abilitySoulIds: party.abilitySoulIds.map(id => id ? [0, id] : [1])
-    }
+    return { characters: party.characterIds.map(buildChar), unison_characters: party.unisonCharacterIds.map(buildChar), equipments: party.equipmentIds.map(buildEquip), abilitySoulIds: party.abilitySoulIds.map(id => id ? [0, id] : [1]) }
 }
 
 async function handleHandshake(socket: net.Socket, data: string, remoteAddr: string): Promise<SessionClient> {
     console.log(`[SESSION] handshake from ${remoteAddr}:`, data);
-
     let handshake: any;
-    try { handshake = JSON.parse(data); } catch {
-        throw new Error("Invalid handshake JSON");
-    }
+    try { handshake = JSON.parse(data); } catch { throw new Error("Invalid handshake JSON"); }
 
-    // Battle socklet: accept and handle basic messages (no viewerId needed)
     if (handshake.socklet === "cooperation_battle") {
-        const battleRoomNumber = handshake.roomNumber
-        const connectionId = handshake.connectionId
-        console.log(`[SESSION] battle handshake: room=${battleRoomNumber} cid=${connectionId}`)
+        const battleRoomNumber = handshake.roomNumber, connectionId = handshake.connectionId
         if (!battleRoomNumber) throw new Error("Missing roomNumber for battle handshake")
-
-        // Accept battle connection with minimal client
-        const battleClient: SessionClient = {
-            socket,
-            viewerId: 0,
-            roomNumber: String(battleRoomNumber),
-            isReady: false,
-            buffer: "",
-            mates: [],
-            enterData: null,
-            playerId: null,
-            isBattle: true
-        }
+        const battleClient: SessionClient = { socket, viewerId: 0, roomNumber: String(battleRoomNumber), connectionId: String(connectionId), isReady: false, buffer: "", mates: [], enterData: null, playerId: null, isBattle: true }
         addClient(battleClient)
+        let btSet = battleClients.get(String(battleRoomNumber)); if (!btSet) { btSet = new Set(); battleClients.set(String(battleRoomNumber), btSet) }
+        btSet.add(String(connectionId))
+        cidToBattleClient.set(String(connectionId), battleClient)
         sendJson(socket, [0, battleRoomNumber, ""])
         return battleClient
     }
 
-    const viewerId = handshake.viewerId;
-    const roomNumber = handshake.roomNumber;
+    const viewerId = handshake.viewerId, roomNumber = handshake.roomNumber;
     if (!viewerId || !roomNumber) throw new Error("Missing viewerId or roomNumber");
-
-    // Look up player data from DB
-    let playerName = `Player${viewerId}`;
-    let playerRank = 1;
-    let playerDegreeId = 1;
-    let playerRoleKind = 1;
-    let playerIsNewbie = false;
-    let playerPartySlot = 1;
-    let actualPlayerId: number | null = null;
-
+    let playerName = `Player${viewerId}`, playerRank = 1, playerDegreeId = 1, playerRoleKind = 1, playerIsNewbie = false, playerPartySlot = 1, actualPlayerId: number | null = null;
     try {
         const session = await getSession(String(viewerId));
         if (session) {
             const playerIds = await getAccountPlayers(session.accountId);
             if (playerIds && playerIds.length > 0 && !isNaN(playerIds[0])) {
                 const player = getPlayerSync(playerIds[0]);
-                if (player) {
-                    playerName = player.name || playerName;
-					playerRank = getRankLevel(player.rankPoint || 0);
-                    playerDegreeId = player.degreeId || playerDegreeId;
-                    playerRoleKind = player.role || playerRoleKind;
-                    playerIsNewbie = !!player.tutorialStep;
-                    playerPartySlot = player.partySlot || 1;
-                    actualPlayerId = playerIds[0];
-                }
+                if (player) { playerName = player.name || playerName; playerRank = getRankLevel(player.rankPoint || 0); playerDegreeId = player.degreeId || playerDegreeId; playerRoleKind = player.role || playerRoleKind; playerIsNewbie = !!player.tutorialStep; playerPartySlot = player.partySlot || 1; actualPlayerId = playerIds[0]; }
             }
         }
-    } catch (e) {
-        console.log(`[SESSION] failed to read player data for viewer=${viewerId}:`, (e as Error).message);
-    }
+    } catch (e) { console.log(`[SESSION] failed to read player data for viewer=${viewerId}:`, (e as Error).message); }
 
-    const client: SessionClient = {
-        socket,
-        viewerId: Number(viewerId),
-        roomNumber: String(roomNumber),
-        isReady: false,
-        buffer: "",
-        mates: [],
-        enterData: null,
-        playerId: actualPlayerId,
-        isBattle: false
-    };
-
+    const isHost = Number(viewerId) === getRoom(String(roomNumber))?.host_viewer_id
+    const connectionId = isHost ? `${roomNumber}-host` : `${roomNumber}-${viewerId}`;
+    const client: SessionClient = { socket, viewerId: Number(viewerId), roomNumber: String(roomNumber), connectionId, isReady: false, buffer: "", mates: [], enterData: null, playerId: actualPlayerId, isBattle: false };
     const isReconnect = (roomClients.get(String(roomNumber))?.size ?? 0) > 0
-    // Cancel any pending return-window disband timer
     const existingTimer = roomDisbandTimers.get(String(roomNumber))
-    if (existingTimer) {
-        clearTimeout(existingTimer)
-        roomDisbandTimers.delete(String(roomNumber))
-        console.log(`[SESSION] room ${roomNumber} return window cancelled, new client connecting`)
-    }
+    if (existingTimer) { clearTimeout(existingTimer); roomDisbandTimers.delete(String(roomNumber)); console.log(`[SESSION] room ${roomNumber} return window cancelled, new client connecting`) }
     addClient(client);
     console.log(`[SESSION] client added: viewer=${viewerId} room=${roomNumber} total=${roomClients.get(roomNumber)?.size} ${isReconnect ? '[RECONNECT]' : '[NEW]'}`);
+    console.log(`[SESSION] handshake OK viewer=${viewerId} room=${roomNumber} name=${playerName} ${isHost ? '[HOST]' : '[GUEST]'}`)
+    sendJson(socket, [0, connectionId, roomNumber]);
+    if (isHost) updateRoomState(String(roomNumber), 1);
 
-    const hostConnectionId = `${roomNumber}-host`;
-
-    // Send Accept (roomId, roomNumber) — client uses params[0] as myConnectionId
-    console.log(`[SESSION] handshake OK viewer=${viewerId} room=${roomNumber} name=${playerName}`)
-    sendJson(socket, [0, hostConnectionId, roomNumber]);
-    // Host entered TCP room → raising_state 2→1 (Ready for guests)
-    updateRoomState(String(roomNumber), 1);
-
-    // Build host party from real DB data (use room host_party_id from create_room, fallback to DB playerPartySlot)
-    // party_id is a global PartyId: (groupIndex * 10 + slot), where groupIndex is 0-based
     let hostParty = buildDefaultParty()
     const rawPartyId = getRoom(roomNumber)?.host_party_id ?? playerPartySlot
-    const groupIndex = Math.floor((rawPartyId - 1) / 10)
-    const slot = ((rawPartyId - 1) % 10) + 1
-    console.log(`[SESSION] host party: player=${actualPlayerId} partyId=${rawPartyId} groupIdx=${groupIndex} slot=${slot}`)
     if (actualPlayerId) {
         try {
             const partyGroups = getPlayerPartyGroupListSync(actualPlayerId, PartyCategory.NORMAL)
+            const groupIndex = Math.floor((rawPartyId - 1) / 10), slot = ((rawPartyId - 1) % 10) + 1
             const group = partyGroups[groupIndex + 1] ?? partyGroups[Object.keys(partyGroups)[0]]
-            if (group) {
-                const party = group.list[slot] ?? group.list[Object.keys(group.list)[0]]
-                if (party) {
-                    hostParty = buildRealParty(actualPlayerId, party)
-                    console.log(`[SESSION] host party: loaded group=${groupIndex+1} slot=${slot} chars=${party.characterIds.filter(Boolean).length}`)
-                } else {
-                    console.log(`[SESSION] host party: NO party found for group=${groupIndex+1} slot=${slot}`)
-                }
-            }
-        } catch (e) {
-            console.log(`[SESSION] failed to read party for player=${actualPlayerId}:`, (e as Error).message)
-        }
+            if (group) { const party = group.list[slot] ?? group.list[Object.keys(group.list)[0]]; if (party) hostParty = buildRealParty(actualPlayerId, party) }
+        } catch (e) {}
     }
-    console.log(`[SESSION] host party chars: ${JSON.stringify(hostParty.characters.map((c: any) => c[0] === 0 ? c[1].id : 'none'))}`)
-
-    // Build yourself from real DB data
-    const yourself = {
-        viewerId: Number(viewerId),
-        name: playerName,
-        playerRoleKind,
-        rank: playerRank,
-        degreeId: playerDegreeId,
-        party: hostParty,
-        connectionId: hostConnectionId,
-        autoplayMode: false,
-        autoskillMode: 1,
-        autoSpeedLevel: 1,
-        autoStart: false,
-        skillAbilityBehaviorMode: 1,
-        dashBehaviorMode: 1,
-        allowHealFromOtherPlayers: true,
-        state: [0],
-        entryTime: Date.now(),
-        isNewbie: playerIsNewbie,
-        isHost: true,
-        currentPartyId: playerPartySlot
-    };
-
-    // Welcome sent after client's Enter (official relay mode)
-    // self party will be replaced with client's own party data from Enter
+    const yourself = { viewerId: Number(viewerId), name: playerName, playerRoleKind, rank: playerRank, degreeId: playerDegreeId, party: hostParty, connectionId, autoplayMode: false, autoskillMode: 1, autoSpeedLevel: 1, autoStart: false, skillAbilityBehaviorMode: 1, dashBehaviorMode: 1, allowHealFromOtherPlayers: true, state: [0], entryTime: Date.now(), isNewbie: playerIsNewbie, isHost, currentPartyId: playerPartySlot };
     client.yourself = yourself;
-    client.mates = [yourself]; // for future StartBattle
-
+    client.mates = [yourself];
     return client;
 }
 
