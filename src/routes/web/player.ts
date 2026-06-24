@@ -151,6 +151,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         // Resource fields
         const resourceFields = [
+            { key: 'expPool', label: '经验池', value: player.expPool },
             { key: 'freeVmoney', label: '星导石(免费)', value: player.freeVmoney },
             { key: 'vmoney', label: '星导石(付费)', value: player.vmoney },
             { key: 'freeMana', label: 'Mana(免费)', value: player.freeMana },
@@ -247,9 +248,12 @@ const routes = async (fastify: FastifyInstance) => {
 
         // Account settings
         html = html.replace("{{tutorialStep}}", String(player.tutorialStep ?? ''));
+        html = html.replace("{{tutorialSkipFlag}}", player.tutorialSkipFlag ? 'checked' : '');
         html = html.replace("{{auto3x}}", player.enableAuto3x ? 'checked' : '');
         html = html.replace("{{birth}}", String(player.birth));
         html = html.replace("{{degreeId}}", String(player.degreeId));
+        html = html.replace("{{leaderCharacterId}}", String(player.leaderCharacterId));
+        html = html.replace("{{timeOffset}}", String(player.timeOffset ?? ''));
 
         reply.header("content-type", "text/html; charset=utf-8")
         reply.send(html)

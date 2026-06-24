@@ -107,8 +107,18 @@ const routes = async (fastify: FastifyInstance) => {
         if (!result.ok) return reply.status(400).send({ error: result.error })
         const value = result.value
 
+        // Auto-sync related time fields
+        const extra: Record<string, any> = {}
+        if (field === 'stamina') {
+            extra.staminaHealTime = new Date()
+        }
+        if (field === 'expPool') {
+            extra.expPooledTime = new Date()
+        }
+
         try {
-            updatePlayerSync({ id: playerId, [field]: value })
+            const updateData = { id: playerId, [field]: value, ...extra }
+            updatePlayerSync(updateData)
             return reply.status(200).send({ ok: true, field, value })
         } catch (e: any) {
             return reply.status(500).send({ error: e.message })

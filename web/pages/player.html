@@ -167,9 +167,17 @@
                         <input class="edit-field bg-surface-container rounded border border-outline-variant p-1 w-full" value="{{degreeId}}" data-field="degreeId"></div>
                     <div><label class="text-xs text-on-surface-variant">tutorial_step</label>
                         <input class="edit-field bg-surface-container rounded border border-outline-variant p-1 w-full" value="{{tutorialStep}}" data-field="tutorialStep"></div>
+                    <div><label class="text-xs text-on-surface-variant">leaderCharacterId</label>
+                        <input class="edit-field bg-surface-container rounded border border-outline-variant p-1 w-full" value="{{leaderCharacterId}}" data-field="leaderCharacterId"></div>
+                    <div><label class="text-xs text-on-surface-variant">timeOffset(ms)</label>
+                        <input class="edit-field bg-surface-container rounded border border-outline-variant p-1 w-full" value="{{timeOffset}}" data-field="timeOffset"></div>
                     <div class="flex items-center gap-2 pt-4">
                         <input id="auto3x" type="checkbox" {{auto3x}} class="edit-field" data-field="enableAuto3x">
                         <label class="text-sm" for="auto3x">3x加速</label>
+                    </div>
+                    <div class="flex items-center gap-2 pt-4">
+                        <input id="skipFlag" type="checkbox" {{tutorialSkipFlag}} class="edit-field" data-field="tutorialSkipFlag">
+                        <label class="text-sm" for="skipFlag">跳过教程</label>
                     </div>
                 </div>
             </section>
