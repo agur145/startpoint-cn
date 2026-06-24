@@ -61,21 +61,8 @@ document.addEventListener('click', async function (e) {
 
     try {
         switch (action) {
-            case 'addChar': {
-                const code = document.getElementById('charCode').value;
-                await api('POST', '/character', { code });
-                location.reload();
-                break;
-            }
             case 'delChar': {
                 await api('DELETE', '/character/' + btn.dataset.code);
-                location.reload();
-                break;
-            }
-            case 'addItem': {
-                const id = document.getElementById('itemId').value;
-                const count = document.getElementById('itemCount').value;
-                await api('POST', '/item', { id, count });
                 location.reload();
                 break;
             }
@@ -118,9 +105,22 @@ document.addEventListener('click', async function (e) {
             }
         }
     } catch (err) {
-        const el = (action === 'addChar') ? document.getElementById('charMsg') :
-                   (action === 'addItem') ? document.getElementById('itemMsg') : null;
-        if (el) { el.textContent = err.message; }
-        else { showToast(err.message, 'error'); }
+        showToast(err.message, 'error');
     }
 });
+
+// Item search filter
+(function() {
+    const input = document.getElementById('itemSearch');
+    if (!input) return;
+    input.addEventListener('input', function() {
+        const q = this.value.toLowerCase().trim();
+        const table = this.closest('section').querySelector('tbody');
+        if (!table) return;
+        const rows = table.querySelectorAll('tr');
+        for (const row of rows) {
+            const text = row.textContent.toLowerCase();
+            row.style.display = q === '' || text.includes(q) ? '' : 'none';
+        }
+    });
+})();

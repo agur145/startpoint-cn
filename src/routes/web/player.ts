@@ -5,6 +5,7 @@ import { staticPagesDir } from ".";
 import { getAllPlayersSync, getPlayerSync, getPlayerCharactersSync, getPlayerItemsSync, getPlayerEquipmentListSync, getAllAccountsSync, getAccountPlayersSync, getPlayerQuestProgressSync, getPlayerDrawnQuestsSync } from "../../data/wdfpData";
 import { getActivePlayerId, getSelectedAccountId, getAccountDefaultPlayer } from "../../data/activeAccount";
 import characterTable from "../../../docs/generated/character_table.json";
+import itemLookup from "../../../assets/item_lookup.json";
 
 interface CharInfo { name: string; title: string; rarity: string; element: string }
 const charLookup: Record<number, CharInfo> = {}
@@ -208,13 +209,15 @@ const routes = async (fastify: FastifyInstance) => {
         const items = getPlayerItemsSync(parsedPlayerId);
         let itemsHtml = '';
         for (const [itemId, count] of Object.entries(items)) {
+            const itemName = (itemLookup as Record<string, string>)[itemId] || '-';
             itemsHtml += `<tr>
-                <td class="p-1">${itemId}</td>
+                <td class="p-1">${htmlEscape(itemName)}</td>
+                <td class="p-1 text-xs text-on-surface-variant">${itemId}</td>
                 <td class="p-1">${count}</td>
                 <td class="p-1"><button class="js-action text-xs text-error border border-error rounded-full px-2" data-action="delItem" data-item-id="${itemId}">✕</button></td>
             </tr>`;
         }
-        html = html.replace("{{itemRows}}", itemsHtml || '<tr><td colspan="3" class="text-on-surface-variant p-2">暂无道具</td></tr>');
+        html = html.replace("{{itemRows}}", itemsHtml || '<tr><td colspan="4" class="text-on-surface-variant p-2">暂无道具</td></tr>');
 
         // Equipment
         const equipment = getPlayerEquipmentListSync(parsedPlayerId);
