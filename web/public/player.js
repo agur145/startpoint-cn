@@ -53,8 +53,7 @@ document.addEventListener('click', async function (e) {
         delAllQuestProgress: '删除全部关卡进度?',
         delDrawnQuest: '删除抽选关卡 category=' + btn.dataset.category + ' quest=' + btn.dataset.questId + '?',
         delAllDrawnQuests: '删除全部抽选关卡?',
-        resetChallenge: '将所有每日挑战次数恢复至 CDN 默认值？',
-        clearMailbox: '清空该存档的全部邮件？此操作不可撤销（用于误发非法邮件导致游戏崩溃时恢复）。'
+        resetChallenge: '将所有每日挑战次数恢复至 CDN 默认值？'
     };
 
     if (confirmMap[action] && !confirm(confirmMap[action])) return;
@@ -94,12 +93,6 @@ document.addEventListener('click', async function (e) {
             case 'resetChallenge': {
                 await api('POST', '/reset_challenge');
                 alert('已恢复');
-                location.reload();
-                break;
-            }
-            case 'clearMailbox': {
-                const d = await api('DELETE', '/mail');
-                alert('已清空 ' + (d.deleted ?? 0) + ' 封邮件');
                 location.reload();
                 break;
             }
