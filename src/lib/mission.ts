@@ -6,6 +6,14 @@ import degreeRewards from "../../assets/mission_degree_reward.json";
 import collectItemRewards from "../../assets/mission_collect_item_reward.json";
 import weeklyRewards from "../../assets/mission_weekly_reward.json";
 
+// Mission definition tables — for pattern → mission_id lookup
+import regularDefs from "../../assets/mission_regular.json";
+import dailyDefs from "../../assets/mission_daily.json";
+import eventDefs from "../../assets/mission_event.json";
+import degreeDefs from "../../assets/mission_degree.json";
+import collectItemDefs from "../../assets/mission_collect_item.json";
+import weeklyDefs from "../../assets/mission_weekly_def.json";
+
 // Category mapping (client API category → reward table + stage data)
 // 1=Regular, 2=Daily, 3=Event, 4=CollectItemEvent, 5=Degree
 // 10=Weekly (CN-specific patch) — trial mapping
@@ -39,6 +47,32 @@ const missionStageLookup: Record<number, Record<string, MissionStage[]>> = {
     5: buildLookup(degreeRewards as any),
     10: buildLookup(weeklyRewards as any),  // CN-specific: Weekly missions
 };
+
+// Pattern → mission_id reverse index (for update_mission_progress)
+interface PatternMatch { missionId: number; category: number }
+const patternIndex: Record<string, PatternMatch[]> = {};
+
+function indexPatterns(defs: Record<string, any>, category: number) {
+    for (const [missionId, rows] of Object.entries(defs)) {
+        const row = (rows as any[])[0];
+        if (!row || !Array.isArray(row)) continue;
+        const pattern = String(row[0]);
+        if (!pattern || pattern === '(None)') continue;
+        if (!patternIndex[pattern]) patternIndex[pattern] = [];
+        patternIndex[pattern].push({ missionId: parseInt(missionId), category });
+    }
+}
+
+indexPatterns(regularDefs as any, 1);
+indexPatterns(dailyDefs as any, 2);
+indexPatterns(eventDefs as any, 3);
+indexPatterns(collectItemDefs as any, 4);
+indexPatterns(degreeDefs as any, 5);
+indexPatterns(weeklyDefs as any, 10);
+
+export function getMissionsByPattern(pattern: string): PatternMatch[] {
+    return patternIndex[pattern] || [];
+}
 
 /**
  * Get all mission IDs (as integers) for a given category,

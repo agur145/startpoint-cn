@@ -3,7 +3,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerActiveMissionsSync, getSession, updatePlayerActiveMissionSync, updatePlayerActiveMissionStageSync } from "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
-import { getCurrentStage, getMissionIdsByCategory } from "../../lib/mission";
+import { getCurrentStage, getMissionIdsByCategory, getMissionsByPattern } from "../../lib/mission";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 
 interface GetMissionProgressBody {
@@ -98,11 +98,19 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No players bound to account."
         })
 
-        // This endpoint is fire-and-forget — the client sends accumulated counter values.
-        // We store them in active missions DB for get_mission_progress to use.
+        // Update mission progress counters in DB (fire-and-forget from client)
         const missionParams = body.mission_param_list || []
+        let updatedCount = 0
 
-        console.log(`[MISSION] update_progress viewer=${viewerId} params=${missionParams.length}`)
+        for (const param of missionParams) {
+            const matches = getMissionsByPattern(param.mission_pattern)
+            for (const m of matches) {
+                updatePlayerActiveMissionSync(playerId, m.missionId, param.progress_value)
+                updatedCount++
+            }
+        }
+
+        console.log(`[MISSION] update_progress viewer=${viewerId} params=${missionParams.length} db_updates=${updatedCount}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
