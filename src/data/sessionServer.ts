@@ -158,8 +158,6 @@ function broadcastToRoom(roomNumber: string, obj: any, exceptViewerId?: number) 
 
 // Notify all room TCP clients that the room is disbanded
 export function notifyRoomDisbanded(roomNumber: string) {
-    const set = roomClients.get(roomNumber)
-    console.log(`[SESSION] notifyRoomDisbanded: room=${roomNumber} tcp_clients=${set?.size ?? 0}`)
     broadcastToRoom(roomNumber, [1, [6, "disbanded"]])
 }
 
@@ -167,7 +165,6 @@ export function notifyRoomDisbanded(roomNumber: string) {
 export function notifyBattleClients(roomNumber: string, msg: any) {
     const set = battleClients.get(roomNumber)
     if (!set) return
-    console.log(`[SESSION] notifyBattleClients: room=${roomNumber} clients=${set.size}`)
     for (const cid of set) {
         const c = cidToBattleClient.get(cid)
         if (c) sendJson(c.socket, msg)
@@ -177,7 +174,6 @@ export function notifyBattleClients(roomNumber: string, msg: any) {
 function relayToBattleRoom(roomNumber: string, fromCid: string, obj: any) {
     const set = battleClients.get(roomNumber)
     if (!set) return
-    console.log(`[SESSION] relay tag=${obj[0]} room=${roomNumber} from=${fromCid} targets=${set.size}`)
     for (const cid of set) {
         if (cid !== fromCid) {
             const c = cidToBattleClient.get(cid)
@@ -249,7 +245,6 @@ function handleClient2Server(client: SessionClient, msg: any[]) {
             break;
         case 1: // Broadcast → relay as BattleServer2Client.Messages(2, senderId, array)
             if (client.isBattle) {
-                console.log(`[SESSION] battle Broadcast from cid=${client.connectionId} len=${JSON.stringify(msg[1])?.length}`)
                 relayToBattleRoom(client.roomNumber, client.connectionId, [2, client.connectionId, msg[1]])
                 sendJson(client.socket, [1, [3, 0, 0, Date.now()]]);
             }
@@ -258,7 +253,6 @@ function handleClient2Server(client: SessionClient, msg: any[]) {
             if (client.isBattle) {
                 const sendMsg = msg[2]
                 if (sendMsg) {
-                    console.log(`[SESSION] battle Send from cid=${client.connectionId}`)
                     relayToBattleRoom(client.roomNumber, client.connectionId, [3, client.connectionId, sendMsg])
                 }
                 sendJson(client.socket, [1, [3, 0, 0, Date.now()]]);
@@ -365,8 +359,8 @@ function handleNotify(client: SessionClient, msg: any[]) {
             const mate = client.mates.find(m => m.viewerId === client.viewerId)
             if (mate) {
                 mate.state = msg[1] ?? [1]
-                console.log(`[SESSION] client ${client.viewerId} ready via cid=${mate.connectionId} state=`, msg[1])
                 broadcastToRoom(client.roomNumber, [1, [2, mate.connectionId, mate.state]])
+                console.log(`[SESSION] client ${client.viewerId} ready via cid=${mate.connectionId}`)
                 checkHostAutoReady(client.roomNumber)
             }
             break;
@@ -422,7 +416,6 @@ function handleBattleNotify(client: SessionClient, msg: any[]) {
                 const set = battleClients.get(client.roomNumber)
                 if (set) for (const cid of set) {
                     const c = cidToBattleClient.get(cid)
-                    console.log(`[SESSION] BattleStart → cid=${cid} found=${!!c}`)
                     if (c) sendJson(c.socket, [1, [1]])
                 }
             }
