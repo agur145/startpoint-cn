@@ -5,6 +5,7 @@ import { getPlayerActiveMissionsSync, getSession, getPlayerSync, updatePlayerAct
 import { generateDataHeaders } from "../../utils";
 import { getCurrentStage, getMissionIdsByCategory, getMissionsByPattern, getTargetDegree } from "../../lib/mission";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
+import { getRankDegree } from "../../lib/stamina";
 
 interface GetMissionProgressBody {
     api_count: number,
@@ -65,7 +66,8 @@ const routes = async (fastify: FastifyInstance) => {
                 if (category === 5) {
                     const targetDeg = getTargetDegree(missionId)
                     if (targetDeg !== undefined) {
-                        progress = player.degreeId >= targetDeg ? 1 : 0
+                        const rkDegree = getRankDegree(player.rankPoint)
+                        progress = rkDegree >= targetDeg ? 1 : 0
                     }
                 }
                 const stage = getCurrentStage(category, missionId, progress)
