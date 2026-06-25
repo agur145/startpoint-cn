@@ -57,6 +57,7 @@ export default function init(
         free_mana INTEGER NOT NULL,
         paid_mana INTEGER NOT NULL,
         enable_auto_3x INTEGER NOT NULL,
+        total_stamina_used INTEGER NOT NULL DEFAULT 0,
         account_id INTEGER NOT NULL,
         tutorial_step INTEGER,
         tutorial_skip_flag INTEGER,
@@ -67,6 +68,9 @@ export default function init(
 
     // migration: add tutorial_gacha_character_id to existing tables
     try { database.prepare(`ALTER TABLE players ADD COLUMN tutorial_gacha_character_id INTEGER DEFAULT NULL`).run(); } catch { /* column already exists */ }
+
+    // migration: add total_stamina_used for mission progress tracking
+    try { database.prepare(`ALTER TABLE players ADD COLUMN total_stamina_used INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
 
     database.prepare(`CREATE TABLE IF NOT EXISTS device_bindings (
         device_id INTEGER PRIMARY KEY,

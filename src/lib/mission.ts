@@ -52,6 +52,7 @@ const missionStageLookup: Record<number, Record<string, MissionStage[]>> = {
 // Pattern → mission_id reverse index (for update_mission_progress)
 interface PatternMatch { missionId: number; category: number }
 const patternIndex: Record<string, PatternMatch[]> = {};
+const missionPatternLookup: Record<string, string> = {}; // "category_missionId" → pattern
 
 function indexPatterns(defs: Record<string, any>, category: number) {
     for (const [missionId, rows] of Object.entries(defs)) {
@@ -61,6 +62,7 @@ function indexPatterns(defs: Record<string, any>, category: number) {
         if (!pattern || pattern === '(None)') continue;
         if (!patternIndex[pattern]) patternIndex[pattern] = [];
         patternIndex[pattern].push({ missionId: parseInt(missionId), category });
+        missionPatternLookup[`${category}_${missionId}`] = pattern;
     }
 }
 
@@ -86,6 +88,30 @@ const degreeTargetMap: Record<number, number> = {};
 
 export function getTargetDegree(missionId: number): number | undefined {
     return degreeTargetMap[missionId];
+}
+
+// Server-computable mission patterns (aligned with official server behavior)
+// Maps pattern → DB calculation reference
+const computablePatterns: Set<string> = new Set([
+    'single_battle_play',
+    'single_battle_clear_count',
+    'rank_ss',
+    'rank_s',
+    'rank_a',
+    'rank_b',
+    'used_stamina_count',
+]);
+
+export function isComputablePattern(pattern: string): boolean {
+    return computablePatterns.has(pattern);
+}
+
+/**
+ * Get the mission pattern for a given mission in a category.
+ * Returns empty string if not found.
+ */
+export function getMissionPattern(category: number, missionId: number): string {
+    return missionPatternLookup[`${category}_${missionId}`] || '';
 }
 
 export function getMissionsByPattern(pattern: string): PatternMatch[] {

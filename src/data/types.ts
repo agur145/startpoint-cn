@@ -479,6 +479,7 @@ export interface RawPlayer {
     free_mana: number
     paid_mana: number
     enable_auto_3x: number
+    total_stamina_used: number
     tutorial_step: number | null
     tutorial_skip_flag: number | null
     tutorial_gacha_character_id: number | null
@@ -510,6 +511,7 @@ export interface Player {
     freeMana: number
     paidMana: number
     enableAuto3x: boolean
+    totalStaminaUsed: number
     tutorialStep: number | null
     tutorialSkipFlag: boolean | null
     tutorialGachaCharacterId: number | null

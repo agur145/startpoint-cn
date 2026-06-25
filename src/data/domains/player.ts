@@ -319,6 +319,7 @@ function buildPlayer(
         freeMana: raw.free_mana,
         paidMana: raw.paid_mana,
         enableAuto3x: deserializeBoolean(raw.enable_auto_3x),
+        totalStaminaUsed: raw.total_stamina_used || 0,
         tutorialStep: raw.tutorial_step,
         tutorialSkipFlag: raw.tutorial_skip_flag === null ? null : deserializeBoolean(raw.tutorial_skip_flag),
         tutorialGachaCharacterId: raw.tutorial_gacha_character_id,
@@ -402,7 +403,8 @@ export function insertPlayerSync(
         accountId,
         player.tutorialStep === null ? null : player.tutorialStep,
         player.tutorialSkipFlag === null ? null : serializeBoolean(player.tutorialSkipFlag),
-        player.tutorialGachaCharacterId === undefined ? null : player.tutorialGachaCharacterId
+        player.tutorialGachaCharacterId === undefined ? null : player.tutorialGachaCharacterId,
+        player.totalStaminaUsed ?? 0
     ]
 
     if (playerIdGiven)
@@ -412,9 +414,9 @@ export function insertPlayerSync(
     INSERT INTO players (stamina, stamina_heal_time, boost_point, boss_boost_point,
         transition_state, role, name, last_login_time, comment, vmoney, free_vmoney,
         rank_point, star_crumb, bond_token, exp_pool, exp_pooled_time, leader_character_id,
-        party_slot, degree_id, birth, free_mana, paid_mana, enable_auto_3x, account_id, 
+        party_slot, degree_id, birth, free_mana, paid_mana, enable_auto_3x, total_stamina_used, account_id, 
         tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id${playerIdGiven ? ', id' : ''})
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${playerIdGiven ? ', ?' : ''})
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${playerIdGiven ? ', ?' : ''})
     `).run(values)
 
     // return
@@ -1030,6 +1032,7 @@ export function updatePlayerSync(
         'freeMana': 'free_mana',
         'paidMana': 'paid_mana',
         'enableAuto3x': 'enable_auto_3x',
+        'totalStaminaUsed': 'total_stamina_used',
         'tutorialStep': 'tutorial_step',
         'tutorialSkipFlag': 'tutorial_skip_flag',
         'tutorialGachaCharacterId': 'tutorial_gacha_character_id'

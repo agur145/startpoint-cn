@@ -1,9 +1,9 @@
 // Mission progress endpoints — get and update
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getPlayerActiveMissionsSync, getSession, getPlayerSync, updatePlayerActiveMissionSync } from "../../data/wdfpData";
+import { getPlayerActiveMissionsSync, getSession, getPlayerSync, getPlayerQuestProgressSync, updatePlayerActiveMissionSync } from "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
-import { getCurrentStage, getMissionIdsByCategory, getMissionsByPattern, getTargetDegree } from "../../lib/mission";
+import { getCurrentStage, getMissionIdsByCategory, getMissionsByPattern, getTargetDegree, getMissionPattern, isComputablePattern } from "../../lib/mission";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getRankDegree } from "../../lib/stamina";
 
@@ -56,19 +56,60 @@ const routes = async (fastify: FastifyInstance) => {
         const activeMissions = getPlayerActiveMissionsSync(playerId)
         const missionProgressList: any[] = []
 
+        // Pre-compute quest clear counts for server-side progress
+        const questProgress = getPlayerQuestProgressSync(playerId)
+        let totalQuestClears = 0
+        let ssClears = 0; let sClears = 0; let aClears = 0; let bClears = 0
+        for (const [section, quests] of Object.entries(questProgress)) {
+            for (const qp of quests) {
+                if (qp.finished) {
+                    totalQuestClears++
+                    if (qp.clearRank === 6) ssClears++
+                    else if (qp.clearRank === 5) sClears++
+                    else if (qp.clearRank === 4) aClears++
+                    else if (qp.clearRank === 3) bClears++
+                }
+            }
+        }
+
+        const rankCounts: Record<string, number> = {
+            'rank_ss': ssClears,
+            'rank_s': sClears,
+            'rank_a': aClears,
+            'rank_b': bClears,
+        }
+
         // Iterate CDN reward tables for each requested category
         for (const category of requestCategories) {
             const allIds = getMissionIdsByCategory(category)
             for (const missionId of allIds) {
                 const mission = activeMissions[String(missionId)]
-                // Compute server-side progress for degree missions
+                // Compute server-side progress (official server behavior)
                 let progress: number = mission?.progress ?? 0
+                let computed = false
+
                 if (category === 5) {
                     const targetDeg = getTargetDegree(missionId)
                     if (targetDeg !== undefined) {
                         progress = getRankDegree(player.rankPoint)
+                        computed = true
                     }
                 }
+
+                // Computable patterns for categories 1,2 (Regular + Daily)
+                if (!computed && (category === 1 || category === 2)) {
+                    const pattern = getMissionPattern(category, missionId)
+                    if (isComputablePattern(pattern)) {
+                        if (pattern === 'single_battle_play' || pattern === 'single_battle_clear_count') {
+                            progress = totalQuestClears
+                        } else if (pattern === 'used_stamina_count') {
+                            progress = player.totalStaminaUsed ?? 0
+                        } else if (pattern in rankCounts) {
+                            progress = rankCounts[pattern]
+                        }
+                    }
+                }
+
                 const stage = getCurrentStage(category, missionId, progress)
                 missionProgressList.push({
                     mission_category: category,

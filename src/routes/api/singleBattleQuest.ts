@@ -728,7 +728,8 @@ const routes = async (fastify: FastifyInstance) => {
             updatePlayerSync({
                 id: playerId,
                 stamina: newStamina,
-                staminaHealTime: new Date()
+                staminaHealTime: new Date(),
+                totalStaminaUsed: (player.totalStaminaUsed ?? 0) + staminaCost
             })
             afterStamina = newStamina
             console.log(`[BATTLE-START] stamina: ${currentStamina} -> ${newStamina} (cost: ${staminaCost})`)
