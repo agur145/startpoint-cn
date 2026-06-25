@@ -3,7 +3,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerActiveMissionsSync, getSession, updatePlayerActiveMissionSync, updatePlayerActiveMissionStageSync } from "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
-import { getCurrentStage } from "../../lib/mission";
+import { getCurrentStage, getAllMissionIds } from "../../lib/mission";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 
 interface GetMissionProgressBody {
@@ -49,25 +49,19 @@ const routes = async (fastify: FastifyInstance) => {
         const activeMissions = getPlayerActiveMissionsSync(playerId)
         const missionProgressList: any[] = []
 
-        for (const missionIdStr of Object.keys(activeMissions)) {
-            const missionId = parseInt(missionIdStr)
-            const mission = activeMissions[missionIdStr]
-            const progress = mission.progress
-
-            // Determine which category this mission belongs to
-            // Mission IDs are in ranges: 1-99=Regular, 100-199=Daily, etc.
-            // But for simplicity, try all requested categories
-            for (const category of requestCategories) {
+        // Iterate CDN mission definitions for each requested category
+        for (const category of requestCategories) {
+            const allIds = getAllMissionIds(category)
+            for (const missionId of allIds) {
+                const mission = activeMissions[String(missionId)]
+                const progress = mission?.progress ?? 0
                 const stage = getCurrentStage(category, missionId, progress)
-                if (stage > 0) {
-                    missionProgressList.push({
-                        mission_category: category,
-                        mission_id: missionId,
-                        progress_value: progress,
-                        stage: stage
-                    })
-                    break
-                }
+                missionProgressList.push({
+                    mission_category: category,
+                    mission_id: missionId,
+                    progress_value: progress,
+                    stage: stage
+                })
             }
         }
 
