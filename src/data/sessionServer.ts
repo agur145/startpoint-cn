@@ -380,6 +380,7 @@ function handleNotify(client: SessionClient, msg: any[]) {
             disconnectClient(client);
             break;
         case 6: // StartBattle
+            if (battleExpectedCount.has(client.roomNumber)) break  // already started
             console.log(`[SESSION] client ${client.viewerId} StartBattle, mates=${client.mates.length}`)
             battleExpectedCount.set(client.roomNumber, countRealPlayers(client.mates))
             broadcastToRoom(client.roomNumber, [1, [5, client.mates]])
