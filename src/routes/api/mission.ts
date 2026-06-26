@@ -53,6 +53,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         const requestCategories = body.category_list?.map(c => c.category) || [1, 2, 3, 5]
+        console.log(`[MISSION] categories_full: ${JSON.stringify(body.category_list)}`)  // DEBUG
         const activeMissions = getPlayerActiveMissionsSync(playerId)
         const missionProgressList: any[] = []
 

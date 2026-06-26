@@ -6,7 +6,7 @@ import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync
 import { BattleQuest, EquipmentItemReward, MultiMate, MultiMateParty, PlayerRewardResult, QuestCategory } from "../../lib/types";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { createRoom, disbandRoom, getDisplayHost, getNpcMates, getRoom, getRoomByToken, getRooms, serializeRoom, serializeRoomConnection, updateHostEntryTime, updateRoomState } from "../../data/multiRoom";
-import { hasRoomClients, isHostOnline } from "../../data/sessionServer";
+import { hasRoomClients, isHostOnline, clearBattleExpectedCount } from "../../data/sessionServer";
 import { insertActiveQuest, activeQuests } from "./singleBattleQuest";
 import { computeRealTimeStamina, getRankDegree, getMaxStamina } from "../../lib/stamina";
 import { RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
@@ -716,6 +716,7 @@ const routes = async (fastify: FastifyInstance) => {
         // delete active quest
         delete activeQuests[playerId]
         deletePlayerActiveQuestSync(playerId)
+        if (activeQuestData.roomNumber) clearBattleExpectedCount(activeQuestData.roomNumber)
 
         // keep room alive for "return to room" after battle
         if (activeQuestData.roomNumber) {
@@ -995,6 +996,7 @@ const routes = async (fastify: FastifyInstance) => {
             }
             delete activeQuests[ctx.playerId]
             deletePlayerActiveQuestSync(ctx.playerId)
+            clearBattleExpectedCount(activeQuestData.roomNumber!)
         }
 
         const headers = generateDataHeaders({ viewer_id: body.viewer_id })

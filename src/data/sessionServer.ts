@@ -624,6 +624,11 @@ async function handleHandshake(socket: net.Socket, data: string, remoteAddr: str
 
 export { SESSION_PORT, SESSION_HOST };
 
+// Clear battle expected count (called on finish/abort to allow new StartBattle)
+export function clearBattleExpectedCount(roomNumber: string) {
+    battleExpectedCount.delete(roomNumber)
+}
+
 // Check if the host client is currently connected via TCP
 export function isHostOnline(roomNumber: string): boolean {
     return !!getHostClient(roomNumber)
