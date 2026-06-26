@@ -33,10 +33,9 @@
 | ⚠️ | 40 条（28%） | clear_count 近似 |
 | ❌ | 12 条（8%） | 条件部署示 |
 
-### Alk 类型 3 修复（2026-06-26）
+### Alk 类型 3（强化弹射）暂不计算（2026-06-26）
 
-Alk type_3 (强化弹射 97 次) 之前为 ❌ → `return 0`。
-现在 ✅ → `player.totalPowerflips`，数据从 `/finish` 的 `statistics.zones[].use_power_flip_count` 采集。
+Alk type_3 (强化弹射 97 次) 当前 `return 0`。弹射数据采集已实现（`/finish` 中 `zones[].use_power_flip_count` → `totalPowerflips`），但 type_3 计算逻辑暂未连线。待补全后从 ❌ 变 ✅。
 
 ### 弹射/冲刺数据源（2026-06-26）
 
@@ -56,9 +55,13 @@ Alk type_3 (强化弹射 97 次) 之前为 ❌ → `return 0`。
 ### 自动奖励（2026-06-26）
 
 - `get_mission_progress` 中检测阶段完成 → 自动标记 `received=true`
-- **觉醒任务奖励格式未知**：`mission_char_awake_reward.json` 与 `active_mission_reward.json` 格式不同
-- 当前仅标记 stage 完成，不发放奖励（待解析格式后补全）
-- `active_mission/receive` 的 5 种奖励类型（道具/装备/玛娜/角色/经验）仅适用于活跃任务
+- **觉醒奖励格式已解析**：column 9 开始，每阶段 1 个 Item 型奖励
+  - `[9]` = kind（始终 `1` = Item）
+  - `[10]` = amount（1-10）
+  - `[11]` = item_id（角色定制道具 ID）
+- 与活跃任务格式的区别：active_mission_reward 从 column 7 开始，4 个奖励槽；awake 从 column 9 开始，1 个奖励槽
+- `getAwakeMissionRewards()` 使用 `base=9`
+- 示例：Alk story → item_id=1 x10，贝瑞塔 story → item_id=46 x10
 
 ### 架构优化（2026-06-26）
 
