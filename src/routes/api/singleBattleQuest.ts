@@ -46,6 +46,12 @@ interface QuestStatistics {
         ability_soul_ids: (number | null)[],
         leader?: ({ id: (number | null) } | null)
     }
+    zones?: {
+        use_power_flip_count?: number
+        use_dash_count?: number
+        use_skill_count?: number
+        [key: string]: any
+    }[]
 }
 
 export interface FinishBody {
@@ -341,8 +347,15 @@ const routes = async (fastify: FastifyInstance) => {
         const partyCharacterIds = [...bodyPartyStatistics.characters, ...bodyPartyStatistics.unison_characters]
 
         // Track ALL party characters quest clears for awakening missions
-        const seen = new Set<number>()
-        for (const c of bodyPartyStatistics.characters) {
+        // Leader (position 0) tracked separately for "以X为队长" tasks
+        const leaderId = bodyPartyStatistics.characters[0]?.id
+        if (leaderId) {
+            incrementPlayerCharacterClearSync(playerId, leaderId, false)
+        }
+        // Other party members for "队伍中编有X" tasks
+        const seen = new Set<number>([leaderId].filter(Boolean) as number[])
+        for (let i = 1; i < bodyPartyStatistics.characters.length; i++) {
+            const c = bodyPartyStatistics.characters[i]
             if (c?.id && !seen.has(c.id)) {
                 incrementPlayerCharacterClearSync(playerId, c.id, false)
                 seen.add(c.id)
@@ -353,6 +366,21 @@ const routes = async (fastify: FastifyInstance) => {
                 incrementPlayerCharacterClearSync(playerId, c.id, false)
                 seen.add(c.id)
             }
+        }
+
+        // Accumulate zone-level counters (power flip, dash, skill) for mission progress
+        const zones = (body as any).statistics.zones || []
+        let powerFlipCount = 0, dashCount = 0
+        for (const zone of zones) {
+            powerFlipCount += zone.use_power_flip_count ?? 0
+            dashCount += zone.use_dash_count ?? 0
+        }
+        if (powerFlipCount > 0 || dashCount > 0) {
+            updatePlayerSync({
+                id: playerId,
+                totalPowerflips: (playerData.totalPowerflips ?? 0) + powerFlipCount,
+                totalDashes: (playerData.totalDashes ?? 0) + dashCount
+            })
         }
         const partyCharacterIdsArray: number[] = []
         for (const value of partyCharacterIds.values()) {

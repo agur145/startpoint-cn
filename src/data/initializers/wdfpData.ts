@@ -58,6 +58,8 @@ export default function init(
         paid_mana INTEGER NOT NULL,
         enable_auto_3x INTEGER NOT NULL,
         total_stamina_used INTEGER NOT NULL DEFAULT 0,
+        total_powerflips INTEGER NOT NULL DEFAULT 0,
+        total_dashes INTEGER NOT NULL DEFAULT 0,
         account_id INTEGER NOT NULL,
         tutorial_step INTEGER,
         tutorial_skip_flag INTEGER,
@@ -71,6 +73,10 @@ export default function init(
 
     // migration: add total_stamina_used for mission progress tracking
     try { database.prepare(`ALTER TABLE players ADD COLUMN total_stamina_used INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
+
+    // migration: add powerflip/dash counters for mission progress
+    try { database.prepare(`ALTER TABLE players ADD COLUMN total_powerflips INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
+    try { database.prepare(`ALTER TABLE players ADD COLUMN total_dashes INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_character_quest_clears (
         player_id INTEGER NOT NULL,
