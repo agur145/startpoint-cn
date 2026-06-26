@@ -24,6 +24,90 @@ interface UpdateMissionProgressBody {
     }[]
 }
 
+// Compute context — pre-computed values shared by all mission computers
+interface ComputeContext {
+    player: ReturnType<typeof getPlayerSync> extends infer T | null ? NonNullable<T> : never
+    questProgress: ReturnType<typeof getPlayerQuestProgressSync>
+    rankCounts: Record<string, number>
+    totalQuestClears: number
+    totalStories: number      // finished section=3 quests (for Alk type_2)
+}
+
+function buildContext(playerId: number): ComputeContext {
+    const player = getPlayerSync(playerId)!
+    const questProgress = getPlayerQuestProgressSync(playerId)
+    let totalQuestClears = 0, ssClears = 0, sClears = 0, aClears = 0, bClears = 0, totalStories = 0
+    for (const [section, quests] of Object.entries(questProgress)) {
+        for (const qp of quests) {
+            if (qp.finished) {
+                totalQuestClears++
+                if (section === '3') totalStories++
+                if (qp.clearRank === 6) ssClears++
+                else if (qp.clearRank === 5) sClears++
+                else if (qp.clearRank === 4) aClears++
+                else if (qp.clearRank === 3) bClears++
+            }
+        }
+    }
+    return {
+        player,
+        questProgress,
+        totalQuestClears,
+        totalStories,
+        rankCounts: { rank_ss: ssClears, rank_s: sClears, rank_a: aClears, rank_b: bClears },
+    }
+}
+
+// Category-specific mission progress computers
+function computeProgress(category: number, missionId: number, ctx: ComputeContext, dbProgress: number): number {
+    // Degree missions
+    if (category === 5) {
+        const targetDeg = getTargetDegree(missionId)
+        if (targetDeg !== undefined) return getRankDegree(ctx.player.rankPoint)
+    }
+
+    // Character awakening missions
+    if (category === 9) {
+        const charId = getCharacterIdFromMission(missionId)
+        const clears = getPlayerCharacterClearSync(ctx.player.id, Number(charId))
+        const questId = getCharacterStoryQuestId(charId)
+        const lastDigit = missionId % 10
+
+        if (lastDigit === 1) {
+            // Story reading for this character
+            const qpEntry = ctx.questProgress['3']?.find(q => q.questId === questId)
+            return qpEntry?.finished ? 1 : 0
+        }
+        if (lastDigit === 2) {
+            if (charId === '1') return ctx.totalStories  // Alk: total all-character stories
+            return clears.clear_count                       // Others: party member clears
+        }
+        if (lastDigit === 3) {
+            return clears.clear_count  // Party member clears (works for most non-Alk type_3)
+        }
+        if (lastDigit === 4) {
+            // All complete: check directly via recursive calls for types 1-3
+            const s1 = computeProgress(category, missionId - 3, ctx, dbProgress)
+            const s2 = computeProgress(category, missionId - 2, ctx, dbProgress)
+            const s3 = computeProgress(category, missionId - 1, ctx, dbProgress)
+            return (s1 >= 1 && s2 >= 1 && s3 >= 1) ? 1 : 0
+        }
+    }
+
+    // Computable patterns for categories 1,2 (Regular + Daily)
+    if (category === 1 || category === 2) {
+        const pattern = getMissionPattern(category, missionId)
+        if (pattern && isComputablePattern(pattern)) {
+            if (pattern.startsWith('single_battle_play') || pattern.startsWith('single_battle_clear_count')) return ctx.totalQuestClears
+            if (pattern.includes('stamina_use')) return ctx.player.totalStaminaUsed ?? 0
+            if (ctx.rankCounts[pattern] !== undefined) return ctx.rankCounts[pattern]
+        }
+    }
+
+    // Fallback to DB-stored progress
+    return dbProgress
+}
+
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/get_mission_progress", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as GetMissionProgressBody
@@ -46,18 +130,13 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No players bound to account."
         })
 
-        const player = getPlayerSync(playerId)
-        if (!player) return reply.status(500).send({
-            "error": "Internal Server Error",
-            "message": "Player not found."
-        })
-
+        const ctx = buildContext(playerId)
         const requestList = body.category_list || [{ category: 1 }]
         const requestCategories = requestList.map(c => c.category)
         const activeMissions = getPlayerActiveMissionsSync(playerId)
         const missionProgressList: any[] = []
 
-        // Build category→character_id map for character-awake requests
+        // Build category→character_id filter map
         const categoryCharMap: Record<number, string | undefined> = {}
         for (const entry of requestList) {
             if ((entry as any).character_id !== undefined) {
@@ -65,100 +144,19 @@ const routes = async (fastify: FastifyInstance) => {
             }
         }
 
-        // Pre-compute quest clear counts for server-side progress
-        const questProgress = getPlayerQuestProgressSync(playerId)
-        let totalQuestClears = 0
-        let ssClears = 0; let sClears = 0; let aClears = 0; let bClears = 0
-        for (const [section, quests] of Object.entries(questProgress)) {
-            for (const qp of quests) {
-                if (qp.finished) {
-                    totalQuestClears++
-                    if (qp.clearRank === 6) ssClears++
-                    else if (qp.clearRank === 5) sClears++
-                    else if (qp.clearRank === 4) aClears++
-                    else if (qp.clearRank === 3) bClears++
-                }
-            }
-        }
-
-    const rankCounts: Record<string, number> = {
-            'rank_ss': ssClears,
-            'rank_s': sClears,
-            'rank_a': aClears,
-            'rank_b': bClears,
-        }
-
-        // Iterate CDN reward tables for each requested category
         for (const category of requestCategories) {
             const allIds = getMissionIdsByCategory(category)
-            const charId = categoryCharMap[category]  // for category 9 filtering
+            const charId = categoryCharMap[category]
             for (const missionId of allIds) {
-                // Character-awake: filter by character_id from request
+                // Character-awake: filter by character_id
                 if (charId && category === 9) {
-                    const missionCharId = getCharacterIdFromMission(missionId)
-                    if (missionCharId !== charId) continue
+                    if (getCharacterIdFromMission(missionId) !== charId) continue
                 }
 
-                const mission = activeMissions[String(missionId)]
-                // Compute server-side progress (official server behavior)
-                let progress: number = mission?.progress ?? 0
-                let computed = false
-
-                if (category === 5) {
-                    const targetDeg = getTargetDegree(missionId)
-                    if (targetDeg !== undefined) {
-                        progress = getRankDegree(player.rankPoint)
-                        computed = true
-                    }
-                }
-
-                // Character awakening missions
-                if (!computed && category === 9) {
-                    const awakeCharId = getCharacterIdFromMission(missionId)
-                    const questId = getCharacterStoryQuestId(awakeCharId)
-                    const clears = getPlayerCharacterClearSync(playerId, Number(awakeCharId))
-                    const lastDigit = missionId % 10
-
-                    if (lastDigit === 1) {
-                        // Type _1: story reading
-                        const section = '3'
-                        const qpEntry = questProgress[section]?.find(q => q.questId === questId)
-                        progress = qpEntry?.finished ? 1 : 0
-                    } else if (lastDigit === 2) {
-                        // Type _2: leader quest clears
-                        progress = clears.clear_count
-                    } else if (lastDigit === 3) {
-                        // Type _3: co-op clears
-                        progress = clears.multi_count
-                    } else if (lastDigit === 4) {
-                        // Type _all: check story + leader + co-op
-                        const baseId = missionId - 4
-                        const storyEntry = missionProgressList.find(e => e.mission_id === (baseId + 1))
-                        const leadEntry = missionProgressList.find(e => e.mission_id === (baseId + 2))
-                        const coopEntry = missionProgressList.find(e => e.mission_id === (baseId + 3))
-                        const storyDone = storyEntry ? storyEntry.progress_value >= 1 : false
-                        const leadDone = leadEntry ? leadEntry.progress_value >= 1 : false
-                        const coopDone = coopEntry ? coopEntry.progress_value >= 1 : false
-                        progress = (storyDone && leadDone && coopDone) ? 1 : 0
-                    }
-                    computed = true
-                }
-
-                // Computable patterns for categories 1,2 (Regular + Daily)
-                if (!computed && (category === 1 || category === 2)) {
-                    const pattern = getMissionPattern(category, missionId)
-                    if (pattern && isComputablePattern(pattern)) {
-                        if (pattern.startsWith('single_battle_play') || pattern.startsWith('single_battle_clear_count')) {
-                            progress = totalQuestClears
-                        } else if (pattern.includes('stamina_use')) {
-                            progress = player.totalStaminaUsed ?? 0
-                        } else if (rankCounts[pattern] !== undefined) {
-                            progress = rankCounts[pattern]
-                        }
-                    }
-                }
-
+                const dbProgress = activeMissions[String(missionId)]?.progress ?? 0
+                const progress = computeProgress(category, missionId, ctx, dbProgress)
                 const stage = getCurrentStage(category, missionId, progress)
+
                 missionProgressList.push({
                     mission_category: category,
                     mission_id: missionId,

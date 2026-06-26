@@ -340,10 +340,19 @@ const routes = async (fastify: FastifyInstance) => {
         const bodyPartyStatistics = body.statistics.party
         const partyCharacterIds = [...bodyPartyStatistics.characters, ...bodyPartyStatistics.unison_characters]
 
-        // Track leader character quest clears for awakening missions
-        const leaderCharId = bodyPartyStatistics.characters[0]?.id
-        if (leaderCharId) {
-            incrementPlayerCharacterClearSync(playerId, leaderCharId, false)
+        // Track ALL party characters quest clears for awakening missions
+        const seen = new Set<number>()
+        for (const c of bodyPartyStatistics.characters) {
+            if (c?.id && !seen.has(c.id)) {
+                incrementPlayerCharacterClearSync(playerId, c.id, false)
+                seen.add(c.id)
+            }
+        }
+        for (const c of bodyPartyStatistics.unison_characters) {
+            if (c?.id && !seen.has(c.id)) {
+                incrementPlayerCharacterClearSync(playerId, c.id, false)
+                seen.add(c.id)
+            }
         }
         const partyCharacterIdsArray: number[] = []
         for (const value of partyCharacterIds.values()) {
