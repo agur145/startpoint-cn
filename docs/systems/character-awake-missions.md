@@ -1,6 +1,6 @@
 # 角色觉醒任务覆盖文档
 
-> 状态: 部分完成   关键文件: src/routes/api/mission.ts, src/lib/mission.ts   数据源: assets/mission_char_awake.json, assets/character_quest_lookup.json
+> 状态: 部分完成   最后更新: 2026-06-26
 
 ## 概览
 
@@ -14,7 +14,7 @@
 |-----------|------|---------|
 | 1 | 阅读个人剧情 / 队伍中编有X通关 | 故事计数 或 `clears.clear_count`（fallback） |
 | 2 | 累计阅读故事（Alk）/ 队长或队伍通关 | Alk=`totalStories`，其他=`clears.clear_count` |
-| 3 | 强化弹射（Alk）/ 共斗/限时 | Alk=0，其他=`clears.clear_count`（部分覆盖） |
+| 3 | 强化弹射（Alk）/ 共斗/限时 | Alk=`totalPowerflips`，其他=`clears.clear_count` |
 | 4 | 完成全部觉醒任务 | 检查 slot 1+2+3 是否全部 ≥1 |
 
 ### 正确度评估
@@ -22,8 +22,58 @@
 | 符号 | 含义 |
 |------|------|
 | ✅ | 完全计算，与官方对齐 |
-| ⚠️ | 部分覆盖（clear_count 近似，缺少特定条件跟踪） |
-| ❌ | 不可计算（需弹射/共斗/限时/玛纳/特定关卡数据） |
+| ⚠️ | 部分覆盖（clear_count 近似） |
+| ❌ | 不可计算 |
+
+### 统计
+
+| 正确度 | 数量 | 说明 |
+|:---:|------|------|
+| ✅ | 92 条（64%） | 故事/弹射/队伍出场计数 |
+| ⚠️ | 40 条（28%） | clear_count 近似 |
+| ❌ | 12 条（8%） | 条件部署示 |
+
+### Alk 类型 3 修复（2026-06-26）
+
+Alk type_3 (强化弹射 97 次) 之前为 ❌ → `return 0`。
+现在 ✅ → `player.totalPowerflips`，数据从 `/finish` 的 `statistics.zones[].use_power_flip_count` 采集。
+
+### 弹射/冲刺数据源（2026-06-26）
+
+`/finish` 的 `statistics.zones[]` 包含：
+- `use_power_flip_count`：弹射总次数
+- `use_power_flip_lv1/2/3_count`：各级弹射
+- `use_dash_count`：冲刺次数
+- `ball_flip_count`：弹珠翻转
+
+累计到 `players.total_powerflips` / `players.total_dashes` 字段。
+
+### 队长 vs 队员追踪（2026-06-26）
+
+- **队长**（characters[0]）：单独追踪，用于"以X为队长"任务
+- **队员**（characters[1+], unison）：批量追踪，用于"队伍中编有X"任务
+
+### 自动奖励（2026-06-26）
+
+- `get_mission_progress` 中检测阶段完成 → 自动标记 `received=true`
+- **觉醒任务奖励格式未知**：`mission_char_awake_reward.json` 与 `active_mission_reward.json` 格式不同
+- 当前仅标记 stage 完成，不发放奖励（待解析格式后补全）
+- `active_mission/receive` 的 5 种奖励类型（道具/装备/玛娜/角色/经验）仅适用于活跃任务
+
+### 架构优化（2026-06-26）
+
+`get_mission_progress` 抽取为 `ComputeContext` + `computeProgress()`：
+- 新增 category = 添加 ~5 行逻辑
+- 预计算 `questProgress`、`rankCounts`、`totalStories` 在一轮遍历中完成
+
+### 后续完善路径
+
+| 顺序 | 功能 | 工作量 | 说明 |
+|------|------|--------|------|
+| 1 | 解析觉醒任务奖励格式 | 中 | 需读客户端源码 |
+| 2 | 信用代币进度（从 `players_characters_bond_tokens` 读取） | 小 | 解锁 4 个 ❌ |
+| 3 | 每日任务重置 | 中 | `totalQuestClears/staminaUsed` 按日统计 |
+| 4 | 特定任务完成（quest_id→task 映射） | 中 | 解锁 ~30 个 ⚠️ |
 
 ---
 

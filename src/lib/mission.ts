@@ -211,6 +211,39 @@ export function getActiveMissionRewards(missionId: number, stage: number): Activ
 }
 
 /**
+ * Get all rewards for a given character awake mission stage.
+ * Same format as getActiveMissionRewards but uses charAwakeRewards table.
+ */
+export function getAwakeMissionRewards(missionId: number, stage: number): ActiveMissionReward[] {
+    const mission = (charAwakeRewards as Record<string, Record<string, any[]>>)[String(missionId)];
+    if (!mission) return [];
+    const stageData = mission[String(stage)];
+    if (!stageData || !stageData[0]) return [];
+    const row = stageData[0];
+
+    const result: ActiveMissionReward[] = [];
+    for (let slot = 0; slot < 4; slot++) {
+        const base = 7 + slot * 6;
+        const kind = parseInt(row[base]) || 0;
+        if (kind === 0) continue;
+        const amount = parseInt(row[base + 1]) || 0;
+        if (amount === 0) continue;
+
+        const reward: ActiveMissionReward = { kind, amount };
+        const itemId = row[base + 2] ? parseInt(row[base + 2]) : undefined;
+        const charId = row[base + 3] ? parseInt(row[base + 3]) : undefined;
+        const equipId = row[base + 4] ? parseInt(row[base + 4]) : undefined;
+
+        if (itemId) reward.itemId = itemId;
+        if (charId) reward.characterId = charId;
+        if (equipId) reward.equipmentId = equipId;
+
+        result.push(reward);
+    }
+    return result;
+}
+
+/**
  * Get all mission IDs (as integers) for a given category,
  * derived from the CDN reward table — aligns with DummyMissionRepository.createDummyData().
  */
