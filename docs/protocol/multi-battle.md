@@ -923,11 +923,12 @@ Client B → Broadcast(frameCmd) → Server → relayToBattleRoom → BattleServ
 | 问题 | 状态 | 说明 |
 |------|:---:|------|
 | C8700 stale room | ✅ 已修复 | `hasRoomClients` 过滤 + 60s return window 清理 |
+| C5707 duplicate BattleStart | ✅ 已修复 | `battleExpectedCount.has()` guard 防重 |
+| C5602 Disband NPE | ✅ 已修复 | `notifyRoomDisbanded` 仅用于 TCP 断线通知 |
 | 消息 TCP 合并 | ⚠️ | 100ms/200ms 延迟规避 |
-| `get_rooms` 返回无 TCP 客户端的房间 | ✅ 已修复 | `hasRoomClients` 防御过滤 |
 | 战斗恢复 UI（RestoreState.Battle） | 待测 | DB 层已就绪，客户端恢复弹窗流程待验证 |
-| battle TCP 退出弹窗 | ⚠️ 疑似预期行为 | 客户端 `socket.close()` → `isolateBySocketError` 本地触发，服务端无法干预 |
-| 空房间"6秒后挑战合作任务"浮字 | ⚠️ 客户端本地 UI | ReadyCounter 内部倒计时，非服务端 TCP 消息。仅 visual，不影响功能 |
+| 空房间"6秒后挑战合作任务"浮字 | ⚠️ 客户端本地 UI | ReadyCounter 倒计时，非服务端 TCP 消息 |
+| state=3 (Filled) | 待恢复 | `handleEnterComs` 中 `updateRoomState(3)` 被 F1 修复误删 |
 
 ### 9.9 下一步 — Phase 4 匹配系统 ⏳ 暂缓
 
