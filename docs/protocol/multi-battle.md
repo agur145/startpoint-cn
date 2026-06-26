@@ -929,6 +929,7 @@ Client B → Broadcast(frameCmd) → Server → relayToBattleRoom → BattleServ
 | 战斗恢复 UI（RestoreState.Battle） | 待测 | DB 层已就绪，客户端恢复弹窗流程待验证 |
 | 空房间"6秒后挑战合作任务"浮字 | ⚠️ 客户端本地 UI | ReadyCounter 倒计时，非服务端 TCP 消息 |
 | state=3 (Filled) | 待恢复 | `handleEnterComs` 中 `updateRoomState(3)` 被 F1 修复误删 |
+| 连战后偶发"无法返回房间" | ⚠️ 待复现 | 疑似 TCP 重连未在 60s 内到达；`QUEST_RESULT_DISBAND_DELAY_MS=120000` 可规避 |
 
 ### 9.9 下一步 — Phase 4 匹配系统 ⏳ 暂缓
 
