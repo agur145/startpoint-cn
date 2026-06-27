@@ -495,7 +495,8 @@ export function getDefaultPlayerData(): Omit<Player, 'id'> {
         totalDashes: 0,
         tutorialStep: 0,
         tutorialSkipFlag: null,
-        tutorialGachaCharacterId: null
+        tutorialGachaCharacterId: null,
+        timeOffset: null
     }
 }
 

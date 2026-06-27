@@ -378,50 +378,63 @@ export function insertPlayerSync(
     const playerId = player.id
     const playerIdGiven = playerId !== undefined
 
-    const values = [
-        player.stamina,
-        player.staminaHealTime.toISOString(),
-        player.boostPoint,
-        player.bossBoostPoint,
-        player.transitionState,
-        player.role,
-        player.name,
-        player.lastLoginTime.toISOString(),
-        player.comment,
-        player.vmoney,
-        player.freeVmoney,
-        player.rankPoint,
-        player.starCrumb,
-        player.bondToken,
-        player.expPool,
-        player.expPooledTime.toISOString(),
-        player.leaderCharacterId,
-        player.partySlot,
-        player.degreeId,
-        player.birth,
-        player.freeMana,
-        player.paidMana,
-        serializeBoolean(player.enableAuto3x),
-        accountId,
-        player.tutorialStep === null ? null : player.tutorialStep,
-        player.tutorialSkipFlag === null ? null : serializeBoolean(player.tutorialSkipFlag),
-        player.tutorialGachaCharacterId === undefined ? null : player.tutorialGachaCharacterId,
-        player.totalStaminaUsed ?? 0,
-        player.totalPowerflips ?? 0,
-        player.totalDashes ?? 0
-    ]
+    const params: Record<string, any> = {
+        stamina: player.stamina,
+        stamina_heal_time: player.staminaHealTime.toISOString(),
+        boost_point: player.boostPoint,
+        boss_boost_point: player.bossBoostPoint,
+        transition_state: player.transitionState,
+        role: player.role,
+        name: player.name,
+        last_login_time: player.lastLoginTime.toISOString(),
+        comment: player.comment,
+        vmoney: player.vmoney,
+        free_vmoney: player.freeVmoney,
+        rank_point: player.rankPoint,
+        star_crumb: player.starCrumb,
+        bond_token: player.bondToken,
+        exp_pool: player.expPool,
+        exp_pooled_time: player.expPooledTime.toISOString(),
+        leader_character_id: player.leaderCharacterId,
+        party_slot: player.partySlot,
+        degree_id: player.degreeId,
+        birth: player.birth,
+        free_mana: player.freeMana,
+        paid_mana: player.paidMana,
+        enable_auto_3x: serializeBoolean(player.enableAuto3x),
+        total_stamina_used: player.totalStaminaUsed ?? 0,
+        total_powerflips: player.totalPowerflips ?? 0,
+        total_dashes: player.totalDashes ?? 0,
+        account_id: accountId,
+        tutorial_step: player.tutorialStep ?? null,
+        tutorial_skip_flag: player.tutorialSkipFlag !== null ? serializeBoolean(player.tutorialSkipFlag) : null,
+        tutorial_gacha_character_id: player.tutorialGachaCharacterId ?? null,
+        time_offset: player.timeOffset ?? null,
+    }
 
     if (playerIdGiven)
-        values.push(playerId);
+        params.id = playerId
+
+    const idCol = playerIdGiven ? ', id' : ''
+    const idVal = playerIdGiven ? ', @id' : ''
 
     const insert = getDb().prepare(`
     INSERT INTO players (stamina, stamina_heal_time, boost_point, boss_boost_point,
         transition_state, role, name, last_login_time, comment, vmoney, free_vmoney,
         rank_point, star_crumb, bond_token, exp_pool, exp_pooled_time, leader_character_id,
-        party_slot, degree_id, birth, free_mana, paid_mana, enable_auto_3x, total_stamina_used, total_powerflips, total_dashes, account_id, 
-        tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id${playerIdGiven ? ', id' : ''})
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${playerIdGiven ? ', ?' : ''})
-    `).run(values)
+        party_slot, degree_id, birth, free_mana, paid_mana, enable_auto_3x,
+        total_stamina_used, total_powerflips, total_dashes, account_id,
+        tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id,
+        time_offset${idCol})
+    VALUES (@stamina, @stamina_heal_time, @boost_point, @boss_boost_point,
+        @transition_state, @role, @name, @last_login_time, @comment,
+        @vmoney, @free_vmoney, @rank_point, @star_crumb, @bond_token,
+        @exp_pool, @exp_pooled_time, @leader_character_id, @party_slot,
+        @degree_id, @birth, @free_mana, @paid_mana, @enable_auto_3x,
+        @total_stamina_used, @total_powerflips, @total_dashes, @account_id,
+        @tutorial_step, @tutorial_skip_flag, @tutorial_gacha_character_id,
+        @time_offset${idVal})
+    `).run(params)
 
     // return
     return Number(insert.lastInsertRowid)
@@ -531,7 +544,9 @@ export function insertDefaultPlayerSync(
 ): Player {
     const player: Omit<Player, 'id'> = getDefaultPlayerData()
 
-    const playerId = insertPlayerSync(accountId, player)
+    const db = getDb()
+    const insertAll = db.transaction((): number => {
+        const playerId = insertPlayerSync(accountId, player)
 
     // daily challenge point list — initialize all 282 CDN entries
     insertPlayerDailyChallengePointListSync(playerId, getDailyChallengePointDefaults())
@@ -997,8 +1012,12 @@ export function insertDefaultPlayerSync(
         }
     ])
 
+        return playerId
+    })
+
+    const finalPlayerId = insertAll()
     const finalPlayer = player as Player
-    finalPlayer.id = playerId
+    finalPlayer.id = finalPlayerId
     return finalPlayer
 }
 

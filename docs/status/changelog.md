@@ -1059,25 +1059,37 @@ const offset = defaultDate.getTime() - Date.now()
 Dashboard 时间控件可覆盖此默认值，保存后重启自动恢复。
 
 
-## 十六、Signup 竞态条件修复 (2026-06-27)
+## 十六、Signup 空账号问题修复 (2026-06-27)
 
-### 问题：客户端重试导致重复创建空账号
+### 症状
 
-某些客户端因网络延迟导致 signup 超时，触发客户端 `RETRY_LIMIT=5` 重试机制（`RequestQueue.as:77`），每次访问在服务端生成 6 个空账号。
+部分客户端每次访问在服务端生成 6 个空账号（account 有记录但 player 为空）。
 
-**根因：** `tool.ts` signup 中 `await insertAccount()` 包装在 `new Promise(...)` 里，`await` 时 Node.js 事件循环让出，并发 signup 请求在 `device_bindings` 插入前通过绑定检查 → 重复创建账号。
+### 根因：`insertPlayerSync` INSERT 列顺序与 VALUES 数组不匹配
+
+`total_stamina_used`/`total_powerflips`/`total_dashes` 字段在 INSERT SQL 中位于 `account_id` **之前**，但 VALUES 数组中位于 `accountId` **之后**，导致 4 列数据错位：
+
+```
+INSERT 列:    enable_auto_3x, total_*, total_*, total_*, account_id, tutorial_*
+VALUES 数组:  enableAuto3x,  accountId, tutorial*, ...,     total_*, ...
+                                         ↑ 4列错位 ↑
+```
+
+`accountId`(数字) 被写入 `total_stamina_used` 列，`tutorialGachaCharacterId`(null) 被写入 `total_dashes` 列（NOT NULL 约束）→ `SqliteError: 31 values for 30 columns`。
+
+客户端 `RETRY_LIMIT=5` 重试将单次失败放大为恰好 6 次 signup，每次 account 创建成功但 player 插入失败 → 6 个空账号。
 
 ### 修复
 
-`src/routes/cn/tool.ts` — 将关键区改为全同步：
-- `await getAccount(...)` → `getAccountSync(...)`
-- `await insertAccount(...)` → `insertAccountSync(...)`
+**`src/data/domains/player.ts`**：
+- `insertPlayerSync`：改为命名绑定（`@stamina`/`@account_id` 等），消除 VALUES 与列名双维护的顺序错位风险
+- `insertDefaultPlayerSync`：加 `db.transaction()` 包裹，避免中途失败产生半残存档
 
-`src/data/domains/account.ts` — `insertAccountSync` 改为 `export`
+**`src/routes/cn/tool.ts`**（防御性）：
+- `await insertAccount/getAccount` → `insertAccountSync/getAccountSync`，消除关键区事件循环让出点
 
-`src/data/wdfpData.ts` — 桶文件导出 `getAccountSync`、`insertAccountSync`
-
-**效果：** `getDeviceBindingSync` → `getAccountSync` → `insertAccountSync` → `insertDeviceBindingSync` 全程无 `await` 让出点，Node.js 单线程保证原子执行。并发请求见绑定已存在 → 复用账号，不再重复创建。
+**`src/data/utils.ts`**：
+- `getDefaultPlayerData` 补 `timeOffset: null`，与 schema 的 `time_offset` 列对齐
 
 
 ## TODO（更新）
