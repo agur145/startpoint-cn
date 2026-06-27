@@ -477,7 +477,7 @@ function handleEnterComs(client: SessionClient, coms: any[]) {
     // Sync host client's mates if relevant
     const hostClient = getHostClient(client.roomNumber)
     if (hostClient) hostClient.mates = client.mates
-    room.mates = client.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
+    if (room) room.mates = client.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
     console.log(`[SESSION] EnterComs: room=${client.roomNumber} real=${realMates.length} npc=${needNPCs} total=${client.mates.length}`)
 
     // Broadcast Mates + NPC Ready to all room clients
