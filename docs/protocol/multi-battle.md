@@ -929,32 +929,15 @@ Client B → Broadcast(frameCmd) → Server → relayToBattleRoom → BattleServ
 | 战斗恢复 UI（RestoreState.Battle） | 待测 | DB 层已就绪，客户端恢复弹窗流程待验证 |
 | 空房间"6秒后挑战合作任务"浮字 | ⚠️ 客户端本地 UI | ReadyCounter 倒计时，非服务端 TCP 消息 |
 | state=3 (Filled) | 待恢复 | `handleEnterComs` 中 `updateRoomState(3)` 被 F1 修复误删 |
-| 连战后偶发"无法返回房间" | ⚠️ 待复现 | 疑似 TCP 重连未在 60s 内到达 |
 
-### 9.8.1 结算画面 60s 双定时器
+### 9.8.1 结算画面 60s 定时器
 
-结算画面存在两个独立的 60s 定时器：
-
-**客户端 `disbandRoomTimer`**（`QuestResultScene.as` L956-969）：
-
-| 属性 | 说明 |
-|------|------|
-| 启动时机 | P1 一开始（`prepareScene()`） |
-| 启动条件 | 多人模式 + 非孤立 + 房主/访客；NPC 单人模式**不启动** |
-| 触发方式 | 到达 60s 后**每帧**尝试 `finishQuestResultIfPossible()`，仅在用户到达 P3 按钮界面且动画完成后才真正执行 |
-| 客户端行为 | 房主→发 `disbandRoom` HTTP；客机→直接返回上层 |
-| P1/P2 超时 | 不自动跳转，等待用户手动操作 |
-
-**服务端 `QUEST_RESULT_DISBAND_DELAY_MS`**（`sessionServer.ts` `removeClient` L115-125）：
-
-| 属性 | 说明 |
-|------|------|
-| 启动时机 | battle TCP 断开时（finish 后） |
-| 启动条件 | `isBattle && raising_state === 1` |
-| 触发方式 | 60s 后 `disbandRoom` + `notifyRoomDisbanded` |
-| 取消条件 | 客户端 `prepare/select_room` → TCP handshake → `clearTimeout` |
-
-两者独立运作，互不冲突。偶发"无法返回房间"是服务端定时器先于客户端 TCP 重连触发。
+| 属性 | 客户端 `disbandRoomTimer` | 服务端 |
+|------|------|------|
+| 启动时机 | P1 一开始 | **不设置**（官方服务端 finish 后不自动解散） |
+| 启动条件 | 多人+非孤立 | — |
+| 单人模式 | 不启动 | — |
+| 房间存活 | 仅靠 `cleanExpiredRooms` (10min idle) 兜底 |
 
 ### 9.9 下一步 — Phase 4 匹配系统 ⏳ 暂缓
 
