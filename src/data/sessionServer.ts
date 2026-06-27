@@ -285,7 +285,7 @@ function handleNotify(client: SessionClient, msg: any[]) {
                         sendJson(client.socket, [1, [0, yours, [yours]]])
                         setTimeout(() => sendJson(client.socket, [1, [1, client.mates]]), 100)
                         broadcastToRoom(client.roomNumber, [1, [1, hostClient.mates]], client.viewerId)
-                        room.mates = hostClient.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
+                        if (room) room.mates = hostClient.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
                         checkHostAutoReady(client.roomNumber)
                     } else {
                         // Host not yet online — guest enters alone, waits for host
