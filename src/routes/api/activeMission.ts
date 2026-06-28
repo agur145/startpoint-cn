@@ -42,6 +42,7 @@ const routes = async (fastify: FastifyInstance) => {
         const itemRewards: Record<number, number> = {}
         let freeMana = player.freeMana
         let expPool = player.expPool
+        let totalManaGained = 0
 
         const requestList = body.active_mission_list || []
 
@@ -74,6 +75,7 @@ const routes = async (fastify: FastifyInstance) => {
                             break
                         case 3: // Mana
                             freeMana += r.amount
+                            totalManaGained += r.amount
                             break
                         case 4: // Character
                             if (r.characterId && r.amount > 0) {
@@ -102,7 +104,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         // Apply mana and exp changes
         if (freeMana !== player.freeMana || expPool !== player.expPool) {
-            updatePlayerSync({ id: playerId, freeMana, expPool })
+            updatePlayerSync({ id: playerId, freeMana, expPool, totalManaObtained: (player.totalManaObtained ?? 0) + totalManaGained })
         }
 
         console.log(`[ACTIVE_MISSION] receive viewer=${viewerId} missions=${requestList.length} items=${Object.keys(itemRewards).length}`)

@@ -482,6 +482,7 @@ export interface RawPlayer {
     total_stamina_used: number
     total_powerflips: number
     total_dashes: number
+    total_mana_obtained: number
     tutorial_step: number | null
     tutorial_skip_flag: number | null
     tutorial_gacha_character_id: number | null
@@ -516,6 +517,7 @@ export interface Player {
     totalStaminaUsed: number
     totalPowerflips: number
     totalDashes: number
+    totalManaObtained: number
     tutorialStep: number | null
     tutorialSkipFlag: boolean | null
     tutorialGachaCharacterId: number | null

@@ -115,7 +115,7 @@ function applyMailReward(playerId: number, mail: RawPlayerMail): {
         }
         case MailType.FREE_MANA: {
             const newMana = player.freeMana + mail.number
-            updatePlayerSync({ id: playerId, freeMana: newMana })
+            updatePlayerSync({ id: playerId, freeMana: newMana, totalManaObtained: (player.totalManaObtained ?? 0) + mail.number })
             userInfo['free_mana'] = newMana
             break
         }

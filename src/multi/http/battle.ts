@@ -166,6 +166,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         const beforeRankPoint = player.rankPoint;
         const newRankPoint = beforeRankPoint + questData.rankPointReward;
         const newMana = player.freeMana + questData.manaReward + ((body as any).add_mana || 0);
+        const manaObtained = questData.manaReward + ((body as any).add_mana || 0);
         const newExpPool = player.expPool + questData.poolExpReward;
 
         let newBoostPoint = player.boostPoint - (activeQuestData.useBoostPoint ? 1 : 0);
@@ -212,6 +213,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             rankPoint: newRankPoint,
             boostPoint: newBoostPoint,
             bossBoostPoint: newBossBoostPoint,
+            totalManaObtained: (player.totalManaObtained ?? 0) + manaObtained,
             ...(didLevelUp ? { stamina: player.stamina + getMaxStamina(newDegreeId), staminaHealTime: new Date() } : {}),
         });
         const playerData = player;

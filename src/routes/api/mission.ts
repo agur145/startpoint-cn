@@ -90,6 +90,7 @@ function computeProgress(category: number, missionId: number, ctx: ComputeContex
         }
         if (lastDigit === 2) {
             if (charId === '1') return ctx.totalStories  // Alk: total all-character stories
+            if (charId === '263002') return ctx.player.totalManaObtained ?? 0  // 拉芙: 累计获得玛纳
             return clears.clear_count                       // Others: party member clears
         }
         if (lastDigit === 3) {
@@ -188,7 +189,7 @@ const routes = async (fastify: FastifyInstance) => {
                         if (r.kind === 1 || r.kind === 2) {
                             givePlayerItemSync(playerId, (r.itemId || r.equipmentId)!, r.amount)
                         } else if (r.kind === 3) {
-                            updatePlayerSync({ id: playerId, freeMana: (ctx.player.freeMana ?? 0) + r.amount })
+                            updatePlayerSync({ id: playerId, freeMana: (ctx.player.freeMana ?? 0) + r.amount, totalManaObtained: (ctx.player.totalManaObtained ?? 0) + r.amount })
                         } else if (r.kind === 4 && r.characterId) {
                             try { insertDefaultPlayerCharacterSync(playerId, r.characterId) } catch (_) {}
                         } else if (r.kind === 5) {

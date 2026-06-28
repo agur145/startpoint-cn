@@ -493,6 +493,7 @@ export function getDefaultPlayerData(): Omit<Player, 'id'> {
         totalStaminaUsed: 0,
         totalPowerflips: 0,
         totalDashes: 0,
+        totalManaObtained: 0,
         tutorialStep: 0,
         tutorialSkipFlag: null,
         tutorialGachaCharacterId: null,
@@ -544,6 +545,7 @@ export function deserializePlayerData(
             totalStaminaUsed: 0,  // server-side counter, not in client data
             totalPowerflips: 0,
             totalDashes: 0,
+        totalManaObtained: 0,
             tutorialStep: userTutorial?.tutorial_step === undefined ? null : userTutorial.tutorial_step,
             tutorialSkipFlag: userTutorial?.skip_flag === undefined ? null : userTutorial.skip_flag,
             tutorialGachaCharacterId: toDeserialize['tutorial_gacha']?.character_id ?? null

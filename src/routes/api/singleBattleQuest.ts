@@ -209,6 +209,7 @@ const routes = async (fastify: FastifyInstance) => {
         const beforeRankPoint = playerData.rankPoint
         const newRankPoint = beforeRankPoint + questData.rankPointReward
         let newMana = playerData.freeMana + questData.manaReward + body.add_mana
+        const manaObtained = questData.manaReward + body.add_mana
 
         // calculate boost point
         let newBoostPoint = playerData.boostPoint - (activeQuestData.useBoostPoint ? 1 : 0)
@@ -272,6 +273,7 @@ const routes = async (fastify: FastifyInstance) => {
             rankPoint: newRankPoint,
             boostPoint: newBoostPoint,
             bossBoostPoint: newBossBoostPoint,
+            totalManaObtained: (playerData.totalManaObtained ?? 0) + manaObtained,
             ...(didLevelUp ? { stamina: playerData.stamina + getMaxStamina(newDegreeId), staminaHealTime: new Date() } : {}),
         })
         if (didLevelUp) {
