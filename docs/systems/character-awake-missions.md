@@ -91,7 +91,28 @@
 映射常量 `QUEST_CLEAR_MISSIONS` 在 `mission.ts` 中定义，
 `computeProgress` 在 lastDigit 分支之前优先检测。
 
-### 队长 vs 队员追踪（2026-06-26）
+### 架构重构（2026-06-28）✅
+
+`lib/mission.ts` 重构为 `lib/mission/` 模块目录：
+
+```
+lib/mission/
+├── index.ts           barrel export
+├── types.ts           MissionComputer + CategoryContext 接口
+├── registry.ts        分类→MissionComputer 分发表
+├── stages.ts          阶段阈值 (getCurrentStage, getCompletedStageNumbers)
+├── rewards.ts         奖励解析 (getActiveMissionRewards, getAwakeMissionRewards)
+├── patterns.ts        pattern→mission 索引 (getMissionsByPattern)
+├── character-queries.ts  角色→任务映射
+├── computer-regular.ts   category 1/2 (pattern 分发)
+├── computer-degree.ts    category 5 (等级任务)
+├── computer-awake.ts     category 9 (角色觉醒，预缓存 DB)
+└── computer-fallback.ts  默认回退 DB progress
+```
+
+- `MissionComputer` 接口：`buildContext()` 一次预取 DB → `compute()` 纯计算
+- 新分类只需实现接口 + 注册到 `registry.ts` 一行
+- cat9 预缓存：`getPlayerCharactersSync` + `getPlayerCharacterClearSync` 批量预取，消除 144 次 per-mission DB 查询
 
 - **队长**（characters[0]）：单独追踪，"以X为队长"任务
 - **队员**（characters[1+], unison）：批量追踪，"队伍中编有X"任务
