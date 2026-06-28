@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { generateDataHeaders, getServerTime, getServerDate } from "../../utils";
-import { getPlayerSync, dailyResetPlayerDataSync, collectPlayerDataPooledExpSync, updatePlayerSync, getPlayerActiveQuestSync } from "../../data/wdfpData";
+import { getPlayerSync, dailyResetPlayerDataSync, collectPlayerDataPooledExpSync, updatePlayerSync, getPlayerActiveQuestSync, getSession } from "../../data/wdfpData";
 import { getClientSerializedData } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDisplayHost } from "../../multi/room/serializer";
@@ -86,8 +86,10 @@ const routes = async (fastify: FastifyInstance) => {
     fastify.post("/load", async (request: FastifyRequest, reply: FastifyReply) => {
         try {
         const body = request.body as CnLoadBody;
-        const accountId = body.viewer_id || body.keychain || 1;
+        const viewerId = body.viewer_id || body.keychain || 1;
 
+        const session = await getSession(String(viewerId));
+        const accountId = session ? session.accountId : (body.viewer_id || body.keychain || 1);
         const playerId = resolvePlayerIdSync(accountId);
         if (!playerId) {
             return reply.status(400).send({ error: "Bad Request", message: "No player found" });
