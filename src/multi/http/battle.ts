@@ -13,6 +13,7 @@ import {
     updatePlayerQuestProgressSync,
     updatePlayerSync,
     getSession,
+    incrementPlayerCharacterClearSync,
 } from "../../data/wdfpData";
 import { getQuestFromCategorySync } from "../../lib/assets";
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
@@ -229,6 +230,25 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         for (const value of [...(bodyPartyStatistics.characters || []), ...(bodyPartyStatistics.unison_characters || [])]) {
             if (value !== null && (value as any).id !== null && (value as any).id !== undefined) partyCharacterIdsArray.push((value as any).id);
         }
+
+        // Track co-op party character clears for awakening missions
+        const leaderId = bodyPartyStatistics.characters?.[0]?.id
+        if (leaderId) incrementPlayerCharacterClearSync(playerId, leaderId, true, true)
+        const seen = new Set<number>([leaderId].filter(Boolean) as number[])
+        for (let i = 1; i < (bodyPartyStatistics.characters || []).length; i++) {
+            const c = bodyPartyStatistics.characters[i]
+            if (c?.id && !seen.has(c.id)) {
+                incrementPlayerCharacterClearSync(playerId, c.id, true, false)
+                seen.add(c.id)
+            }
+        }
+        for (const c of (bodyPartyStatistics.unison_characters || [])) {
+            if (c?.id && !seen.has(c.id)) {
+                incrementPlayerCharacterClearSync(playerId, c.id, true, false)
+                seen.add(c.id)
+            }
+        }
+
         const rewardCharacterExpResult = givePlayerCharactersExpSync(
             playerId, partyCharacterIdsArray, questData.characterExpReward || 0,
             questData.fixedParty !== undefined

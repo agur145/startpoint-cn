@@ -14,7 +14,7 @@ function buildStats(playerId: number): CategoryContext {
     for (const [section, quests] of Object.entries(questProgressRaw)) {
         const list: CategoryContext["questProgress"][string] = []
         for (const qp of quests) {
-            list.push({ questId: qp.questId, finished: qp.finished, clearRank: qp.clearRank })
+            list.push({ questId: qp.questId, finished: qp.finished, clearRank: qp.clearRank, bestElapsedTimeMs: qp.bestElapsedTimeMs })
             if (qp.finished) {
                 totalQuestClears++
                 if (section === '3') totalStories++

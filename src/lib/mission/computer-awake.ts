@@ -10,6 +10,7 @@ import type { PlayerCharacter } from "../../data/types"
 interface AwakeContext extends CategoryContext {
     charClears: Map<string, number>
     leaderClears: Map<string, number>
+    multiClears: Map<string, number>
     charData: Map<string, PlayerCharacter>
 }
 
@@ -18,6 +19,7 @@ interface AwakeContext extends CategoryContext {
 interface QuestClearTarget {
     category: number
     questIds: number[]
+    timeLimitMs?: number  // if set, requires bestElapsedTimeMs <= this value
 }
 
 const QUEST_CLEAR_MAP: Map<number, QuestClearTarget> = new Map([
@@ -25,7 +27,9 @@ const QUEST_CLEAR_MAP: Map<number, QuestClearTarget> = new Map([
     [1310052, { category: 15, questIds: [96] }],
     [1410032, { category: 2, questIds: [1020003] }],
     [2110013, { category: 2, questIds: [1028004] }],
+    [2310013, { category: 2, questIds: [1010004], timeLimitMs: 90000 }],     // 寄居蟹船长 地狱级
     [2510032, { category: 13, questIds: [1020, 1023, 1026, 1029, 1032, 1035, 1038] }],
+    [2510033, { category: 13, questIds: [1020, 1023, 1026, 1029, 1032, 1035, 1038], timeLimitMs: 180000 }], // 3分钟
     [2630023, { category: 19, questIds: [100100004, 100401004] }],
 ])
 
@@ -33,6 +37,9 @@ const BOND_TOKEN_MISSION_IDS = new Set([1410033, 2210043, 2510043, 2610073])
 
 /** Missions that require the character as party LEADER (not just a member) */
 const LEADER_REQUIRED_IDS = new Set([1510062, 1610022, 1610023, 2310012, 2610072])
+
+/** Missions that track co-op (multiplayer) clears */
+const COOP_MISSION_IDS = new Set([1310053, 1510063])
 
 // ─── Computer ───
 
@@ -47,7 +54,7 @@ function buildAwakeContext(playerId: number): AwakeContext {
     for (const [section, quests] of Object.entries(questProgressRaw)) {
         const list: CategoryContext["questProgress"][string] = []
         for (const qp of quests) {
-            list.push({ questId: qp.questId, finished: qp.finished, clearRank: qp.clearRank })
+            list.push({ questId: qp.questId, finished: qp.finished, clearRank: qp.clearRank, bestElapsedTimeMs: qp.bestElapsedTimeMs })
             if (qp.finished) {
                 totalQuestClears++
                 if (section === '3') totalStories++
@@ -63,12 +70,14 @@ function buildAwakeContext(playerId: number): AwakeContext {
     // Pre-fetch character clear counts (batch: one DB call per owned character)
     const charClears = new Map<string, number>()
     const leaderClears = new Map<string, number>()
+    const multiClears = new Map<string, number>()
     const charData = new Map<string, PlayerCharacter>()
     for (const [cid, char] of Object.entries(allChars)) {
         charData.set(cid, char)
         const row = getPlayerCharacterClearSync(playerId, Number(cid))
         charClears.set(cid, row.clear_count)
         leaderClears.set(cid, row.leader_clear_count)
+        multiClears.set(cid, row.multi_count)
     }
 
     return {
@@ -80,6 +89,7 @@ function buildAwakeContext(playerId: number): AwakeContext {
         rankCounts: { rank_ss: ssClears, rank_s: sClears, rank_a: aClears, rank_b: bClears },
         charClears,
         leaderClears,
+        multiClears,
         charData,
     }
 }
@@ -101,6 +111,14 @@ export const AwakeComputer: MissionComputer = {
         if (qc) {
             const progress = ctx.questProgress[String(qc.category)]
             if (!progress) return 0
+            if (qc.timeLimitMs) {
+                const limit = qc.timeLimitMs
+                return progress.some(q =>
+                    qc.questIds.includes(q.questId) &&
+                    q.finished &&
+                    (q.bestElapsedTimeMs ?? Infinity) <= limit
+                ) ? 1 : 0
+            }
             return progress.some(q => qc.questIds.includes(q.questId) && q.finished) ? 1 : 0
         }
 
@@ -124,6 +142,9 @@ export const AwakeComputer: MissionComputer = {
                 if (BOND_TOKEN_MISSION_IDS.has(missionId)) {
                     const char = actx.charData.get(charId)
                     return char?.bondTokenList.every(bt => bt.status >= 2) ? 1 : 0
+                }
+                if (COOP_MISSION_IDS.has(missionId)) {
+                    return actx.multiClears.get(charId) ?? 0
                 }
                 return isLeaderRequired
                     ? actx.leaderClears.get(charId) ?? 0
