@@ -61,14 +61,13 @@ const fastify = Fastify({
 // Restore saved time offset from active player on startup
 restoreTimeOffset();
 
-// Simple in-memory rate limiter for diagnostic endpoints (/crash, /debug)
+// Simple in-memory rate limiter for /crash endpoint only.
+// /debug is excluded — game client sends heavy beacon traffic during normal startup.
 const rateLimitMap = new Map<string, { count: number; reset: number }>();
-const RATE_LIMIT_MAX = 30;   // max requests per window
-const RATE_LIMIT_WINDOW = 60000; // 60 seconds window
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW = 60000;
 fastify.addHook("onRequest", async (request, reply) => {
-    const url = request.url;
-    if (url === "/crash" || url.startsWith("/debug")) {
-        // Use x-forwarded-for if behind proxy, otherwise request.ip
+    if (request.url === "/crash") {
         const ip = (request.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
             || request.ip;
         const now = Date.now();

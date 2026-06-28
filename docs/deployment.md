@@ -328,7 +328,7 @@ sudo iptables -A INPUT -p tcp --dport 8003 -j DROP
 |---|--------|:---:|
 | 1 | CN 会话 token 使用随机数（非自增 ID） | ✅ `tool.ts` |
 | 2 | `contentsGuide.ts` 验证 session | ✅ `contentsGuide.ts` |
-| 3 | `/crash` `/debug` 速率限制（30次/60秒） | ✅ `cn-server.ts` |
+| 3 | `/crash` 速率限制（30次/60秒）；`/debug` 不限速（游戏beacon流量大） | ✅ `cn-server.ts` |
 | 4 | 请求体大小限制 64KB | ✅ `cn-server.ts` |
 | 5 | `CN_LISTEN_HOST="127.0.0.1"`（仅本地监听） | ✅ `.env` |
 | 6 | nginx 反向代理（443 + SSL） | ✅ 第 6 步 |
