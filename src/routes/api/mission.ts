@@ -1,11 +1,14 @@
 // Mission progress endpoints — get and update
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getPlayerActiveMissionsSync, getSession, getPlayerSync, getPlayerQuestProgressSync, getPlayerCharacterClearSync, givePlayerItemSync, insertDefaultPlayerCharacterSync, updatePlayerSync, updatePlayerActiveMissionSync, updatePlayerActiveMissionStageSync } from "../../data/wdfpData";
+import { getPlayerActiveMissionsSync, getSession, getPlayerSync, getPlayerCharacterSync, getPlayerQuestProgressSync, getPlayerCharacterClearSync, givePlayerItemSync, insertDefaultPlayerCharacterSync, updatePlayerSync, updatePlayerActiveMissionSync, updatePlayerActiveMissionStageSync } from "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
 import { getCurrentStage, getMissionIdsByCategory, getMissionsByPattern, getTargetDegree, getMissionPattern, isComputablePattern, getCharacterStoryQuestIds, getCharacterIdFromMission, getActiveMissionRewards, getAwakeMissionRewards, getCompletedStageNumbers } from "../../lib/mission";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getRankDegree } from "../../lib/stamina";
+
+// Category 9 type_3 missions that require checking if ALL bond tokens are claimed
+const BOND_TOKEN_MISSION_IDS = new Set([1410033, 2210043, 2510043, 2610073])
 
 interface GetMissionProgressBody {
     api_count: number,
@@ -91,6 +94,11 @@ function computeProgress(category: number, missionId: number, ctx: ComputeContex
         }
         if (lastDigit === 3) {
             if (charId === '1') return ctx.player.totalPowerflips ?? 0  // Alk: power flips
+            if (BOND_TOKEN_MISSION_IDS.has(missionId)) {
+                const char = getPlayerCharacterSync(ctx.player.id, Number(charId))
+                if (!char || !char.bondTokenList.length) return 0
+                return char.bondTokenList.every(bt => bt.status >= 2) ? 1 : 0
+            }
             return clears.clear_count      // Others: party member clears
         }
         if (lastDigit === 4) {
