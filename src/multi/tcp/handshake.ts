@@ -147,9 +147,9 @@ export async function handleHandshake(socket: net.Socket, data: any): Promise<vo
 
     const socklet = data.socklet
     const roomNumber = data.room_number || data.roomNumber
-    const connectionId = data.connection_id || data.connectionId || `${socket.remoteAddress}:${socket.remotePort}`
 
     if (socklet === "cooperation_battle") {
+        const connectionId = data.connection_id || data.connectionId || `${socket.remoteAddress}:${socket.remotePort}`
         if (!roomNumber) {
             sessionManager.sendJson(socket, [3, "HANDSHAKE_DENIED"])
             socket.end()
@@ -193,6 +193,7 @@ export async function handleHandshake(socket: net.Socket, data: any): Promise<vo
         }
 
         const playerId = playerIds[0]
+        const connectionId = String(roomNumber)
         const client = sessionManager.createClient(socket, Number(viewerId), String(roomNumber), String(connectionId), playerId)
         client.clientState.tryTransition(ClientState.Handshaking)
 

@@ -396,20 +396,26 @@
 | Message | 1 | `(MeetingServerMessage)` |
 | Messages | 2 | `(broadcaster: String, messages: Array)` |
 
-#### MeetingServerMessage
-| 枚举 | Index | 参数 |
-|------|:-----:|------|
-| Welcome | 0 | `(yourself: Object, mates: Array)` |
-| Mates | 1 | `(mates: Array)` |
-| StateChanged | 2 | `(viewerId: String, state: ReadyState)` |
-| AutoplayModeChanged | 3 | `(viewerId, auto: Bool, manual: Bool)` |
-| AutoStartChanged | 4 | `(viewerId, autoStart: Bool)` |
-| Start | 5 | `(members: Array<Object>)` |
-| Disbanded | 6 | `(reason: String)` |
-| RemainingTime | 7 | `(time: Int)` |
-| Update | 8 | `(reason: String)` |
-| StartRemainingTime | 9 | `(time: Int)` |
-| AckHeartbeat | 10 | `(viewerId: String)` |
+#### MeetingServerMessage（CN 运行时 — 原始 APK __constructs__ 验证）
+
+> ⚠️ 反编译源码不含 `AssetUpdate`（CN 专属），且 index 顺序不同。以下为**原始 CN APK 字节码提取**的正确映射。
+
+| 枚举 | CN Index | 参数 | Wire 全量测试验证 |
+|------|:---:|------|:---:|
+| Welcome | 0 | `(yourself, mates)` | ✅ CN 实测 |
+| Mates | 1 | `(mates)` | ✅ CN 实测 |
+| StateChanged | 2 | `(viewerId, ReadyState)` | ✅ CN 实测 |
+| AutoplayModeChanged | 3 | `(viewerId, Bool, Bool)` | ✅ CN 实测 |
+| AutoStartChanged | 4 | `(viewerId, Bool)` | ✅ CN 实测 |
+| Start | 5 | `(members)` | ⚠️ 未测（会进战斗） |
+| Disbanded | 6 | `(reason)` | ✅ CN 实测 |
+| RemainingTime | 7 | `(seconds)` | ✅ CN 实测 |
+| Update | 8 | `(reason)` | ✅ CN 实测 |
+| **AssetUpdate** ★ | **9** | **`(reason)`** | **✅ CN 实测（进房弹下载提示）** |
+| StartRemainingTime | 10 | `(seconds)` | ✅ CN 实测 |
+| AckHeartbeat | **11** | `(connectionId)` | **✅ CN 实测（30s 不解散）** |
+
+> ★ `AssetUpdate` 是 CN（Leiting）专属枚举，反编译 `wf-2.1.125-cn-decompiled` 中缺失。FFDec 反编译时未输出此枚举，导致后续 index 全偏移 1 位。原始 APK 字节码中 `__constructs__` 确认此顺序为正。
 
 #### Client2Server
 | 枚举 | Index | 参数 |

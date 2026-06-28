@@ -291,7 +291,7 @@ function handleReady(_socket: net.Socket, client: SessionClient, data: any[]): v
 }
 
 function handleHeartbeat(socket: net.Socket, client: SessionClient, _data: any[]): void {
-    sessionManager.sendJson(socket, [1, [10, client.connectionId]])
+    sessionManager.sendJson(socket, [1, [11, client.connectionId]])
 }
 
 function handleStartBattle(_socket: net.Socket, client: SessionClient, _data: any[]): void {
