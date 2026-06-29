@@ -2,7 +2,8 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { readFileSync } from "fs";
 import path from "path";
 import { staticPagesDir } from ".";
-import { getAllPlayersSync, getPlayerSync, getPlayerCharactersSync, getPlayerItemsSync, getPlayerEquipmentListSync, getAllAccountsSync, getAccountPlayersSync, getPlayerQuestProgressSync, getPlayerDrawnQuestsSync, getAllDeviceBindingsSync } from "../../data/wdfpData";
+import { getAllPlayersSync, getPlayerSync, getPlayerCharactersSync, getPlayerItemsSync, getPlayerEquipmentListSync, getAllAccountsSync, getAccountPlayersSync, getPlayerQuestProgressSync, getPlayerDrawnQuestsSync, getAllDeviceBindingsSync, getSessionByAccountIdSync } from "../../data/wdfpData";
+import { SessionType } from "../../data/types";
 import { getActivePlayerId, getSelectedAccountId, getAccountDefaultPlayer } from "../../data/activeAccount";
 import characterTable from "../../../docs/generated/character_table.json";
 import itemLookup from "../../../assets/item_lookup.json";
@@ -44,8 +45,11 @@ const routes = async (fastify: FastifyInstance) => {
             const defaultPid = getAccountDefaultPlayer(dev.account_id)
             const activeName = defaultPid ? (htmlEscape(getPlayerSync(defaultPid)?.name || '-')) : '-'
             const devName = htmlEscape(dev.name || '')
+            const session = getSessionByAccountIdSync(dev.account_id, SessionType.VIEWER)
+            const viewerIdStr = session ? htmlEscape(session.token) : '-'
             deviceRows += `<tr>
                 <td class="text-xs text-on-surface-variant">${dev.device_id}</td>
+                <td class="text-xs text-on-surface-variant">${viewerIdStr}</td>
                 <td>
                     <input value="${devName}" placeholder="名称"
                            class="edit-field text-xs border border-outline-variant rounded px-1 py-0.5 w-24 bg-background text-on-background"
@@ -69,8 +73,8 @@ const routes = async (fastify: FastifyInstance) => {
         listContent += `<section class="flex flex-col p-5 border border-outline-variant rounded-3xl w-full gap-3">
             <h3 class="text-xl text-on-background font-semibold">设备绑定 / 账号管理</h3>
             <table class="w-full text-sm"><thead><tr class="text-left border-b border-outline-variant">
-                <th class="p-1">设备 ID</th><th class="p-1">名称</th><th class="p-1">存档数</th><th class="p-1">生效存档</th><th class="p-1">操作</th>
-            </tr></thead><tbody>${deviceRows || '<tr><td colspan="5" class="text-on-surface-variant p-2">暂无设备绑定</td></tr>'}</tbody></table>
+                <th class="p-1">设备 ID</th><th class="p-1">ID</th><th class="p-1">名称</th><th class="p-1">存档数</th><th class="p-1">生效存档</th><th class="p-1">操作</th>
+            </tr></thead><tbody>${deviceRows || '<tr><td colspan="6" class="text-on-surface-variant p-2">暂无设备绑定</td></tr>'}</tbody></table>
         </section>`
 
         // Save management table (for selected account)
