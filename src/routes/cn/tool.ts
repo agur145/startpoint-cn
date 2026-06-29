@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { generateDataHeaders, generateViewerId } from "../../utils";
-import { insertAccountSync, getAccountSync, insertDefaultPlayerSync, getPlayerSync, insertSessionWithToken, updateAccountSync, deleteSession, deleteSessionSync, getDeviceBindingSync, insertDeviceBindingSync, deleteDeviceBindingSync, getSessionByAccountIdSync } from "../../data/wdfpData";
+import { insertAccountSync, getAccountSync, insertDefaultPlayerSync, getPlayerSync, insertSessionWithToken, updateAccountSync, getDeviceBindingSync, insertDeviceBindingSync, deleteDeviceBindingSync, deleteAccountSessionsOfTypeSync, getAccountSessionsOfTypeSync } from "../../data/wdfpData";
 import { SessionType } from "../../data/types";
 import { saveAccountDefaultPlayer } from "../../data/activeAccount";
 
@@ -78,11 +78,11 @@ const routes = async (fastify: FastifyInstance) => {
                 accountId = binding.account_id
                 newAccount = false
                 updateAccountSync({ id: accountId, lastLoginTime: new Date() })
-                // Reuse existing viewer_id if session exists for this account
-                const existingSession = getSessionByAccountIdSync(accountId, SessionType.VIEWER)
-                if (existingSession) {
-                    deleteSessionSync(existingSession.token)
-                    viewerId = parseInt(existingSession.token)
+                // Clean all old sessions for this account, reuse first token
+                const sessions = getAccountSessionsOfTypeSync(accountId, SessionType.VIEWER)
+                if (sessions.length > 0) {
+                    viewerId = parseInt(sessions[0].token)
+                    deleteAccountSessionsOfTypeSync(accountId, SessionType.VIEWER)
                 }
             } else {
                 // Account was deleted — clean up stale binding and create new account

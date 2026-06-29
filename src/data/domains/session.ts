@@ -122,7 +122,7 @@ export function getSessionByAccountIdSync(accountId: number, type: SessionType):
  * @param type The type of session to get.
  * @returns An array of sessions.
  */
-function getAccountSessionsOfTypeSync(
+export function getAccountSessionsOfTypeSync(
     accountId: number,
     type: SessionType
 ): Session[] {
@@ -292,7 +292,7 @@ export function deleteAccountSessions(
  * @param accountId The ID of the account to delete the sessions of.
  * @param type The type of session to delete.
  */
-function deleteAccountSessionsOfTypeSync(
+export function deleteAccountSessionsOfTypeSync(
     accountId: number,
     type: SessionType
 ) {
