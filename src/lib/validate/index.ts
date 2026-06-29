@@ -3,10 +3,11 @@
 
 import { SaveValidator, TemporalFilter } from "./types"
 import { MaxLevelValidator } from "./max-level"
+import { PartySlotValidator } from "./party-slot"
 
 const PERMANENT_VALIDATORS: SaveValidator[] = [
     MaxLevelValidator,
-    // Add more permanent validators here (e.g. PartyRefValidator, CharacterExValidator)
+    PartySlotValidator,
 ]
 
 const TEMPORAL_FILTERS: TemporalFilter[] = [
