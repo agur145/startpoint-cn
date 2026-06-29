@@ -55,7 +55,7 @@ const fastify = Fastify({
     logger: {
         level: "info"
     },
-    bodyLimit: 65536  // 64KB — crash/debug endpoints don't need large bodies
+    bodyLimit: 262144  // 256KB — covers /single_battle_quest/finish large battle stats
 });
 
 // Restore saved time offset from active player on startup
