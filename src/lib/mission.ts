@@ -13,4 +13,6 @@ export {
     getCharacterIdFromMission,
     getTargetDegree,
     getComputer,
+    filterToActiveMissions,
+    isActiveMissionId,
 } from "./mission/index"

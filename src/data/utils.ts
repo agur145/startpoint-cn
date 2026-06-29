@@ -6,6 +6,7 @@ import { availableAssetVersion } from "../routes/api/asset"
 import { deserializePlayerRushEventPlayedParty, deserializeRushEvent, getPlayerActiveMissionsSync, getPlayerBoxGachasSync, getPlayerCharactersManaNodesSync, getPlayerCharactersSync, getPlayerClearedRegularMissionListSync, getPlayerDailyChallengePointListSync, getPlayerDrawnQuestsSync, getPlayerEquipmentListSync, getPlayerGachaCampaignListSync, getPlayerGachaInfoListSync, getPlayerItemsSync, getPlayerMailCountSync, getPlayerMultiSpecialExchangeCampaignsSync, getPlayerOptionsSync, getPlayerPartyGroupListSync, getPlayerPeriodicRewardPointsSync, getPlayerQuestProgressSync, getPlayerRushEventListClearedFoldersSync, getPlayerRushEventListPlayedPartiesSync, getPlayerRushEventListSync, getPlayerStartDashExchangeCampaignsSync, getPlayerSync, getPlayerTriggeredTutorialsSync, serializePlayerRushEventPlayedParty, updatePlayerSync } from "./wdfpData"
 import { kIdToBusinessCode, businessCodeToKId } from "./codeMap"
 import { computeRealTimeStamina } from "../lib/stamina"
+import { filterToActiveMissions } from "../lib/mission"
 
 export interface SerializePlayerDataOptions {
     viewerId?: number
@@ -1024,7 +1025,7 @@ export function getClientSerializedData(
         gachaCampaignList: getPlayerGachaCampaignListSync(playerId),
         drawnQuestList: getPlayerDrawnQuestsSync(playerId),
         periodicRewardPointList: getPlayerPeriodicRewardPointsSync(playerId),
-        allActiveMissionList: getPlayerActiveMissionsSync(playerId),
+        allActiveMissionList: filterToActiveMissions(getPlayerActiveMissionsSync(playerId)),
         boxGachaList: getPlayerBoxGachasSync(playerId),
         purchasedTimesList: {},
         startDashExchangeCampaignList: getPlayerStartDashExchangeCampaignsSync(playerId),
