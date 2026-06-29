@@ -43,7 +43,8 @@ import rushEventQuestFolders from "../../assets/rush_event_quest_folder.json"
 import configData from "../../assets/config.json"
 import equipmentDissolveData from "../../assets/equipment_dissolve.json"
 import itemSaleData from "../../assets/item_sale.json"
-import { AssetCharacter, BattleQuest, BossCoinShopItems, BoxGacha, ClearRewards, ConfigValues, EquipmentDissolveEntry, EventItemShopIdMapItem, EventShopItems, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, Gachas, ItemSaleEntry, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopItem, ShopItems, ShopType, StoryQuest } from "./types";
+import equipmentCraftData from "../../assets/equipment_craft.json"
+import { AssetCharacter, BattleQuest, BossCoinShopItems, BoxGacha, ClearRewards, ConfigValues, EquipmentCraftEntry, EquipmentDissolveEntry, EventItemShopIdMapItem, EventShopItems, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, Gachas, ItemSaleEntry, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopItem, ShopItems, ShopType, StoryQuest } from "./types";
 
 /**
  * Gets a clear reward from its ID.
@@ -672,5 +673,16 @@ export function getEquipmentDissolveSync(id: number | string): EquipmentDissolve
  */
 export function getItemSaleSync(id: number | string): ItemSaleEntry | null {
     const entry = (itemSaleData as Record<string, ItemSaleEntry>)[String(id)]
+    return entry ?? null
+}
+
+// ─── Equipment craft / dissolve cost data ────────────────────────────────
+
+/**
+ * Gets equipment craft-point costs and dissolve rates by rarity (1-5).
+ * Returns null if rarity is invalid.
+ */
+export function getEquipmentCraftSync(rarity: number): EquipmentCraftEntry | null {
+    const entry = (equipmentCraftData as Record<string, EquipmentCraftEntry>)[String(Math.max(1, Math.min(5, rarity)))]
     return entry ?? null
 }

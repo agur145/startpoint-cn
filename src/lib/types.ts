@@ -635,3 +635,11 @@ export interface ItemSaleEntry {
     sale_price: number
     sellable: boolean
 }
+
+// ─── Equipment craft / dissolve cost data ──────────────────────────────
+
+export interface EquipmentCraftEntry {
+    dissolve_craft: number
+    awakening_craft: number
+    dissolve_star: number
+}

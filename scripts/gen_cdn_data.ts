@@ -120,10 +120,47 @@ function extractItemSale() {
   console.log(`  sellable=true: ${sellableItems}`);
 }
 
+// ─── Equipment craft cost / dissolve rate ──────────────────────────────
+
+interface CraftEntry {
+    dissolve_craft: number;
+    awakening_craft: number;
+    dissolve_star: number;
+}
+
+function extractEquipmentCraft() {
+    const craftRaw = JSON.parse(
+        fs.readFileSync(path.join(ASSETS_CN, "equipment_craft_point_exchange.json"), "utf8")
+    ) as Record<string, string[][]>;
+    const starRaw = JSON.parse(
+        fs.readFileSync(path.join(ASSETS_CN, "equipment_dissolve_rate.json"), "utf8")
+    ) as Record<string, string[][]>;
+
+    const out: Record<string, CraftEntry> = {};
+    for (const rarity of ["1", "2", "3", "4", "5"]) {
+        const craft = craftRaw[rarity]?.[0] ?? ["0", "0"];
+        const star = starRaw[rarity]?.[0] ?? ["0"];
+        out[rarity] = {
+            dissolve_craft: parseInt(craft[0], 10),
+            awakening_craft: parseInt(craft[1], 10),
+            dissolve_star: parseInt(star[0], 10),
+        };
+    }
+
+    fs.writeFileSync(
+        path.join(ASSETS_OUT, "equipment_craft.json"),
+        JSON.stringify(out, null, 2)
+    );
+    console.log(`[gen_cdn_data] equipment_craft.json: ${Object.keys(out).length} entries`);
+    console.log(`  ${JSON.stringify(out)}`);
+}
+
 // ─── Run ─────────────────────────────────────────────────────────────────
 
 console.log("[gen_cdn_data] Extracting CDN data...\n");
 extractEquipmentDissolve();
 console.log("");
 extractItemSale();
+console.log("");
+extractEquipmentCraft();
 console.log("\n[gen_cdn_data] Done.");

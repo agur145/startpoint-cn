@@ -3,14 +3,15 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
-    getPlayerEquipmentListSync, getPlayerEquipmentSync,
-    getSession, givePlayerItemSync, updatePlayerEquipmentSync
+    getPlayerEquipmentSync, getSession, givePlayerItemSync,
+    updatePlayerEquipmentSync
 } from "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
 import { clientSerializeEquipment, buildFullEquipmentList } from "../../lib/equipment";
 import { calculateDissolveRewards } from "../../lib/equipment-dissolve";
 import { asAccountId, asPlayerId, AccountId, PlayerId } from "../../lib/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
+import { getConfigSync } from "../../lib/assets";
 
 interface SellEquipmentListItem {
     equipment_id: number
@@ -32,8 +33,8 @@ interface BulkSellStackBody {
     equipment_ids: number[]
 }
 
-const wrightpieceItemId = 100000
-const starGrainItemId = 990008
+const wrightpieceItemId = () => getConfigSync().craft_point_item_id || 100000
+const starGrainItemId = () => getConfigSync().star_grain_item_id || 990008
 
 const routes = async (fastify: FastifyInstance) => {
 
@@ -83,10 +84,10 @@ const routes = async (fastify: FastifyInstance) => {
 
         const returnItemList: Record<number, number> = {}
         if (totalCraftPoints > 0) {
-            returnItemList[wrightpieceItemId] = givePlayerItemSync(playerId, wrightpieceItemId, totalCraftPoints)
+            returnItemList[wrightpieceItemId()] = givePlayerItemSync(playerId, wrightpieceItemId(), totalCraftPoints)
         }
         if (totalStarGrains > 0) {
-            returnItemList[starGrainItemId] = givePlayerItemSync(playerId, starGrainItemId, totalStarGrains)
+            returnItemList[starGrainItemId()] = givePlayerItemSync(playerId, starGrainItemId(), totalStarGrains)
         }
         for (const [soulId, count] of Object.entries(totalAbilitySouls)) {
             returnItemList[parseInt(soulId)] = givePlayerItemSync(playerId, parseInt(soulId), count)
@@ -158,10 +159,10 @@ const routes = async (fastify: FastifyInstance) => {
 
         const returnItemList: Record<number, number> = {}
         if (totalCraftPoints > 0) {
-            returnItemList[wrightpieceItemId] = givePlayerItemSync(playerId, wrightpieceItemId, totalCraftPoints)
+            returnItemList[wrightpieceItemId()] = givePlayerItemSync(playerId, wrightpieceItemId(), totalCraftPoints)
         }
         if (totalStarGrains > 0) {
-            returnItemList[starGrainItemId] = givePlayerItemSync(playerId, starGrainItemId, totalStarGrains)
+            returnItemList[starGrainItemId()] = givePlayerItemSync(playerId, starGrainItemId(), totalStarGrains)
         }
         for (const [soulId, count] of Object.entries(totalAbilitySouls)) {
             returnItemList[parseInt(soulId)] = givePlayerItemSync(playerId, parseInt(soulId), count)
@@ -243,10 +244,10 @@ const routes = async (fastify: FastifyInstance) => {
 
         const returnItemList: Record<number, number> = {}
         if (totalCraftPoints > 0) {
-            returnItemList[wrightpieceItemId] = givePlayerItemSync(playerId, wrightpieceItemId, totalCraftPoints)
+            returnItemList[wrightpieceItemId()] = givePlayerItemSync(playerId, wrightpieceItemId(), totalCraftPoints)
         }
         if (totalStarGrains > 0) {
-            returnItemList[starGrainItemId] = givePlayerItemSync(playerId, starGrainItemId, totalStarGrains)
+            returnItemList[starGrainItemId()] = givePlayerItemSync(playerId, starGrainItemId(), totalStarGrains)
         }
         for (const [soulId, count] of Object.entries(totalAbilitySouls)) {
             returnItemList[parseInt(soulId)] = givePlayerItemSync(playerId, parseInt(soulId), count)

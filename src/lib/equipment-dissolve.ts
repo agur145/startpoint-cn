@@ -1,4 +1,4 @@
-import { getEquipmentDissolveSync } from "./assets";
+import { getEquipmentDissolveSync, getEquipmentCraftSync } from "./assets";
 
 export interface DissolveRewards {
     craftPoints: number;
@@ -7,18 +7,14 @@ export interface DissolveRewards {
     abilitySouls: Record<number, number>;
 }
 
-// wrightpiece reward per stack for dissolving each rank of weapon
-const dissolvingCraftPoints: number[] = [1, 2, 3, 4, 5];
-
-// star grain reward per stack for dissolving each rank of weapon
-const dissolvingStarGrains: number[] = [0, 0, 1, 5, 15];
-
 /**
  * Calculate dissolve rewards for one equipment type × count stacks.
  *
  * CDN checks applied:
  * - generate_ability_soul: only grant ability souls if `true`
  * - obtain_source: only grant star grains if `0`
+ *
+ * Craft-point and star-grain values loaded from CDN equipment_craft.json.
  *
  * @param equipmentId  The equipment ID being dissolved.
  * @param count        How many stacks to dissolve.
@@ -29,14 +25,15 @@ export function calculateDissolveRewards(
     count: number
 ): DissolveRewards {
     const rarity = Math.floor(equipmentId / 1000000) - 1;
-    const craftPoints = (dissolvingCraftPoints[rarity] ?? 0) * count;
+    const craftEntry = getEquipmentCraftSync(rarity);
+    const craftPoints = (craftEntry?.dissolve_craft ?? (rarity + 1)) * count;
 
     const cdn = getEquipmentDissolveSync(equipmentId);
 
     // Star grains: only if obtain_source == 0
     const starGrains =
         cdn && cdn.obtain_source === 0
-            ? (dissolvingStarGrains[rarity] ?? 0) * count
+            ? (craftEntry?.dissolve_star ?? 0) * count
             : 0;
 
     // Ability souls: only if generate_ability_soul == true

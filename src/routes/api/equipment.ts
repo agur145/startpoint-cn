@@ -9,7 +9,7 @@ import {
 } from "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
 import { clientSerializeEquipment, buildFullEquipmentList } from "../../lib/equipment";
-import { getEquipmentDissolveSync } from "../../lib/assets";
+import { getEquipmentDissolveSync, getConfigSync, getEquipmentCraftSync } from "../../lib/assets";
 import { AccountId, PlayerId } from "../../lib/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 
@@ -35,10 +35,10 @@ interface BulkUpgradeBody {
     equipment_ids: number[]
 }
 
-const wrightpieceItemId = 100000
+const wrightpieceItemId = () => getConfigSync().craft_point_item_id || 100000
 
-// wrightpiece cost for each rank of weapon (awakening)
-const equipmentUpgradeCost = [5, 10, 15, 20, 25]
+// wrightpiece cost for each rank of weapon (awakening) — from CDN
+const getUpgradeCost = (rarity: number): number => getEquipmentCraftSync(rarity)?.awakening_craft ?? 25
 
 const routes = async (fastify: FastifyInstance) => {
 
@@ -72,8 +72,8 @@ const routes = async (fastify: FastifyInstance) => {
         if (newStack < 0) return reply.status(400).send({ "error": "Bad Request", "message": "Not enough stack." })
 
         const equipmentRarity = Math.floor(equipmentId / 1000000) - 1
-        const wrightPieces = getPlayerItemSync(playerId, wrightpieceItemId) ?? 0
-        const upgradeCost = equipmentUpgradeCost[equipmentRarity] ?? 0
+        const wrightPieces = getPlayerItemSync(playerId, wrightpieceItemId()) ?? 0
+        const upgradeCost = getUpgradeCost(equipmentRarity)
         const newWrightPieces = wrightPieces - (upgradeCost * upgradeCount)
         if (newWrightPieces < 0) return reply.status(400).send({ "error": "Bad Request", "message": "Not enough of wrightpieces." })
 
@@ -88,8 +88,8 @@ const routes = async (fastify: FastifyInstance) => {
             updatePlayerItemSync(playerId, itemId, newItemCount)
         }
 
-        returnItemList[wrightpieceItemId] = newWrightPieces
-        updatePlayerItemSync(playerId, wrightpieceItemId, newWrightPieces)
+        returnItemList[wrightpieceItemId()] = newWrightPieces
+        updatePlayerItemSync(playerId, wrightpieceItemId(), newWrightPieces)
 
         equipment.level = newLevel
         equipment.stack = newStack
@@ -150,7 +150,7 @@ const routes = async (fastify: FastifyInstance) => {
             if (upgradeCount <= 0) continue
 
             const rarity = Math.floor(equipmentId / 1000000) - 1
-            totalCraftPointCost += equipmentUpgradeCost[rarity] * upgradeCount
+            totalCraftPointCost += getUpgradeCost(rarity) * upgradeCount
             upgrades.push({ equipmentId, upgradeCount })
         }
 
@@ -162,7 +162,7 @@ const routes = async (fastify: FastifyInstance) => {
             })
         }
 
-        const currentCraftPoints = getPlayerItemSync(playerId, wrightpieceItemId) ?? 0
+        const currentCraftPoints = getPlayerItemSync(playerId, wrightpieceItemId()) ?? 0
         if (totalCraftPointCost > currentCraftPoints) {
             return reply.status(400).send({ "error": "Bad Request", "message": "Not enough craft points." })
         }
@@ -181,8 +181,8 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         const newCraftPoints = currentCraftPoints - totalCraftPointCost
-        updatePlayerItemSync(playerId, wrightpieceItemId, newCraftPoints)
-        returnItemList[wrightpieceItemId] = newCraftPoints
+        updatePlayerItemSync(playerId, wrightpieceItemId(), newCraftPoints)
+        returnItemList[wrightpieceItemId()] = newCraftPoints
 
         console.log(`[BULK_UPGRADE] account=${accountId} player=${playerId}: ${upgrades.length} equipment upgraded, craft points ${currentCraftPoints} -> ${newCraftPoints}`)
 
