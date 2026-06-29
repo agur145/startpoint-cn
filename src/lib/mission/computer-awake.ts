@@ -11,6 +11,7 @@ interface AwakeContext extends CategoryContext {
     charClears: Map<string, number>
     leaderClears: Map<string, number>
     multiClears: Map<string, number>
+    leaderMultiClears: Map<string, number>
     charData: Map<string, PlayerCharacter>
 }
 
@@ -19,27 +20,25 @@ interface AwakeContext extends CategoryContext {
 interface QuestClearTarget {
     category: number
     questIds: number[]
-    timeLimitMs?: number  // if set, requires bestElapsedTimeMs <= this value
+    timeLimitMs?: number
+    leaderCharId?: number
 }
 
 const QUEST_CLEAR_MAP: Map<number, QuestClearTarget> = new Map([
-    [1110013, { category: 2, questIds: [1028004] }],
-    [1310052, { category: 15, questIds: [96] }],
+    [1110013, { category: 2, questIds: [1028004], leaderCharId: 111001 }],
+    [1310052, { category: 15, questIds: [96], leaderCharId: 131005 }],
     [1410032, { category: 2, questIds: [1020003] }],
-    [2110013, { category: 2, questIds: [1028004] }],
-    [2310013, { category: 2, questIds: [1010004], timeLimitMs: 90000 }],     // 寄居蟹船长 地狱级
-    [2510032, { category: 13, questIds: [1020, 1023, 1026, 1029, 1032, 1035, 1038] }],
-    [2510033, { category: 13, questIds: [1020, 1023, 1026, 1029, 1032, 1035, 1038], timeLimitMs: 180000 }], // 3分钟
-    [2630023, { category: 19, questIds: [100100004, 100401004] }],
+    [2110013, { category: 2, questIds: [1028004], leaderCharId: 211001 }],
+    [2310013, { category: 2, questIds: [1010004], timeLimitMs: 90000, leaderCharId: 231001 }],
+    [2510032, { category: 13, questIds: [1020, 1023, 1026, 1029, 1032, 1035, 1038], leaderCharId: 251003 }],
+    [2510033, { category: 13, questIds: [1020, 1023, 1026, 1029, 1032, 1035, 1038], timeLimitMs: 180000, leaderCharId: 251003 }],
+    [2630023, { category: 19, questIds: [100100004, 100401004], leaderCharId: 151006 }],
 ])
 
 const BOND_TOKEN_MISSION_IDS = new Set([1410033, 2210043, 2510043, 2610073])
-
-/** Missions that require the character as party LEADER (not just a member) */
 const LEADER_REQUIRED_IDS = new Set([1510062, 1610022, 1610023, 2310012, 2610072])
-
-/** Missions that track co-op (multiplayer) clears */
 const COOP_MISSION_IDS = new Set([1310053, 1510063])
+const COMBO_MISSION_IDS = new Set([1210013])
 
 // ─── Computer ───
 
@@ -54,7 +53,13 @@ function buildAwakeContext(playerId: number): AwakeContext {
     for (const [section, quests] of Object.entries(questProgressRaw)) {
         const list: CategoryContext["questProgress"][string] = []
         for (const qp of quests) {
-            list.push({ questId: qp.questId, finished: qp.finished, clearRank: qp.clearRank, bestElapsedTimeMs: qp.bestElapsedTimeMs })
+            list.push({
+                questId: qp.questId,
+                finished: qp.finished,
+                clearRank: qp.clearRank,
+                bestElapsedTimeMs: qp.bestElapsedTimeMs,
+                leaderCharacterId: qp.leaderCharacterId,
+            })
             if (qp.finished) {
                 totalQuestClears++
                 if (section === '3') totalStories++
@@ -67,10 +72,10 @@ function buildAwakeContext(playerId: number): AwakeContext {
         questProgress[section] = list
     }
 
-    // Pre-fetch character clear counts (batch: one DB call per owned character)
     const charClears = new Map<string, number>()
     const leaderClears = new Map<string, number>()
     const multiClears = new Map<string, number>()
+    const leaderMultiClears = new Map<string, number>()
     const charData = new Map<string, PlayerCharacter>()
     for (const [cid, char] of Object.entries(allChars)) {
         charData.set(cid, char)
@@ -78,6 +83,7 @@ function buildAwakeContext(playerId: number): AwakeContext {
         charClears.set(cid, row.clear_count)
         leaderClears.set(cid, row.leader_clear_count)
         multiClears.set(cid, row.multi_count)
+        leaderMultiClears.set(cid, row.leader_multi_count)
     }
 
     return {
@@ -90,6 +96,7 @@ function buildAwakeContext(playerId: number): AwakeContext {
         charClears,
         leaderClears,
         multiClears,
+        leaderMultiClears,
         charData,
     }
 }
@@ -111,21 +118,20 @@ export const AwakeComputer: MissionComputer = {
         if (qc) {
             const progress = ctx.questProgress[String(qc.category)]
             if (!progress) return 0
+            const matches = progress.filter(q => qc.questIds.includes(q.questId) && q.finished)
+            if (matches.length === 0) return 0
             if (qc.timeLimitMs) {
                 const limit = qc.timeLimitMs
-                return progress.some(q =>
-                    qc.questIds.includes(q.questId) &&
-                    q.finished &&
-                    (q.bestElapsedTimeMs ?? Infinity) <= limit
-                ) ? 1 : 0
+                if (!matches.some(q => (q.bestElapsedTimeMs ?? Infinity) <= limit)) return 0
             }
-            return progress.some(q => qc.questIds.includes(q.questId) && q.finished) ? 1 : 0
+            if (qc.leaderCharId) {
+                if (!matches.some(q => q.leaderCharacterId === qc.leaderCharId)) return 0
+            }
+            return 1
         }
 
-        // Leader-required missions: use leader_clear_count
         const isLeaderRequired = LEADER_REQUIRED_IDS.has(missionId)
 
-        // Dispatch by lastDigit
         switch (lastDigit) {
             case AwakeType.STORY_READ:
                 return computeStoryOrParty(missionId, actx, charId)
@@ -144,7 +150,10 @@ export const AwakeComputer: MissionComputer = {
                     return char?.bondTokenList.every(bt => bt.status >= 2) ? 1 : 0
                 }
                 if (COOP_MISSION_IDS.has(missionId)) {
-                    return actx.multiClears.get(charId) ?? 0
+                    return actx.leaderMultiClears.get(charId) ?? 0
+                }
+                if (COMBO_MISSION_IDS.has(missionId)) {
+                    return ctx.player.maxComboAchieved ?? 0
                 }
                 return isLeaderRequired
                     ? actx.leaderClears.get(charId) ?? 0
@@ -162,16 +171,12 @@ export const AwakeComputer: MissionComputer = {
     },
 }
 
-// ─── Awake type enum (self-documenting) ───
-
 enum AwakeType {
     STORY_READ = 1,
     PARTY_OR_SPECIAL = 2,
     SPECIAL = 3,
     ALL_COMPLETE = 4,
 }
-
-// ─── Pure compute helpers (no DB, no side effects) ───
 
 function computeStoryOrParty(_missionId: number, actx: AwakeContext, charId: string): number {
     const storyIds = getCharacterStoryQuestIds(charId)

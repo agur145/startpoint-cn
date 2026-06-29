@@ -495,6 +495,7 @@ export function getDefaultPlayerData(): Omit<Player, 'id'> {
         totalPowerflips: 0,
         totalDashes: 0,
         totalManaObtained: 0,
+        maxComboAchieved: 0,
         tutorialStep: 0,
         tutorialSkipFlag: null,
         tutorialGachaCharacterId: null,
@@ -547,6 +548,7 @@ export function deserializePlayerData(
             totalPowerflips: 0,
             totalDashes: 0,
         totalManaObtained: 0,
+        maxComboAchieved: 0,
             tutorialStep: userTutorial?.tutorial_step === undefined ? null : userTutorial.tutorial_step,
             tutorialSkipFlag: userTutorial?.skip_flag === undefined ? null : userTutorial.skip_flag,
             tutorialGachaCharacterId: toDeserialize['tutorial_gacha']?.character_id ?? null

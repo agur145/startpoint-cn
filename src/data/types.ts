@@ -225,6 +225,7 @@ export interface RawPlayerQuestProgress {
     high_score?: number
     clear_rank?: number
     best_elapsed_time_ms?: number
+    leader_character_id?: number
 }
 
 export interface PlayerQuestProgress {
@@ -233,6 +234,7 @@ export interface PlayerQuestProgress {
     highScore?: number
     clearRank?: number
     bestElapsedTimeMs?: number
+    leaderCharacterId?: number
     unlocked?: boolean
 }
 
@@ -483,6 +485,7 @@ export interface RawPlayer {
     total_powerflips: number
     total_dashes: number
     total_mana_obtained: number
+    max_combo_achieved: number
     tutorial_step: number | null
     tutorial_skip_flag: number | null
     tutorial_gacha_character_id: number | null
@@ -518,6 +521,7 @@ export interface Player {
     totalPowerflips: number
     totalDashes: number
     totalManaObtained: number
+    maxComboAchieved: number
     tutorialStep: number | null
     tutorialSkipFlag: boolean | null
     tutorialGachaCharacterId: number | null

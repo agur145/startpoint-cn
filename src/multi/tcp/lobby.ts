@@ -99,6 +99,14 @@ async function handleEnterComs(client: SessionClient, coms: { name: string }[]):
     const hostMate = client.yourself ?? client.mates[0]
     if (!hostMate) return
 
+    // Merge all connected (but not yet entered) real players into client.mates
+    const connectedClients = sessionManager.getClientsInRoom(client.roomNumber)
+    for (const c of connectedClients) {
+        if (c.yourself && !client.mates.find(m => m.viewerId === c.viewerId)) {
+            client.mates.push(c.yourself)
+        }
+    }
+
     const realMates = client.mates.filter(m => (m.viewerId ?? 0) < 900000000)
 
     // Determine NPC count: first recruit → calculate and store; rematch → restore fixed count

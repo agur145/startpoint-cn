@@ -178,6 +178,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         const questProgress = getPlayerSingleQuestProgressSync(playerId, questCategory, questId);
         const questPreviouslyCompleted = questProgress !== null;
         const questAccomplished = (body as any).is_accomplished;
+        const leaderId = ((body as any).statistics?.party || (body as any).quest_statistics?.party)?.characters?.[0]?.id
 
         const clearReward = !questPreviouslyCompleted && (questData as any).clearReward !== undefined ? givePlayerRewardSync(playerId, (questData as any).clearReward) : null;
         const sPlusClearReward = (clearRank === 5) && (questProgress?.clearRank !== 5) && ((questData as any).sPlusReward !== undefined) ? givePlayerRewardSync(playerId, (questData as any).sPlusReward) : null;
@@ -187,7 +188,8 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                     questId: questId,
                     finished: true,
                     bestElapsedTimeMs: questProgress.bestElapsedTimeMs === undefined || questProgress.bestElapsedTimeMs === null ? clearTime : Math.min(clearTime, questProgress.bestElapsedTimeMs),
-                    highScore: questProgress.highScore === undefined ? ((body as any).score || 0) : Math.max((body as any).score || 0, questProgress.highScore)
+                    highScore: questProgress.highScore === undefined ? ((body as any).score || 0) : Math.max((body as any).score || 0, questProgress.highScore),
+                    leaderCharacterId: leaderId ?? null
                 };
                 if (clearRank !== null) {
                     updateData.clearRank = questProgress.clearRank === undefined ? clearRank : Math.max(clearRank, questProgress.clearRank);
@@ -199,7 +201,8 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                     finished: true,
                     bestElapsedTimeMs: clearTime,
                     highScore: (body as any).score || 0,
-                    clearRank: clearRank ?? 5
+                    clearRank: clearRank ?? 5,
+                    leaderCharacterId: leaderId ?? null
                 });
             }
         }
@@ -215,6 +218,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             boostPoint: newBoostPoint,
             bossBoostPoint: newBossBoostPoint,
             totalManaObtained: (player.totalManaObtained ?? 0) + manaObtained,
+            maxComboAchieved: Math.max(player.maxComboAchieved ?? 0, (body as any).statistics?.max_combo_count ?? 0),
             ...(didLevelUp ? { stamina: player.stamina + getMaxStamina(newDegreeId), staminaHealTime: new Date() } : {}),
         });
         const playerData = player;
@@ -232,7 +236,6 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         }
 
         // Track co-op party character clears for awakening missions
-        const leaderId = bodyPartyStatistics.characters?.[0]?.id
         if (leaderId) incrementPlayerCharacterClearSync(playerId, leaderId, true, true)
         const seen = new Set<number>([leaderId].filter(Boolean) as number[])
         for (let i = 1; i < (bodyPartyStatistics.characters || []).length; i++) {

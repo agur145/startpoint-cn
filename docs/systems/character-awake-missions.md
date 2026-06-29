@@ -21,15 +21,13 @@
 
 | 正确度 | 数量 |
 |:---:|------|
-| ✅ | 89 条（62%） |
+| ✅ | 90 条（63%） |
 | ⚠️ | 54 条（37%） |
-| ❌ | 1 条（1%）
+| ❌ | 0 条（0%）
 
-### ❌ 剩余不可计算
+### ❌ 已全部清零！
 
-| 任务 | 角色 | 需要的数据 |
-|------|------|-----------|
-| `单次战斗连击` | 索妮雅(1210013) | max_combo_count 追踪 |
+最后 1 个 ❌（1210013 连击）通过 `max_combo_achieved` 追踪解决。
 
 ### 后续完善路径
 
@@ -111,6 +109,35 @@
 - `multi/http/battle.ts` `/finish` 新增 leader + party 的 `incrementPlayerCharacterClearSync(isMulti=true)`
 - `AwakeContext.multiClears` 预缓存 `multi_count`
 - `COOP_MISSION_IDS` 集合 → `multi_count`
+
+### 连击追踪（2026-06-28）✅
+
+1210013（索妮雅队长达成连击）通过 `players.max_combo_achieved` 追踪。
+`statistics.max_combo_count` 来自客户端 `ComboCalculatorImpl.getMaxCombo()`，
+`/finish` 时 `maxComboAchieved = max(old, body.statistics.max_combo_count)`。
+
+### Quest 队长校验（2026-06-28）✅
+
+`players_quest_progress` 新增 `leader_character_id` 列，
+`/finish` 写入 `characters[0].id`。
+`QUEST_CLEAR_MAP` 扩展 `leaderCharId` 字段，9 条 quest-clear 任务精确校验队长：
+
+| mission | quest | leaderCharId |
+|---------|-------|:---:|
+| 1110013 | 伊尔格拉乌 超级 | 111001 |
+| 2110013 | 伊尔格拉乌 超级 | 211001 |
+| 2410032 | 八岐大蛇 | — |
+| 2510032 | 深渊之兽 | 251003 |
+| 2510033 | 深渊之兽(限时) | 251003 |
+| 2310013 | 寄居蟹船长(限时) | 231001 |
+| 2630023 | 女王拉芙 | 151006 |
+| 1310052 | 结实假人·水 | 131005 |
+
+### 共斗队长追踪（2026-06-28）✅
+
+`players_character_quest_clears` 新增 `leader_multi_count` 列。
+`incrementPlayerCharacterClearSync(isMulti=true, isLeader=true)` 同步累加。
+`COOP_MISSION_IDS` 使用 `leaderMultiClears` 替代 `multiClears`。
 
 ### 架构重构（2026-06-28）✅
 

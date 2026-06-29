@@ -323,6 +323,7 @@ function buildPlayer(
         totalPowerflips: raw.total_powerflips || 0,
         totalDashes: raw.total_dashes || 0,
         totalManaObtained: raw.total_mana_obtained || 0,
+        maxComboAchieved: raw.max_combo_achieved || 0,
         tutorialStep: raw.tutorial_step,
         tutorialSkipFlag: raw.tutorial_skip_flag === null ? null : deserializeBoolean(raw.tutorial_skip_flag),
         tutorialGachaCharacterId: raw.tutorial_gacha_character_id,
@@ -337,7 +338,7 @@ export function getPlayerSync(
         transition_state, role, name, last_login_time, comment,
         vmoney, free_vmoney, rank_point, star_crumb,
         bond_token, exp_pool, exp_pooled_time, leader_character_id, party_slot,
-        degree_id, birth, free_mana, paid_mana, enable_auto_3x, total_stamina_used, total_powerflips, total_dashes, total_mana_obtained, tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id
+        degree_id, birth, free_mana, paid_mana, enable_auto_3x, total_stamina_used, total_powerflips, total_dashes, total_mana_obtained, max_combo_achieved, tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id
     FROM players
     WHERE id = ?    
     `).get(playerId) as RawPlayer | undefined
@@ -356,7 +357,7 @@ export function getAllPlayersSync(
         transition_state, role, name, last_login_time, comment,
         vmoney, free_vmoney, rank_point, star_crumb,
         bond_token, exp_pool, exp_pooled_time, leader_character_id, party_slot,
-        degree_id, birth, free_mana, paid_mana, enable_auto_3x, total_stamina_used, total_powerflips, total_dashes, total_mana_obtained, tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id
+        degree_id, birth, free_mana, paid_mana, enable_auto_3x, total_stamina_used, total_powerflips, total_dashes, total_mana_obtained, max_combo_achieved, tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id
     FROM players
     LIMIT ?
     OFFSET ?
@@ -407,6 +408,7 @@ export function insertPlayerSync(
         total_powerflips: player.totalPowerflips ?? 0,
         total_dashes: player.totalDashes ?? 0,
         total_mana_obtained: player.totalManaObtained ?? 0,
+        max_combo_achieved: player.maxComboAchieved ?? 0,
         account_id: accountId,
         tutorial_step: player.tutorialStep ?? null,
         tutorial_skip_flag: player.tutorialSkipFlag !== null ? serializeBoolean(player.tutorialSkipFlag) : null,
@@ -425,7 +427,7 @@ export function insertPlayerSync(
         transition_state, role, name, last_login_time, comment, vmoney, free_vmoney,
         rank_point, star_crumb, bond_token, exp_pool, exp_pooled_time, leader_character_id,
         party_slot, degree_id, birth, free_mana, paid_mana, enable_auto_3x,
-        total_stamina_used, total_powerflips, total_dashes, total_mana_obtained, account_id,
+        total_stamina_used, total_powerflips, total_dashes, total_mana_obtained, max_combo_achieved, account_id,
         tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id,
         time_offset${idCol})
     VALUES (@stamina, @stamina_heal_time, @boost_point, @boss_boost_point,
@@ -433,7 +435,7 @@ export function insertPlayerSync(
         @vmoney, @free_vmoney, @rank_point, @star_crumb, @bond_token,
         @exp_pool, @exp_pooled_time, @leader_character_id, @party_slot,
         @degree_id, @birth, @free_mana, @paid_mana, @enable_auto_3x,
-        @total_stamina_used, @total_powerflips, @total_dashes, @total_mana_obtained, @account_id,
+        @total_stamina_used, @total_powerflips, @total_dashes, @total_mana_obtained, @max_combo_achieved, @account_id,
         @tutorial_step, @tutorial_skip_flag, @tutorial_gacha_character_id,
         @time_offset${idVal})
     `).run(params)
@@ -1061,6 +1063,7 @@ export function updatePlayerSync(
         'totalPowerflips': 'total_powerflips',
         'totalDashes': 'total_dashes',
         'totalManaObtained': 'total_mana_obtained',
+        'maxComboAchieved': 'max_combo_achieved',
         'tutorialStep': 'tutorial_step',
         'tutorialSkipFlag': 'tutorial_skip_flag',
         'tutorialGachaCharacterId': 'tutorial_gacha_character_id'

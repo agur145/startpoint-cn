@@ -235,6 +235,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         const clearReward = !questPreviouslyCompleted && questData.clearReward !== undefined ? givePlayerRewardSync(playerId, questData.clearReward) : null
         const sPlusClearReward = (clearRank === 5) && (questProgress?.clearRank !== 5) && (questData.sPlusReward !== undefined) ? givePlayerRewardSync(playerId, questData.sPlusReward) : null
+        const leaderId = body.statistics.party.characters[0]?.id
         if (questAccomplished) {
             // update quest progress
             if (questPreviouslyCompleted) {
@@ -243,7 +244,8 @@ const routes = async (fastify: FastifyInstance) => {
                     questId: questId,
                     finished: true,
                     bestElapsedTimeMs: questProgress.bestElapsedTimeMs === undefined || questProgress.bestElapsedTimeMs === null ? clearTime : Math.min(clearTime, questProgress.bestElapsedTimeMs),
-                    highScore: questProgress.highScore === undefined ? body.score : Math.max(body.score, questProgress.highScore)
+                    highScore: questProgress.highScore === undefined ? body.score : Math.max(body.score, questProgress.highScore),
+                    leaderCharacterId: leaderId ?? null
                 }
                 if (clearRank !== null) {
                     updateData.clearRank = questProgress.clearRank === undefined ? clearRank : Math.max(clearRank, questProgress.clearRank)
@@ -256,7 +258,8 @@ const routes = async (fastify: FastifyInstance) => {
                     finished: true,
                     bestElapsedTimeMs: clearTime,
                     highScore: body.score,
-                    clearRank: clearRank ?? 5  // default S+ for quests without rank thresholds
+                    clearRank: clearRank ?? 5,
+                    leaderCharacterId: leaderId ?? null
                 }
                 insertPlayerQuestProgressSync(playerId, questCategory, insertData)
             }
@@ -274,6 +277,7 @@ const routes = async (fastify: FastifyInstance) => {
             boostPoint: newBoostPoint,
             bossBoostPoint: newBossBoostPoint,
             totalManaObtained: (playerData.totalManaObtained ?? 0) + manaObtained,
+            maxComboAchieved: Math.max(playerData.maxComboAchieved ?? 0, (body as any).statistics?.max_combo_count ?? 0),
             ...(didLevelUp ? { stamina: playerData.stamina + getMaxStamina(newDegreeId), staminaHealTime: new Date() } : {}),
         })
         if (didLevelUp) {
@@ -350,7 +354,6 @@ const routes = async (fastify: FastifyInstance) => {
 
         // Track ALL party characters quest clears for awakening missions
         // Leader (position 0) tracked separately for "以X为队长" tasks
-        const leaderId = bodyPartyStatistics.characters[0]?.id
         if (leaderId) {
             incrementPlayerCharacterClearSync(playerId, leaderId, false, true)  // isLeader=true for "以X为队长" missions
         }

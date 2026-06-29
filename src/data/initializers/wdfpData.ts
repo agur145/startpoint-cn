@@ -61,6 +61,7 @@ export default function init(
         total_powerflips INTEGER NOT NULL DEFAULT 0,
         total_dashes INTEGER NOT NULL DEFAULT 0,
         total_mana_obtained INTEGER NOT NULL DEFAULT 0,
+        max_combo_achieved INTEGER NOT NULL DEFAULT 0,
         account_id INTEGER NOT NULL,
         tutorial_step INTEGER,
         tutorial_skip_flag INTEGER,
@@ -88,12 +89,22 @@ export default function init(
         clear_count INTEGER NOT NULL DEFAULT 0,
         multi_count INTEGER NOT NULL DEFAULT 0,
         leader_clear_count INTEGER NOT NULL DEFAULT 0,
+        leader_multi_count INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (player_id, character_id),
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
 
     // migration: add leader_clear_count for leader-specific awakening missions
     try { database.prepare(`ALTER TABLE players_character_quest_clears ADD COLUMN leader_clear_count INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
+
+    // migration: add leader_multi_count for co-op leader tracking
+    try { database.prepare(`ALTER TABLE players_character_quest_clears ADD COLUMN leader_multi_count INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
+
+    // migration: add leader_character_id to quest_progress for quest-clear leader validation
+    try { database.prepare(`ALTER TABLE players_quest_progress ADD COLUMN leader_character_id INTEGER`).run(); } catch { /* column already exists */ }
+
+    // migration: add max_combo_achieved for combo mission tracking
+    try { database.prepare(`ALTER TABLE players ADD COLUMN max_combo_achieved INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
 
     database.prepare(`CREATE TABLE IF NOT EXISTS device_bindings (
         device_id INTEGER PRIMARY KEY,
@@ -285,6 +296,7 @@ export default function init(
         high_score INTEGER,
         clear_rank INTEGER,
         best_elapsed_time_ms INTEGER,
+        leader_character_id INTEGER,
         player_id INTEGER NOT NULL,
         PRIMARY KEY (section, quest_id, player_id),
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
