@@ -1092,6 +1092,22 @@ VALUES 数组:  enableAuto3x,  accountId, tutorial*, ...,     total_*, ...
 - `getDefaultPlayerData` 补 `timeOffset: null`，与 schema 的 `time_offset` 列对齐
 
 
+## 净化系统 (2026-06-30)
+
+### PartySlotValidator
+
+**新增文件：**
+- `src/lib/validate/party-slot.ts` — PartySlotValidator：/load 时校验 partySlot 范围
+
+**修改文件：**
+- `src/lib/validate/index.ts` — 注册 PartySlotValidator 到永久净化链
+
+**功能：**
+- party_id 正常范围 1~120（12 组 × 10 槽），超出视为固定编队标识
+- /load 时自动将异常 partySlot 重置为 1，防止 F1009 空指针崩溃
+- 与 MaxLevelValidator 同级运行，不影响加载性能
+
+
 ## TODO（更新）
 
 | 优先级 | 任务 | 状态 |
