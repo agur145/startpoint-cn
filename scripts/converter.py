@@ -2,6 +2,8 @@
 import json
 import os
 from math import floor
+import field_map as f
+import quest_builder as qb
 
 ROOT = os.path.dirname(os.path.realpath(__file__))
 FILE_INPUT = os.path.join(ROOT, 'in')
@@ -53,8 +55,8 @@ def convert_main_ex_quests(obj):
                     }
                     if chapter[118] != "(None)":
                         converted_chapter["fixedParty"] = int(chapter[118])
-                    if chapter[68] != "(None)" and chapter[68] != "":
-                        converted_chapter["element"] = int(chapter[68])
+                    if chapter[72] != "(None)" and chapter[72] != "":
+                        converted_chapter["element"] = int(chapter[72])
                     converted[chapter[0]] = converted_chapter
     return converted
 
@@ -86,211 +88,38 @@ def convert_boss_quests(obj):
                         "manaReward": int(chapter[95]),
                         "poolExpReward": int(chapter[96])
                     }
-                    if chapter[68] != "(None)" and chapter[68] != "":
-                        converted[chapter[0]]["element"] = int(chapter[68])
+                    if chapter[72] != "(None)" and chapter[72] != "":
+                        converted[chapter[0]]["element"] = int(chapter[72])
     return converted
 
 def convert_world_story_event_quest(obj):
-    converted = {}
-    for _, chapter_stages in obj.items():
-        for _, chapter in chapter_stages.items():
-            chapter = chapter[0]  # extract inner array
-            # determine whether the quest is a story or not
-            if chapter[85] == "":
-                # is story
-                converted[chapter[0]] = {
-                    "name": "", #chapter[1],
-                    "clearRewardId": int(chapter[4])
-                }
-            else:
-                converted_chapter = {
-                    "name": "", #chapter[2],
-                    "clearRewardId": int(chapter[4]),
-                    "sPlusRewardId": 1,
-                    "bRankTime": floor(float(chapter[85]) * 1000),
-                    "aRankTime": floor(float(chapter[86]) * 1000),
-                    "sRankTime": floor(float(chapter[87]) * 1000),
-                    "sPlusRankTime":  floor(float(chapter[88]) * 1000),
-                    "rankPointReward": int(chapter[94]),
-                    "characterExpReward": int(chapter[95]),
-                    "manaReward": int(chapter[96]),
-                    "poolExpReward": int(chapter[97]),
-                }
-                if chapter[71] != "(None)":
-                    converted_chapter["scoreRewardGroupId"] = int(chapter[71])
-                if chapter[119] != "(None)":
-                    converted_chapter["fixedParty"] = int(chapter[119])
-                if chapter[69] != "(None)" and chapter[69] != "":
-                    converted_chapter["element"] = int(chapter[69])
-                converted[chapter[0]] = converted_chapter
-
-    return converted
+    return qb.convert_3level_with_story(obj, f.TYPE_MAP['world_story_event_quest']['layout'])
 
 def convert_world_story_event_boss_battle_quest(obj):
-    converted = {}
-    for _, chapter_stages in obj.items():
-        for _, chapter in chapter_stages.items():
-            chapter = chapter[0]  # extract inner array
-            converted_chapter = {
-                "name": "", #chapter[2],
-                "clearRewardId": int(chapter[4]),
-                "sPlusRewardId": 1,
-                "bRankTime": floor(float(chapter[84]) * 1000),
-                "aRankTime": floor(float(chapter[85]) * 1000),
-                "sRankTime": floor(float(chapter[86]) * 1000),
-                "sPlusRankTime":  floor(float(chapter[87]) * 1000),
-                "rankPointReward": int(chapter[93]),
-                "characterExpReward": int(chapter[94]),
-                "manaReward": int(chapter[95]),
-                "poolExpReward": int(chapter[97])
-            }
-            if chapter[70] != "(None)":
-                converted_chapter["scoreRewardGroupId"] = int(chapter[70])
-            if chapter[68] != "(None)" and chapter[68] != "":
-                converted_chapter["element"] = int(chapter[68])
-            converted[chapter[0]] = converted_chapter
-
-    return converted
+    return qb.convert_3level(obj, f.TYPE_MAP['world_story_event_boss_battle_quest']['layout'], hardcode_s_plus=True)
 
 def convert_advent_quest(obj):
-    converted = {}
-    for _, chapter_stages in obj.items():
-        for _, chapter in chapter_stages.items():
-            chapter = chapter[0]  # extract inner array
-            # determine whether the quest is a story or not
-            if chapter[90] == "" or chapter[90] == "(None)":
-                # is story
-                converted[chapter[0]] = {
-                    "name": "", #chapter[1],
-                    "clearRewardId": int(chapter[4])
-                }
-            else:
-                converted_chapter = {
-                    "name": "", #chapter[2],
-                    "clearRewardId": int(chapter[4]),
-                    "sPlusRewardId": 1,
-                    "bRankTime": floor(float(chapter[90]) * 1000),
-                    "aRankTime": floor(float(chapter[91]) * 1000),
-                    "sRankTime": floor(float(chapter[92]) * 1000),
-                    "sPlusRankTime":  floor(float(chapter[93]) * 1000),
-                    "rankPointReward": int(chapter[97]),
-                    "characterExpReward": int(chapter[98]),
-                    "manaReward": int(chapter[99]),
-                    "poolExpReward": int(chapter[100])
-                }
-                if chapter[76] != "(None)" and chapter[76] != '':
-                    converted_chapter["scoreRewardGroupId"] = int(chapter[76])
-                if chapter[72] != "(None)" and chapter[72] != "":
-                    converted_chapter["element"] = int(chapter[72])
-                converted[chapter[0]] = converted_chapter
-
-    return converted
+    return qb.convert_3level_with_story(obj, f.TYPE_MAP['advent_event_quest']['layout'])
 
 def convert_daily_exp_mana_event_quest(obj):
-    converted = {}
-    for _, chapter_stages in obj.items():
-        for _, chapter in chapter_stages.items():
-            chapter = chapter[0]  # extract inner array
-            converted[chapter[0]] = {
-                "name": "", #chapter[2],
-                "clearRewardId": int(chapter[4]),
-                "scoreRewardGroupId": int(chapter[66]),
-                "bRankTime": 0,
-                "aRankTime": 0,
-                "sRankTime": 0,
-                "sPlusRankTime":  0,
-                "rankPointReward": int(chapter[68]),
-                "characterExpReward": int(chapter[69]),
-                "manaReward": int(chapter[70]),
-                "poolExpReward": int(chapter[71])
-            }
-
-    return converted
+    return qb.convert_3level(obj, f.TYPE_MAP['daily_exp_mana_event_quest']['layout'], hardcode_s_plus=False)
 
 def convert_daily_week_event_quest(obj):
-    converted = {}
-    for _, chapter_stages in obj.items():
-        for _, chapter in chapter_stages.items():
-            chapter = chapter[0]  # extract inner array
-            converted[chapter[0]] = {
-                "name": "", #chapter[2],
-                "clearRewardId": int(chapter[3]),
-                "scoreRewardGroupId": int(chapter[65]),
-                "bRankTime": 0,
-                "aRankTime": 0,
-                "sRankTime": 0,
-                "sPlusRankTime":  0,
-                "rankPointReward": int(chapter[67]),
-                "characterExpReward": int(chapter[68]),
-                "manaReward": int(chapter[69]),
-                "poolExpReward": int(chapter[70])
-            }
-
-    return converted
+    return qb.convert_3level(obj, f.TYPE_MAP['daily_week_event_quest']['layout'], hardcode_s_plus=False)
 
 def convert_challenge_dungeon_event_quest(obj):
-    converted = {}
-    for _, quests in obj.items():
-        for _, quest in quests.items():
-            quest = quest[0]  # extract inner array
-            converted[quest[0]] = {
-                "name": "",
-                "clearRewardId": int(quest[4]),
-                "scoreRewardGroupId": int(quest[71]),
-                "sPlusRewardId": 1,
-                "bRankTime": floor(float(quest[85]) * 1000),
-                "aRankTime": floor(float(quest[86]) * 1000),
-                "sRankTime": floor(float(quest[87]) * 1000),
-                "sPlusRankTime":  floor(float(quest[88]) * 1000),
-                "rankPointReward": int(quest[92]),
-                "characterExpReward": int(quest[93]),
-                "manaReward": int(quest[94]),
-                "poolExpReward": int(quest[95])
-            }
-            if quest[69] != "(None)" and quest[69] != "":
-                converted[quest[0]]["element"] = int(quest[69])
-    return converted 
+    return qb.convert_3level(obj, f.TYPE_MAP['challenge_dungeon_event_quest']['layout'])
 
 def convert_story_event_single_quest(obj):
-    converted = {}
-    for _, quests in obj.items():
-        for _, quest in quests.items():
-            quest = quest[0]  # extract inner array
-            if quest[86] == "":
-                # is story
-                converted_quest = {
-                    "name": ""
-                }
-
-                if quest[4] != "(None)":
-                    converted_quest['clearRewardId'] = int(quest[4])
-
-                converted[quest[0]] = converted_quest
-            else:
-                converted[quest[0]] = {
-                    "name": "",
-                    "clearRewardId": int(quest[4]),
-                    "scoreRewardGroupId": int(quest[72]),
-                    "sPlusRewardId": 1,
-                    "bRankTime": floor(float(quest[86]) * 1000),
-                    "aRankTime": floor(float(quest[87]) * 1000),
-                    "sRankTime": floor(float(quest[88]) * 1000),
-                    "sPlusRankTime":  floor(float(quest[89]) * 1000),
-                    "rankPointReward": int(quest[94]),
-                    "characterExpReward": int(quest[95]),
-                    "manaReward": int(quest[96]),
-                    "poolExpReward": int(quest[97])
-                }
-                if quest[69] != "(None)" and quest[69] != "":
-                    converted[quest[0]]["element"] = int(quest[69])
-    return converted 
+    return qb.convert_3level_with_story(obj, f.TYPE_MAP['story_event_single_quest']['layout'])
 
 def convert_ranking_event_single_quest(obj):
+    layout = f.TYPE_MAP['ranking_event_single_quest']['layout']
     converted = {}
     for _, quests in obj.items():
         for _, quest in quests.items():
-            quest = quest[0]  # extract inner array
-            converted[quest[0]] = {
+            row = qb.unwrap(quest)
+            converted[row[layout['quest_id']]] = {
                 "name": "",
                 "bRankTime": 0,
                 "aRankTime": 0,
@@ -304,43 +133,10 @@ def convert_ranking_event_single_quest(obj):
     return converted 
 
 def convert_solo_time_attack_event_quest(obj):
-    converted = {}
-    for _, quests in obj.items():
-        for _, quest in quests.items():
-            quest = quest[0]  # extract inner array
-            converted[quest[0]] = {
-                "name": "",
-                "scoreRewardGroupId": int(quest[71]),
-                "sPlusRewardId": 1,
-                "bRankTime": floor(float(quest[51]) * 1000),
-                "aRankTime": floor(float(quest[52]) * 1000),
-                "sRankTime": floor(float(quest[53]) * 1000),
-                "sPlusRankTime":  floor(float(quest[54]) * 1000),
-                "rankPointReward": int(quest[85]),
-                "characterExpReward": int(quest[86]),
-                "manaReward": int(quest[87]),
-                "poolExpReward": int(quest[88])
-            }
-    return converted 
+    return qb.convert_3level(obj, f.TYPE_MAP['solo_time_attack_event_quest']['layout'], hardcode_clear_reward=False, hardcode_s_plus=True)
 
 def convert_tower_dungeon_event_quest(obj):
-    converted = {}
-    for _, quests in obj.items():
-        for _, quest in quests.items():
-            quest = quest[0]  # extract inner array
-            converted[quest[0]] = {
-                "name": "",
-                "scoreRewardGroupId": int(quest[69]),
-                "bRankTime": 0,
-                "aRankTime": 0,
-                "sRankTime": 0,
-                "sPlusRankTime": 0,
-                "rankPointReward": int(quest[82]),
-                "characterExpReward": int(quest[83]),
-                "manaReward": int(quest[84]),
-                "poolExpReward": int(quest[85])
-            }
-    return converted 
+    return qb.convert_3level(obj, f.TYPE_MAP['tower_dungeon_event_quest']['layout'], hardcode_clear_reward=False, hardcode_s_plus=False)
 
 def convert_expert_single_event_quest(obj):
     converted = {}
@@ -362,30 +158,12 @@ def convert_expert_single_event_quest(obj):
                 "manaReward": int(quest[98]),
                 "poolExpReward": int(quest[99])
             }
-            if quest[69] != "(None)" and quest[69] != "":
-                converted[quest[0]]["element"] = int(quest[69])
+            if quest[73] != "(None)" and quest[73] != "":
+                converted[quest[0]]["element"] = int(quest[73])
     return converted 
 
 def convert_carnival_event_quest(obj):
-    converted = {}
-    for _, quests in obj.items():
-        for _, quest in quests.items():
-            quest = quest[0]  # extract inner array
-            converted[quest[0]] = {
-                "name": "",
-                "clearRewardId": int(quest[6]),
-                "bRankTime": 0,
-                "aRankTime": 0,
-                "sRankTime": 0,
-                "sPlusRankTime": 0,
-                "rankPointReward": int(quest[94]),
-                "characterExpReward": int(quest[95]),
-                "manaReward": int(quest[96]),
-                "poolExpReward": int(quest[97])
-            }
-            if quest[69] != "(None)" and quest[69] != "":
-                converted[quest[0]]["element"] = int(quest[69])
-    return converted 
+    return qb.convert_3level(obj, f.TYPE_MAP['carnival_event_quest']['layout'], hardcode_s_plus=False)
 
 def convert_raid_event_quest(obj):
     converted = {}
@@ -430,8 +208,8 @@ def convert_rush_event_quest(obj):
                 "rushEventFolderId": int(quest[1]),
                 "rushEventRound": int(quest[2])
             }
-            if quest[69] != "(None)" and quest[69] != "":
-                converted[quest[0]]["element"] = int(quest[69])
+            if quest[73] != "(None)" and quest[73] != "":
+                converted[quest[0]]["element"] = int(quest[73])
     return converted 
 
 def convert_score_attack_event_quest(obj):
