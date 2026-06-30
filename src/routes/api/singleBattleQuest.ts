@@ -13,6 +13,8 @@ import { getStaminaCost } from "../../lib/stamina-cost";
 import { handleCarnivalEventFinish } from "../../lib/quest/finish/carnival-handler";
 import { handleRushEventFinish } from "../../lib/quest/finish/rush-handler";
 import { handleRaidEventFinish } from "../../lib/quest/finish/raid-handler";
+import { calculateClearRank } from "../../lib/quest/finish/quest-calc";
+import { validateSessionAndPlayer } from "../../lib/quest/finish/session-validator";
 import { readFileSync, existsSync } from "fs";
 import path from "path";
 import questEntryCosts from "../../../assets/quest_entry_costs.json";
@@ -154,24 +156,14 @@ const routes = async (fastify: FastifyInstance) => {
 
         const viewerId = body.viewer_id
         if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid request body."
+            "error": "Bad Request", "message": "Invalid request body."
         })
 
-        const viewerIdSession = await getSession(viewerId.toString())
-        if (!viewerIdSession) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid viewer id."
+        const sessionResult = await validateSessionAndPlayer(viewerId)
+        if (!sessionResult) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid viewer id."
         })
-
-        // get player
-        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
-        const playerData = playerId !== null ? getPlayerSync(playerId) : null
-
-        if (playerData === null) return reply.status(500).send({
-            "error": "Internal Server Error",
-            "message": "No player bound to account."
-        })
+        const { playerId, playerData } = sessionResult
 
         // get active quest data
         const activeQuestData = activeQuests[playerId]
@@ -197,16 +189,9 @@ const routes = async (fastify: FastifyInstance) => {
         delete activeQuests[playerId]
         deletePlayerActiveQuestSync(playerId)
 
-        // calculate clear rank (only if quest has rank time thresholds)
+        // calculate clear rank
         const clearTime = body.elapsed_time_ms
-        const hasRankThresholds = questData.bRankTime > 0
-        const clearRank = hasRankThresholds ? (
-            questData.sPlusRankTime >= clearTime ? 5
-                : questData.sRankTime >= clearTime ? 4
-                    : questData.aRankTime >= clearTime ? 3
-                        : questData.bRankTime >= clearTime ? 2
-                            : 1
-        ) : null
+        const clearRank = calculateClearRank(clearTime, questData)
 
         // calculate player rewards
         const newExpPool = playerData.expPool + questData.poolExpReward
@@ -523,23 +508,14 @@ const routes = async (fastify: FastifyInstance) => {
 
         const viewerId = body.viewer_id
         if (isNaN(viewerId)) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid request body."
+            "error": "Bad Request", "message": "Invalid request body."
         })
 
-        const viewerIdSession = await getSession(viewerId.toString())
-        if (!viewerIdSession) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid viewer id."
+        const sessionResult = await validateSessionAndPlayer(viewerId)
+        if (!sessionResult) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid viewer id."
         })
-
-        // get player
-        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
-
-        if (playerId === null) return reply.status(500).send({
-            "error": "Internal Server Error",
-            "message": "No player bound to account."
-        })
+        const { playerId } = sessionResult
 
         const headers = generateDataHeaders({ viewer_id: body.viewer_id })
 
@@ -570,23 +546,14 @@ const routes = async (fastify: FastifyInstance) => {
         const useBossBoostPoint = body.use_boss_boost_point
         const isAutoStartMode = body.is_auto_start_mode
         if (isNaN(viewerId) || isNaN(partyId) || isNaN(questId) || isNaN(category) || useBoostPoint === undefined || useBossBoostPoint === undefined || isAutoStartMode === undefined) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid request body."
+            "error": "Bad Request", "message": "Invalid request body."
         })
 
-        const viewerIdSession = await getSession(viewerId.toString())
-        if (!viewerIdSession) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid viewer id."
+        const sessionResult = await validateSessionAndPlayer(viewerId)
+        if (!sessionResult) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid viewer id."
         })
-
-        // get player
-        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
-
-        if (playerId === null) return reply.status(500).send({
-            "error": "Internal Server Error",
-            "message": "No player bound to account."
-        })
+        const { playerId, playerData: player } = sessionResult
 
         // get quest data
         const questData = getQuestFromCategorySync(category, questId) as BattleQuest | null
@@ -619,14 +586,6 @@ const routes = async (fastify: FastifyInstance) => {
         const staminaCost = staminaInfo.cost
         let afterStamina = 0
         if (staminaCost > 0) {
-            const player = getPlayerSync(playerId)
-            if (!player) {
-                console.error(`[BATTLE-START] player not found: ${playerId}`)
-                return reply.status(500).send({
-                    "error": "Internal Server Error",
-                    "message": "Player not found."
-                })
-            }
             const currentStamina = computeRealTimeStamina(player)
             if (currentStamina < staminaCost) {
                 console.warn(`[BATTLE-START] player ${playerId} stamina insufficient: ${currentStamina} < ${staminaCost}`)
@@ -698,24 +657,14 @@ const routes = async (fastify: FastifyInstance) => {
 
         const viewerId = body.viewer_id
         if (isNaN(viewerId)) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid request body."
+            "error": "Bad Request", "message": "Invalid request body."
         })
 
-        const viewerIdSession = await getSession(viewerId.toString())
-        if (!viewerIdSession) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid viewer id."
+        const sessionResult = await validateSessionAndPlayer(viewerId)
+        if (!sessionResult) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid viewer id."
         })
-
-        // get player
-        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
-        const player = playerId !== null ? getPlayerSync(playerId) : null
-
-        if (player === null) return reply.status(500).send({
-            "error": "Internal Server Error",
-            "message": "No player bound to account."
-        })
+        const { playerId, playerData: player } = sessionResult
 
         // get active quest data
         const activeQuestData = activeQuests[playerId]
