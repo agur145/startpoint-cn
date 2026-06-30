@@ -236,8 +236,9 @@ def convert_3level_with_story(obj, layout, hardcode_clear_reward=True, hardcode_
 
 # ── 4-level nested (main/ex/boss quests) ─────────────────────────────────
 
-def convert_4level_with_story(obj, layout):
-    """4-level nested quest converter with story quest support."""
+def convert_4level_with_story(obj, layout, story_clear_reward=None):
+    """4-level nested quest converter with story quest support.
+    story_clear_reward: override clear_reward index for story branch (default: use layout)."""
     from math import floor
     converted = {}
     for _, chapter_stages in obj.items():
@@ -248,7 +249,7 @@ def convert_4level_with_story(obj, layout):
                 
                 if is_story(row, layout):
                     q = {'name': ''}
-                    ci = layout.get('clear_reward', -1)
+                    ci = story_clear_reward if story_clear_reward is not None else layout.get('clear_reward', -1)
                     if ci is not None and ci >= 0:
                         v = optional_int(row, ci)
                         if v is not None:
@@ -256,6 +257,11 @@ def convert_4level_with_story(obj, layout):
                     converted[qid] = q
                 else:
                     q = {'name': ''}
+                    cr = layout.get('clear_reward', -1)
+                    if cr is not None and cr >= 0:
+                        v = optional_int(row, cr)
+                        if v is not None:
+                            q['clearRewardId'] = v
                     sgr = layout.get('score_group', -1)
                     if sgr is not None and sgr >= 0:
                         v = optional_int(row, sgr)
