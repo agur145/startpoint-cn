@@ -9,12 +9,14 @@ import { rushEventFolderMaxRounds } from "./rushEvent";
 import { RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { computeRealTimeStamina, getRankDegree, getMaxStamina } from "../../lib/stamina";
+import { getStaminaCost } from "../../lib/stamina-cost";
+import { handleCarnivalEventFinish } from "../../lib/quest/finish/carnival-handler";
+import { handleRaidEventFinish } from "../../lib/quest/finish/raid-handler";
 import { readFileSync, existsSync } from "fs";
 import path from "path";
 import questEntryCosts from "../../../assets/quest_entry_costs.json";
 import scoreAttackBorderRewards from "../../../assets/score_attack_border_reward.json";
 import eventChallengePointMap from "../../../assets/event_challenge_point_map.json";
-import { getStaminaCost } from "../../lib/stamina-cost";
 
 // Load carnival quest score data
 let carnivalScoreLookup: Record<string, { difficulty_score: number, time_limit_ms: number, folder_id: number, event_id: number }> = {}
@@ -533,62 +535,27 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         // Record played party for RAID_EVENT
-        if (questCategory === QuestCategory.RAID_EVENT && activeQuestData.eventId) {
-            const eventId = activeQuestData.eventId
-            const characterIds = bodyPartyStatistics.characters.map(val => val?.id ?? null)
-            const unisonCharacterIds = bodyPartyStatistics.unison_characters.map(val => val?.id ?? null)
-            const evolutionImgLevels = getCharactersEvolutionImgLevels(playerId, characterIds)
-            const unisonEvolutionImgLevels = getCharactersEvolutionImgLevels(playerId, unisonCharacterIds)
-            insertPlayerRushEventPlayedPartySync(playerId, eventId, {
-                characterIds, unisonCharacterIds,
-                equipmentIds: bodyPartyStatistics.equipments.map(val => val?.id ?? null),
-                abilitySoulIds: bodyPartyStatistics.ability_soul_ids,
-                evolutionImgLevels,
-                unisonEvolutionImgLevels,
-                battleType: RushEventBattleType.FOLDER,
-                round: questId
-            })
-            console.log(`[RAID] recorded played party: eventId=${eventId} questId=${questId}`)
-        }
+        handleRaidEventFinish({
+            questCategory,
+            activeEventId: activeQuestData.eventId,
+            party: bodyPartyStatistics,
+            playerId,
+            questId,
+            getEvoLevelsFn: (pid, chars) => getCharactersEvolutionImgLevels(pid, chars),
+            insertPartyFn: (pid, eid, p) => insertPlayerRushEventPlayedPartySync(pid, eid, p),
+        })
 
         // handle carnival event score & records
-        let carnivalEventData: any = null
-        if (questCategory === QuestCategory.CARNIVAL_EVENT && questAccomplished) {
-            const carnivalInfo = carnivalScoreLookup[String(questId)]
-            if (carnivalInfo) {
-                const characterIds = bodyPartyStatistics.characters.map((v: any) => v?.id ?? null)
-                const unisonCharacterIds = bodyPartyStatistics.unison_characters.map((v: any) => v?.id ?? null)
-                const leaderCharId = bodyPartyStatistics.leader?.id ?? 0
-
-                const difficultyBonus = carnivalInfo.difficulty_score * 100
-                const timeBonus = Math.max(0, carnivalInfo.time_limit_ms - clearTime)
-                const totalScore = difficultyBonus + timeBonus
-
-                upsertPlayerCarnivalEventRecordSync(
-                    playerId,
-                    carnivalInfo.event_id,
-                    carnivalInfo.folder_id,
-                    totalScore,
-                    characterIds,
-                    unisonCharacterIds
-                )
-
-                // Build carnival_event response for client
-                const previousTotalBest = carnivalEventData === null ? 0 : 0  // simplified: no previous total
-
-                carnivalEventData = {
-                    is_record_valid: true,
-                    leader_character_id: leaderCharId,
-                    new_degree_ids: [] as number[],
-                    previous_total_best_score: previousTotalBest,
-                    reward_ids: [] as number[],
-                    score: {
-                        difficulty_bonus: difficultyBonus,
-                        time_bonus: timeBonus
-                    }
-                }
-            }
-        }
+        const carnivalEventData = handleCarnivalEventFinish({
+            questCategory,
+            questAccomplished,
+            questId,
+            clearTime,
+            party: bodyPartyStatistics,
+            playerId,
+            carnivalLookup: carnivalScoreLookup,
+            upsertFn: (pid, eid, fid, score, chars, unisons) => upsertPlayerCarnivalEventRecordSync(pid, eid, fid, score, chars, unisons),
+        })
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
