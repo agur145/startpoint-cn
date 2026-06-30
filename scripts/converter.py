@@ -139,28 +139,7 @@ def convert_tower_dungeon_event_quest(obj):
     return qb.convert_3level(obj, f.TYPE_MAP['tower_dungeon_event_quest']['layout'], hardcode_clear_reward=False, hardcode_s_plus=False)
 
 def convert_expert_single_event_quest(obj):
-    converted = {}
-    for event_id, quests in obj.items():
-        for _, quest in quests.items():
-            quest = quest[0]  # extract inner array
-            converted[quest[0]] = {
-                "name": "",
-                "eventId": int(event_id),
-                "clearRewardId": int(quest[6]),
-                "scoreRewardGroupId": int(quest[73]),
-                "sPlusRewardId": 1,
-                "bRankTime": floor(float(quest[87]) * 1000),
-                "aRankTime": floor(float(quest[88]) * 1000),
-                "sRankTime": floor(float(quest[89]) * 1000),
-                "sPlusRankTime":  floor(float(quest[90]) * 1000),
-                "rankPointReward": int(quest[96]),
-                "characterExpReward": int(quest[97]),
-                "manaReward": int(quest[98]),
-                "poolExpReward": int(quest[99])
-            }
-            if quest[73] != "(None)" and quest[73] != "":
-                converted[quest[0]]["element"] = int(quest[73])
-    return converted 
+    return qb.convert_3level_with_event(obj, f.TYPE_MAP['expert_single_event_quest']['layout'], event_field_name='eventId')
 
 def convert_carnival_event_quest(obj):
     return qb.convert_3level(obj, f.TYPE_MAP['carnival_event_quest']['layout'], hardcode_s_plus=False)

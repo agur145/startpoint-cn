@@ -22,3 +22,4 @@ web/public/comic/
 # mitmproxy traffic captures (may contain real tokens/PII — local only)
 docs/cn-traffic/
 
+scripts/out_new/

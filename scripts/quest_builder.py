@@ -278,3 +278,21 @@ def convert_4level_with_story(obj, layout):
                     q['sPlusRewardId'] = 1
                     converted[qid] = q
     return converted
+
+# ── 3-level with outer event key ─────────────────────────────────────────
+
+def convert_3level_with_event(obj, layout, event_field_name='eventId', **kwargs):
+    """3-level converter where the outer key is event_id, injected as a field.
+    
+    obj: {event_id → {quest_id → [row]}}
+    event_field_name: name of the field to inject (e.g. 'eventId', 'rushEventId')
+    kwargs: passed to convert_3level (hardcode_s_plus, etc.)
+    """
+    converted = {}
+    for event_id, stages in obj.items():
+        extra = {event_field_name: int(event_id)}
+        # convert_3level expects {outer → {inner → [row]}}, wrap appropriately
+        wrapped = {event_id: stages}
+        result = convert_3level(wrapped, layout, extra=extra, **kwargs)
+        converted.update(result)
+    return converted
