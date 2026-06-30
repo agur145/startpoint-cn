@@ -11,6 +11,7 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { computeRealTimeStamina, getRankDegree, getMaxStamina } from "../../lib/stamina";
 import { getStaminaCost } from "../../lib/stamina-cost";
 import { handleCarnivalEventFinish } from "../../lib/quest/finish/carnival-handler";
+import { handleRushEventFinish } from "../../lib/quest/finish/rush-handler";
 import { handleRaidEventFinish } from "../../lib/quest/finish/raid-handler";
 import { readFileSync, existsSync } from "fs";
 import path from "path";
@@ -408,131 +409,24 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // handle event quest-specific data & rewards
-        let rushEventData: ReturnRushEvent | null = null
-        let rushEventRewardsResult: PlayerRewardResult | null = null
-
-        if (questCategory === QuestCategory.RUSH_EVENT) {
-            // rush event
-
-            const rushEventId = questData.rushEventId
-            const rushEventFolderId = questData.rushEventFolderId
-            const rushEventRound = questData.rushEventRound
-            console.log(`[RUSH] finish: playerId=${playerId} eventId=${rushEventId} folderId=${rushEventFolderId} round=${rushEventRound} clearTime=${clearTime}`)
-
-            if (rushEventFolderId !== undefined && rushEventRound !== undefined && rushEventId !== undefined) {
-                // update rush event data
-                const rushEventBattleType = rushEventRound === 0 ? RushEventBattleType.ENDLESS : RushEventBattleType.FOLDER
-
-                // map character ids
-                const characterIds = bodyPartyStatistics.characters.map(val => val?.id ?? null)
-                const unisonCharacterIds = bodyPartyStatistics.unison_characters.map(val => val?.id ?? null)
-
-                // get evolution image levels
-                const evolutionImgLevels: (number | null)[] = getCharactersEvolutionImgLevels(playerId, characterIds)
-                const unisonEvolutionImgLevels: (number | null)[] = getCharactersEvolutionImgLevels(playerId, unisonCharacterIds)
-
-                let round: number = questId
-
-                // update endless battle stats
-                let oldEndlessMaxRound: number | null = null
-                let oldBestElapsedTimeMs: number | null = null
-                let newEndlessMaxRound: number | null = null
-                let newEndlessNextRound: number | null = null
-                let newBestElapsedTimeMs: number | null = null
-
-                if (rushEventBattleType === RushEventBattleType.ENDLESS) {
-                    // get player rush event data
-                    const playerRushEventData = getPlayerRushEventSync(playerId, rushEventId)
-
-                    const playerNextRound = playerRushEventData?.endlessBattleNextRound ?? 1
-                    const playerMaxRound = playerRushEventData?.endlessBattleMaxRound ?? 1
-                    const playerBestClearTime = playerRushEventData?.endlessBattleMaxRoundTime ?? Number.MAX_SAFE_INTEGER
-                    round = playerNextRound
-
-                    // Capture old values before update
-                    oldEndlessMaxRound = playerMaxRound
-                    oldBestElapsedTimeMs = playerBestClearTime < Number.MAX_SAFE_INTEGER ? playerBestClearTime : null
-
-                    const isNewRecord = (playerNextRound >= playerMaxRound && playerBestClearTime >= clearTime) || (playerNextRound > playerMaxRound)
-                    if (isNewRecord) {
-                        console.log(`[RUSH] finish: ENDLESS NEW RECORD! round=${playerNextRound} time=${clearTime}`)
-                        updatePlayerRushEventSync(playerId, {
-                            eventId: rushEventId,
-                            endlessBattleMaxRound: playerNextRound,
-                            endlessBattleMaxRoundTime: clearTime,
-                            endlessBattleMaxRoundCharacterIds: characterIds,
-                            endlessBattleMaxRoundCharacterEvolutionImgLvls: evolutionImgLevels
-                        })
-                        newEndlessMaxRound = playerNextRound
-                        newBestElapsedTimeMs = clearTime
-                    } else {
-                        newEndlessMaxRound = playerMaxRound
-                        newBestElapsedTimeMs = playerBestClearTime < Number.MAX_SAFE_INTEGER ? playerBestClearTime : null
-                    }
-                    newEndlessNextRound = playerNextRound + 1
-
-                    // always record played party for endless
-                    insertPlayerRushEventPlayedPartySync(playerId, rushEventId, {
-                        characterIds, unisonCharacterIds,
-                        equipmentIds: bodyPartyStatistics.equipments.map(val => val?.id ?? null),
-                        abilitySoulIds: bodyPartyStatistics.ability_soul_ids,
-                        evolutionImgLevels, unisonEvolutionImgLevels,
-                        battleType: rushEventBattleType, round
-                    })
-                } else if (rushEventBattleType === RushEventBattleType.FOLDER) {
-                    const isFolderFinal = rushEventRound >= (rushEventFolderMaxRounds[rushEventFolderId] ?? 0)
-                    if (isFolderFinal) {
-                        // mark folder as complete
-                        insertPlayerRushEventClearedFolderSync(playerId, rushEventId, rushEventFolderId)
-                        updatePlayerRushEventSync(playerId, { eventId: rushEventId, activeRushBattleFolderId: null })
-                        deletePlayerRushEventPlayedPartyListSync(playerId, rushEventId, rushEventBattleType)
-                    } else {
-                        // record played party for non-final rounds
-                        insertPlayerRushEventPlayedPartySync(playerId, rushEventId, {
-                            characterIds, unisonCharacterIds,
-                            equipmentIds: bodyPartyStatistics.equipments.map(val => val?.id ?? null),
-                            abilitySoulIds: bodyPartyStatistics.ability_soul_ids,
-                            evolutionImgLevels, unisonEvolutionImgLevels,
-                            battleType: rushEventBattleType, round
-                        })
-                    }
-                }
-
-                // get serialized parties
-                const serializedPlayedParties = getSerializedPlayerRushEventPlayedPartiesSync(playerId, rushEventId)
-
-                // set rush event data
-                const isEndless = rushEventBattleType === RushEventBattleType.ENDLESS
-                rushEventData = {
-                    "rush_battle_reward_list": [],
-                    "rush_battle_played_party_list": serializedPlayedParties.folderParties,
-                    "endless_battle_played_party_list": serializedPlayedParties.endlessParties,
-                    "is_out_of_period": false,
-                    "endless_battle_next_round": isEndless ? newEndlessNextRound : null,
-                    "endless_battle_max_round": isEndless ? newEndlessMaxRound : null,
-                    "high_score": isEndless ? clearTime : null,
-                    "best_elapsed_time_ms": isEndless ? newBestElapsedTimeMs : null,
-                    "old_endless_battle_max_round": isEndless ? oldEndlessMaxRound : null,
-                    "old_best_elapsed_time_ms": isEndless ? oldBestElapsedTimeMs : null
-                }
-
-                // give rewards if allowed (FOLDER only, not ENDLESS)
-                if (rushEventBattleType === RushEventBattleType.FOLDER && rushEventRound >= (rushEventFolderMaxRounds[rushEventFolderId] ?? 0)) {
-                    const rewards = getRushEventFolderClearRewards(rushEventId, rushEventFolderId) ?? []
-                    console.log(`[RUSH] finish: folder clear! rewards=${rewards.length} items`)
-                    rushEventRewardsResult = givePlayerRewardsSync(playerId, rewards)
-
-                    rushEventData.rush_battle_reward_list = rewards.map(reward => {
-                        const itemReward = reward as EquipmentItemReward
-                        return {
-                            "kind": 1,
-                            "kind_id": itemReward.id,
-                            "number": itemReward.count
-                        }
-                    })
-                }
-            }
-        }
+        const { rushEventData, rushEventRewardsResult } = handleRushEventFinish({
+            questCategory,
+            questData,
+            clearTime,
+            party: bodyPartyStatistics,
+            playerId,
+            questId,
+            getEvoLevels: (pid, chars) => getCharactersEvolutionImgLevels(pid, chars),
+            folderMaxRounds: rushEventFolderMaxRounds,
+            getRushEvent: (pid, eid) => getPlayerRushEventSync(pid, eid),
+            updateRushEvent: (pid, data) => updatePlayerRushEventSync(pid, data),
+            insertParty: (pid, eid, p) => insertPlayerRushEventPlayedPartySync(pid, eid, p),
+            insertClearedFolder: (pid, eid, fid) => insertPlayerRushEventClearedFolderSync(pid, eid, fid),
+            deletePartyList: (pid, eid, bt) => deletePlayerRushEventPlayedPartyListSync(pid, eid, bt),
+            getSerializedParties: (pid, eid) => getSerializedPlayerRushEventPlayedPartiesSync(pid, eid),
+            getFolderRewards: (eid, fid) => getRushEventFolderClearRewards(eid, fid),
+            giveRewards: (pid, r) => givePlayerRewardsSync(pid, r),
+        })
 
         // Record played party for RAID_EVENT
         handleRaidEventFinish({
