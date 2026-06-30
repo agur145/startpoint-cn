@@ -3,37 +3,31 @@ import { getConfigSync } from "./assets";
 
 const STAMINA_OVERFLOW_MAX = 999;
 
-interface RankEntry { degree: number; stamina: number; threshold: number; healRate: number }
-const rankData: RankEntry[] = [];
-const staminaByDegree: Map<number, number> = new Map();
+interface RankEntry { stamina: number; threshold: number; healRate: number }
+const rankMap = new Map<number, RankEntry>();
+const sortedDegrees: number[] = [];
 
 for (const [degreeStr, rows] of Object.entries(playerRankTable)) {
     const degree = parseInt(degreeStr);
     const row = (rows as any[])[0];
-    const stamina = parseInt(row[0]);
-    const threshold = parseInt(row[1]);
-    const healRate = parseFloat(row[2]) || 0;
-    rankData.push({ degree, stamina, threshold, healRate });
-    staminaByDegree.set(degree, stamina);
+    rankMap.set(degree, {
+        stamina: parseInt(row[0]),
+        threshold: parseInt(row[1]),
+        healRate: parseFloat(row[2]) || 0,
+    });
+    sortedDegrees.push(degree);
 }
-rankData.sort((a, b) => a.degree - b.degree);
+sortedDegrees.sort((a, b) => a - b);
 
-/**
- * Get max stamina for a given degree (rank level).
- * Falls back to degree 1 value for 0, and 250 for >250.
- */
 export function getMaxStamina(degreeId: number): number {
-    if (degreeId <= 0) return staminaByDegree.get(1) ?? 22;
-    const s = staminaByDegree.get(degreeId);
-    if (s !== undefined) return s;
-    return staminaByDegree.get(250) ?? 125;
+    if (degreeId <= 0) return rankMap.get(1)?.stamina ?? 22;
+    return rankMap.get(degreeId)?.stamina ?? rankMap.get(250)?.stamina ?? 125;
 }
 
-/**
- * Compute real-time stamina recovery from staminaHealTime to now.
- * Uses per-degree heal_rate for client-aligned recovery speed.
- * Caps at getMaxStamina(degreeId), with absolute hard cap at 999.
- */
+export function getHealRate(degree: number): number {
+    return rankMap.get(degree)?.healRate ?? 0;
+}
+
 export function computeRealTimeStamina(player: { stamina: number; staminaHealTime: Date; rankPoint: number }): number {
     const config = getConfigSync();
     const degree = getRankDegree(player.rankPoint);
@@ -46,25 +40,12 @@ export function computeRealTimeStamina(player: { stamina: number; staminaHealTim
     return Math.min(Math.max(0, player.stamina + Math.floor(elapsed)), maxStamina, STAMINA_OVERFLOW_MAX);
 }
 
-/**
- * Look up the heal_rate for a given degree from rank data.
- * Returns 0 for degrees where heal_rate is not defined.
- */
-export function getHealRate(degree: number): number {
-    const row = rankData.find(r => r.degree === degree);
-    return row?.healRate ?? 0;
-}
-
-/**
- * Determine the player's degree ID (rank level) based on total rankPoint.
- * Returns the highest degree whose threshold is <= rankPoint.
- * Returns 1 if rankPoint is below the first rank threshold.
- */
 export function getRankDegree(rankPoint: number): number {
     let result = 1;
-    for (const r of rankData) {
-        if (rankPoint >= r.threshold) {
-            result = r.degree;
+    for (const degree of sortedDegrees) {
+        const entry = rankMap.get(degree)!;
+        if (rankPoint >= entry.threshold) {
+            result = degree;
         } else {
             break;
         }
