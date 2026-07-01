@@ -3,7 +3,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerActiveMissionsSync, getSession, getPlayerSync, updatePlayerSync, givePlayerItemSync, insertDefaultPlayerCharacterSync, updatePlayerActiveMissionStageSync } from "../../data/wdfpData";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { getActiveMissionRewards } from "../../lib/mission";
+import { getActiveMissionRewards, getAwakeMissionRewards } from "../../lib/mission";
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/receive", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -54,11 +54,18 @@ const routes = async (fastify: FastifyInstance) => {
             const responseStages: any[] = []
 
             for (const stage of stages) {
+                // Skip if already received (prevent duplicate rewards)
+                const existingStages = currentMission?.stages
+                if (existingStages && !Array.isArray(existingStages) && (existingStages as Record<string, boolean>)[String(stage)]) continue
+
                 // Mark stage as received
                 updatePlayerActiveMissionStageSync(playerId, stage, missionId, true)
 
-                // Get rewards from CDN
-                const rewards = getActiveMissionRewards(missionId, stage)
+                // Get rewards from CDN — awake missions use a different reward table
+                const isAwake = String(missionId).length >= 7 && missionId % 10 <= 4
+                const rewards = isAwake
+                    ? getAwakeMissionRewards(missionId, stage)
+                    : getActiveMissionRewards(missionId, stage)
                 for (const r of rewards) {
                     switch (r.kind) {
                         case 1: // Item
