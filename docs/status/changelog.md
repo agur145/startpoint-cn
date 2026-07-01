@@ -1,7 +1,43 @@
 # 近期修改与发现
-> 状态: 变更时间线   关键文件: -   相关端点: -
 
-## 一、星粒商店数据修正 (2026-07-01)
+## 一、卡池数据修正 (2026-07-01)
+
+### 1.1 问题
+
+常驻/限定角色完全抽不出来：89 ★5 + 67 ★4 常驻角色缺失，多个限定角色在对应 UP banner 中也无法获取。
+
+### 1.2 根因
+
+`assets/gacha.json` 由旧版 `character_table.json`（~120 常驻角色）生成后从未更新。之后 `character_table.json` 扩展至 271 常驻角色，但 gacha.json 未重新生成。
+
+### 1.3 修复
+
+TS 重写生成工具，替代 Python 脚本，更新 changelog：
+
+**新增文件：**
+- `tools/rebuild_gacha.ts` — 从 CDN 数据 + character_table.json 重建 gacha.json，含三级校验（模板完整性、banner 完全校验、新旧对比）
+
+**修改文件：**
+- `assets/gacha.json` — 从 ~120 常驻扩展至 271，修正全部 banner pool 数据
+
+**删除文件：**
+- `scripts/generate_gacha.py` — 由 TS 工具替代
+
+### 1.4 校验规则
+
+| 级别 | 内容 |
+|------|------|
+| L1 | 模板完整性：271 常驻全部入库，tier 分桶正确 |
+| L2 | Banner 完全校验：每个 banner 的 tier 数量、人员、UP 标记、odds、rarity sum≈1000 |
+| L3 | 新旧对比：报告缺失修复 + 角色丢失检测 + 池大小变化统计 |
+
+### 1.5 revival_fes 复刻流星祭修复
+
+`revival_fes_1_character_5` 池键（gid=213, 1704）的 UP 角色存储在 CDN 外部池文件中，本地 `extractUpChars` 无法提取。从 12 个非 revival fes banner 的 UP 角色中汇总 19 个历史 fes ★5 限定角色，硬编码注入。
+
+---
+
+## 二、星粒商店数据修正 (2026-07-01)
 
 ### 1.1 问题
 
