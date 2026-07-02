@@ -2,7 +2,8 @@ import { serializePlayerData, SerializePlayerDataOptions } from "./serialize-pla
 import { getDateFromServerTime, getServerTime, getServerDate, realToVirtual } from "../../utils"
 import { ClientPlayerData, DailyChallengePointListEntry, MergedPlayerData, PartyCategory, Player, PlayerBoxGacha, PlayerCharacter, PlayerCharacterBondToken, PlayerDrawnQuest, PlayerEquipment, PlayerGachaCampaign, PlayerGachaInfo, PlayerMultiSpecialExchangeCampaign, PlayerParty, PlayerPartyGroup, PlayerQuestProgress, PlayerRushEvent, PlayerRushEventPlayedParty, PlayerStartDashExchangeCampaign, RushEventBattleType, UserBoxGacha, UserCharacter, UserCharacterBondTokenStatus, UserEquipment, UserGachaCampaign, UserPartyGroup, UserPartyGroupTeam, UserQuestProgress, UserRushEvent, UserRushEventPlayedParty, UserRushEventPlayedPartyList, UserTutorial } from "../types"
 import { deserializePlayerRushEventPlayedParty, deserializeRushEvent, getPlayerActiveMissionsSync, getPlayerBoxGachasSync, getPlayerCharactersManaNodesSync, getPlayerCharactersSync, getPlayerClearedRegularMissionListSync, getPlayerDailyChallengePointListSync, getPlayerDrawnQuestsSync, getPlayerEquipmentListSync, getPlayerGachaCampaignListSync, getPlayerGachaInfoListSync, getPlayerItemsSync, getPlayerMailCountSync, getPlayerMultiSpecialExchangeCampaignsSync, getPlayerOptionsSync, getPlayerPartyGroupListSync, getPlayerPeriodicRewardPointsSync, getPlayerQuestProgressSync, getPlayerRushEventListClearedFoldersSync, getPlayerRushEventListPlayedPartiesSync, getPlayerRushEventListSync, getPlayerStartDashExchangeCampaignsSync, getPlayerSync, getPlayerTriggeredTutorialsSync, serializePlayerRushEventPlayedParty, updatePlayerSync } from "../wdfpData"
-import { filterToActiveMissions } from "../../lib/mission"
+import { filterToActiveMissions } from "../../lib/mission/index"
+import { computeAwakeSummary } from "../../lib/mission/index"
 
 /**
  * Generates default player data.
@@ -67,6 +68,9 @@ export function getClientSerializedData(
 
     const doSerializeRushEventData = options.serializeRushEventData ?? false
 
+    // Compute awake mission summary for /load injection
+    const awakeSummary = computeAwakeSummary(playerId)
+
     return serializePlayerData({
         player: playerData,
         dailyChallengePointList: getPlayerDailyChallengePointListSync(playerId),
@@ -91,7 +95,11 @@ export function getClientSerializedData(
         rushEventList: doSerializeRushEventData ? getPlayerRushEventListSync(playerId) : undefined,
         rushEventClearedFolderList: doSerializeRushEventData ? getPlayerRushEventListClearedFoldersSync(playerId) : undefined,
         rushEventPlayedPartyList: doSerializeRushEventData ? getPlayerRushEventListPlayedPartiesSync(playerId) : undefined
-    }, options)
+    }, {
+        ...options,
+        activeMissionList: awakeSummary.activeMissionList,
+        manaBoardAwakeMap: awakeSummary.manaBoardAwakeMap,
+    })
 }
 
 

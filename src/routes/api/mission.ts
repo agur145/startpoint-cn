@@ -4,9 +4,9 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerActiveMissionsSync, getSession, givePlayerItemSync, insertDefaultPlayerCharacterSync, updatePlayerSync, updatePlayerActiveMissionSync, updatePlayerActiveMissionStageSync } from "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
-import { getComputer, getMissionIdsByCategory, getMissionsByPattern, getCurrentStage, getActiveMissionRewards, getAwakeMissionRewards, getEventMissionRewards, getCompletedStageNumbers, getCharacterIdFromMission } from "../../lib/mission";
+import { getComputer, getMissionIdsByCategory, getMissionsByPattern, getCurrentStage, getActiveMissionRewards, getAwakeMissionRewards, getEventMissionRewards, getCompletedStageNumbers, getCharacterIdFromMission } from "../../lib/mission/index";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import type { CategoryContext } from "../../lib/mission/types";
+import type { CategoryContext } from "../../lib/mission/index";
 
 interface GetMissionProgressBody {
     api_count: number,

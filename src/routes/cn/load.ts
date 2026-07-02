@@ -6,8 +6,6 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDisplayHost } from "../../multi/room/serializer";
 import { getRoom } from "../../multi/room/manager";
 import { runPermanentValidators } from "../../lib/validate";
-import { computeAwakeSummary } from "../../lib/mission";
-import { businessCodeToKId } from "../../data/codeMap";
 
 interface CnLoadBody {
     device_id: number;
@@ -143,20 +141,6 @@ const routes = async (fastify: FastifyInstance) => {
         const resVer = request.headers['res_ver'] as string | undefined;
         console.log(`[CN-LOAD] res_ver=${resVer || '(not sent)'} account=${accountId} player=${playerId} party_slot=${clientData?.user_info?.party_slot}`);
         wrapOptionFields(clientData, resVer);
-
-        // Inject awake mission data for character awakening system
-        const awakeSummary = computeAwakeSummary(playerId);
-        clientData.active_mission_list = awakeSummary.activeMissionList;
-
-        if (clientData.user_character_list) {
-            for (const [codeKey, char] of Object.entries(clientData.user_character_list)) {
-                const kId = businessCodeToKId(Number(codeKey));
-                const manaBoard = awakeSummary.manaBoardAwakeMap.get(String(kId));
-                if (manaBoard) {
-                    (char as any).mana_board_awake = manaBoard;
-                }
-            }
-        }
 
         // Inject unfinished quest lists for battle recovery
         const activeQuest = getPlayerActiveQuestSync(playerId);

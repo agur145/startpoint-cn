@@ -3,7 +3,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerActiveMissionsSync, getSession, getPlayerSync, updatePlayerSync, givePlayerItemSync, insertDefaultPlayerCharacterSync, updatePlayerActiveMissionStageSync } from "../../data/wdfpData";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { getActiveMissionRewards, getAwakeMissionRewards } from "../../lib/mission";
+import { getActiveMissionRewards, getAwakeMissionRewards } from "../../lib/mission/index";
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/receive", async (request: FastifyRequest, reply: FastifyReply) => {
