@@ -4,6 +4,7 @@ export {
     getMissionIdsByCategory,
     getCurrentStage,
     getCompletedStageNumbers,
+    getMissionStageIds,
     getActiveMissionRewards,
     getAwakeMissionRewards,
     getEventMissionRewards,
@@ -16,4 +17,5 @@ export {
     getComputer,
     filterToActiveMissions,
     isActiveMissionId,
+    computeAwakeSummary,
 } from "./mission/index"

@@ -599,6 +599,7 @@ export interface UserCharacter {
     stack: number
     bond_token_list: UserCharacterBondTokenStatus[]
     mana_board_index: number
+    mana_board_awake?: Record<number, number>
     ex_boost?: UserCharacterExBoost
     illustration_settings?: number[]
 }

@@ -63,3 +63,9 @@ export function getCompletedStageNumbers(category: number, missionId: number, pr
     if (!stages) return []
     return stages.filter(s => progress >= s.targetProgress).map(s => s.stage)
 }
+
+export function getMissionStageIds(category: number, missionId: number): number[] {
+    const stages = missionStageLookup[category]?.[String(missionId)]
+    if (!stages) return []
+    return stages.map(s => s.stage)
+}

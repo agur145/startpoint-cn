@@ -9,7 +9,7 @@ export type { MissionComputer, CategoryContext, ComputerRegistry, PlayerQuestPro
 export { getComputer } from "./registry"
 
 // Stages
-export { getMissionIdsByCategory, getCurrentStage, getCompletedStageNumbers } from "./stages"
+export { getMissionIdsByCategory, getCurrentStage, getCompletedStageNumbers, getMissionStageIds } from "./stages"
 
 // Rewards
 export type { ActiveMissionReward } from "./rewards"
@@ -21,6 +21,9 @@ export { getMissionsByPattern, getMissionPattern, isComputablePattern } from "./
 
 // Character queries
 export { getCharacterStoryQuestIds, getCharacterIdFromMission } from "./character-queries"
+
+// Awake summary (for /load response)
+export { computeAwakeSummary } from "./compute-awake-summary"
 
 // Degree helpers
 export { getTargetDegree } from "./computer-degree"
@@ -36,9 +39,9 @@ export function isActiveMissionId(id: number | string): boolean {
 }
 
 export function filterToActiveMissions<T>(missions: Record<string, T>): Record<string, T> {
-    // No-op: return all missions unmodified.
-    // Previously filtered to only active_reward entries, but this excluded
-    // category 9 (awake) missions from the /load response, causing the
-    // ability awakening page to show "未完成" even when all missions are done.
-    return missions
+    const out: Record<string, T> = {}
+    for (const [id, value] of Object.entries(missions)) {
+        if (activeMissionIdSet.has(Number(id))) out[id] = value
+    }
+    return out
 }
