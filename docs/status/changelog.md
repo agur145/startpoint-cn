@@ -1,5 +1,17 @@
 # 近期修改与发现
 
+## 待办事项
+
+### TODO-1：装备 UP 机制
+
+**状态：待实现**（2026-07-02）
+
+91 个装备 banner 中约 72 个有 UP（通用 pickup + 6 元素 pickup + 书/solota/common），当前全部 `isRateUp=false, odds=1`。
+
+CDN 装备 UP 数据存储在缺失的 `gacha_odds/equipment_*_pickup_*.json` 文件中，类似角色 revival_fes 问题。全球 starpoint 有参考数据（每 banner 每种稀有度 1 件 UP），但 CN 装备 ID 不同，需要手动确认。
+
+---
+
 ## 一、卡池数据修正 (2026-07-01)
 
 ### 1.1 问题
