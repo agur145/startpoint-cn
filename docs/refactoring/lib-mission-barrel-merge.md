@@ -66,10 +66,23 @@ M  src/routes/cn/load.ts             # 移除 awake 注入代码 (净减 14 行)
 
 ## 后续
 
-### 下一步: 拆分 `wdfpData` barrel
+### 已完成: 拆分 `wdfpData` barrel (2026-07-02)
 
-当前 `src/data/wdfpData.ts` 仍然是 58 行 mega-barrel，暴露了 16 个 domain 模块的全部 export。
-消费者需要导入 27+ 个函数名。
+`src/data/wdfpData.ts` (mega-barrel, 52 行) 已被删除。64 个消费者文件现在直接从 domain 模块导入。
+
+改动统计: 65 files changed, 270 insertions(+), 130 deletions(-)
+
+导入模式:
+```
+改前: import { fps, gcs, gpls, ...27 names } from "../wdfpData"
+改后: import { fps, gpls } from "../domains/player"
+      import { gcs } from "../domains/character"
+```
+
+清理:
+- 16 条 dead import（导入后从未使用）
+- 重复的 getDb()（data/db.ts 才是官方定义）
+- expPoolMax 常量（无消费者引用）
 
 ### 可选: 替换 `import type` + 垂直格式化
 
