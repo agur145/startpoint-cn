@@ -11,6 +11,7 @@ const ROOT = path.resolve(__dirname, "..");
 
 // ── Data sources ──────────────────────────────────────────────
 const CHAR_TABLE_PATH = path.join(ROOT, "data/character_table.json");
+const EQUIP_TABLE_PATH = path.join(ROOT, "data/equipment_table.json");
 const CDN_GACHA_PATH = path.join(ROOT, "assets/cdndata/gacha.json");
 const CDN_FC_PATH = path.join(ROOT, "assets/cdndata/gacha_feature_content.json");
 const CDN_CHARS_PATH = path.join(ROOT, "assets/cdndata/character.json");
@@ -62,52 +63,83 @@ const EQ_IDS = new Set([
     "5029", "5030", "5031", "5032", "5033", "5034", "5035", "5036", "5037", "5038",
 ]);
 
-// Hardcoded equipment pool (from Python script)
-const EQ_POOL: Record<string, PoolItem[]> = {
-    "1": [
-        { id: 5010028, rank: 5, odds: 1, isRateUp: false, rarity: 66.67 },
-        { id: 5020008, rank: 5, odds: 1, isRateUp: false, rarity: 66.67 },
-        { id: 5020010, rank: 5, odds: 1, isRateUp: false, rarity: 66.67 },
-        { id: 5020030, rank: 5, odds: 1, isRateUp: false, rarity: 66.67 },
-        { id: 5020037, rank: 5, odds: 1, isRateUp: false, rarity: 66.67 },
-        { id: 5030025, rank: 5, odds: 1, isRateUp: false, rarity: 66.67 },
-        { id: 5040010, rank: 5, odds: 1, isRateUp: false, rarity: 66.67 },
-        { id: 5040016, rank: 5, odds: 1, isRateUp: false, rarity: 66.67 },
-        { id: 5050009, rank: 5, odds: 1, isRateUp: false, rarity: 66.67 },
-        { id: 5060009, rank: 5, odds: 1, isRateUp: false, rarity: 66.67 },
-        { id: 5060025, rank: 5, odds: 1, isRateUp: false, rarity: 66.67 },
-        { id: 5070023, rank: 5, odds: 1, isRateUp: false, rarity: 66.67 },
-        { id: 5070036, rank: 5, odds: 1, isRateUp: false, rarity: 66.67 },
-        { id: 5080007, rank: 5, odds: 1, isRateUp: false, rarity: 66.67 },
-        { id: 5100002, rank: 5, odds: 1, isRateUp: false, rarity: 66.67 },
-    ],
-    "2": [
-        { id: 4010010, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4020007, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4030003, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4030004, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4030008, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4030009, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4030024, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4040007, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4040008, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4040021, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4050004, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4050007, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4050008, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4070003, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4070004, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4070007, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4070008, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4070009, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4070010, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4070011, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4080003, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4080004, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4080007, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-        { id: 4090003, rank: 4, odds: 1, isRateUp: false, rarity: 41.67 },
-    ],
+// Equipment pool built from equipment_table.json + element filtering
+interface EquipmentTableEntry {
+    name: string;
+    rarity: number;
+    element: string;
+    source: string;
+}
+
+const ELEM_NAME_TO_INDEX: Record<string, number> = {
+    '火': 0, '水': 1, '雷': 2, '风': 3, '光': 4, '暗': 5, '全': -1,
 };
+
+// Equipment element pool key patterns (same keywords as character element banners)
+const EQUIP_ELEMENT_PATTERNS: [string[], number][] = [
+    [["equipment_red", "equipment_fire"], 0],
+    [["equipment_blue", "equipment_water"], 1],
+    [["equipment_yellow", "equipment_thunder"], 2],
+    [["equipment_green", "equipment_wind"], 3],
+    [["equipment_white", "equipment_light"], 4],
+    [["equipment_black", "equipment_dark"], 5],
+];
+
+// Equipment template cache
+const equipTemplateCache: Record<number, Record<string, PoolItem[]>> = {};
+
+function buildEquipPoolTemplate(
+    equipTable: Record<string, EquipmentTableEntry>,
+    element?: number
+): Record<string, PoolItem[]> {
+    const template: Record<string, PoolItem[]> = { "1": [], "2": [], "3": [] };
+
+    for (const [idStr, item] of Object.entries(equipTable)) {
+        if (item.source !== "常驻") continue;
+
+        // Element filter
+        if (element !== undefined) {
+            const eidx = ELEM_NAME_TO_INDEX[item.element] ?? -1;
+            if (eidx !== element) continue;
+        }
+
+        const rarity = item.rarity;
+        let pk: string;
+        if (rarity === 5) pk = "1";
+        else if (rarity === 4) pk = "2";
+        else if (rarity === 3) pk = "3";
+        else continue;
+
+        template[pk].push({
+            id: parseInt(idStr, 10),
+            rank: rarity,
+            odds: 1,
+            isRateUp: false,
+            rarity: 0, // recalculated below
+        });
+    }
+
+    // Calculate rarities: sum per tier ≈ 1000
+    for (const pk of ["1", "2", "3"] as const) {
+        const items = template[pk];
+        if (items.length === 0) continue;
+        const base = 1000 / items.length;
+        for (const item of items) {
+            item.rarity = Math.round(base * 100) / 100;
+        }
+    }
+
+    return template;
+}
+
+function detectEquipElement(poolKey: string): number | null {
+    for (const [keywords, element] of EQUIP_ELEMENT_PATTERNS) {
+        for (const kw of keywords) {
+            if (poolKey.includes(kw)) return element;
+        }
+    }
+    return null;
+}
 
 // UP probability targets (within-tier probability per UP char)
 // ★5: single=1.5%→÷5%=0.30, double=1.0%→÷5%=0.20, triple=0.7%→÷5%=0.14
@@ -283,7 +315,8 @@ function buildBanner(
     fullPoolTemplate: Record<string, PoolItem[]>,
     cdnFeature: Record<string, any>,
     cdnChars: Record<string, any>,
-    charTable: CharacterTableEntry[]
+    charTable: CharacterTableEntry[],
+    equipTable: Record<string, EquipmentTableEntry>
 ): GachaBanner | null {
     const entry = cdnGacha[gachaId];
     if (!entry || !Array.isArray(entry) || entry.length === 0) return null;
@@ -307,9 +340,26 @@ function buildBanner(
         name.includes("装备") || name.includes("武器") ||
         name.includes("武具") || name.startsWith("装备");
 
+    // Equipment pool key (columns 21-23 for equipment, vs 14-16 for characters)
+    const equipPoolKey5 = String(row[23] || "");
+
     if (isEquipment) {
+        // Equipment pool: use equipment_table.json with element filtering
+        const equipElement = detectEquipElement(equipPoolKey5);
+        let equipPool: Record<string, PoolItem[]>;
+        if (equipElement !== null) {
+            if (!equipTemplateCache[equipElement]) {
+                equipTemplateCache[equipElement] = buildEquipPoolTemplate(equipTable, equipElement);
+            }
+            equipPool = equipTemplateCache[equipElement];
+        } else {
+            if (!equipTemplateCache[-1]) {
+                equipTemplateCache[-1] = buildEquipPoolTemplate(equipTable);
+            }
+            equipPool = equipTemplateCache[-1];
+        }
         return {
-            type: 1, // GachaType.WEAPON
+            type: 1,
             paymentType: 0,
             singleCost: singleCost || 75,
             multiCost: multiCost || 750,
@@ -318,8 +368,9 @@ function buildBanner(
             endDate,
             name,
             pool: {
-                "1": [...EQ_POOL["1"]],
-                "2": [...EQ_POOL["2"]],
+                "1": [...(equipPool["1"] || [])],
+                "2": [...(equipPool["2"] || [])],
+                "3": [...(equipPool["3"] || [])],
             },
         };
     }
@@ -693,7 +744,12 @@ function main() {
         ? JSON.parse(fs.readFileSync(OLD_GACHA_PATH, "utf-8"))
         : null;
 
+    const equipTable: Record<string, EquipmentTableEntry> = JSON.parse(
+        fs.readFileSync(EQUIP_TABLE_PATH, "utf-8")
+    );
+
     console.log(`  character_table: ${charTable.length} entries`);
+    console.log(`  equipment_table: ${Object.keys(equipTable).length} entries`);
     console.log(`  cdndata/gacha: ${Object.keys(cdnGacha).length} entries`);
     console.log(`  cdndata/gacha_feature_content: ${Object.keys(cdnFeature).length} entries`);
     console.log(`  cdndata/character: ${Object.keys(cdnChars).length} entries`);
@@ -725,7 +781,7 @@ function main() {
     let charCount = 0;
 
     for (const gid of Object.keys(cdnGacha)) {
-        const banner = buildBanner(gid, cdnGacha, template, cdnFeature, cdnChars, charTable);
+        const banner = buildBanner(gid, cdnGacha, template, cdnFeature, cdnChars, charTable, equipTable);
         if (!banner) { skipped++; continue; }
 
         output[gid] = banner;

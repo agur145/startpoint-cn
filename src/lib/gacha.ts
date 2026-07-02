@@ -42,7 +42,8 @@ const characterGachaRankRates = {
 const equipmentGachaRankRates = {
     normal: [
         50,  // 5*
-        950  // 4*
+        250, // 4*
+        700  // 3*
     ],
     multiGuarantee: [
         50, // 5*
