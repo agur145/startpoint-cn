@@ -17,10 +17,10 @@ const CDN_FC_PATH = path.join(ROOT, "assets/cdndata/gacha_feature_content.json")
 const CDN_CHARS_PATH = path.join(ROOT, "assets/cdndata/character.json");
 const OUTPUT_PATH = path.join(ROOT, "assets/gacha.json");
 const OLD_GACHA_PATH = path.join(ROOT, "assets/gacha_old.json");
+const PYTHON_GACHA_PATH = path.join(ROOT, "assets/gacha_python.json");
 const GLOBAL_GACHA_PATH = path.join(ROOT, "..", "starpoint", "assets", "gacha.json");
 
-// CN launch date: JP dates before this are capped to this floor
-const CN_FLOOR = "2021-10-26";
+// CN launch date — removed floorDate from pool templates, now per-banner asOfDate only
 
 // ── Types ─────────────────────────────────────────────────────
 interface PoolItem {
@@ -218,13 +218,9 @@ function buildPoolTemplate(
     charTable: CharacterTableEntry[],
     cdnChars: Record<string, any>,
     element?: number,
-    asOfDate?: string,
-    floorDate?: string
+    asOfDate?: string
 ): Record<string, PoolItem[]> {
     const template: Record<string, PoolItem[]> = { "1": [], "2": [], "3": [] };
-
-    // Effective cutoff: max(asOfDate, floorDate) for CN timeline alignment
-    const cutoff = floorDate && asOfDate && asOfDate < floorDate ? floorDate : asOfDate;
 
     for (const item of charTable) {
         if (item.source !== "常驻卡池") continue;
@@ -232,7 +228,7 @@ function buildPoolTemplate(
         if (!code) continue;
 
         // Time filter: only include characters available at banner time
-        if (cutoff && item.available_from && item.available_from > cutoff.substring(0, 10)) continue;
+        if (asOfDate && item.available_from && item.available_from > asOfDate.substring(0, 10)) continue;
 
         // Element filter (for element pickup banners)
         if (element !== undefined) {
@@ -297,8 +293,8 @@ function extractUpChars(
             const num = parseInt(raw, 10);
             if (!isNaN(num) && num > 0) {
                 const s = String(num);
-                // Accept 5-6 digit IDs
-                if ((s.length === 5 || s.length === 6) && /^\d+$/.test(s)) {
+                // Accept 5-6 digit IDs that exist in CDN character table
+                if ((s.length === 5 || s.length === 6) && /^\d+$/.test(s) && cdnChars[s]) {
                     chars.add(s);
                 }
             }
@@ -375,19 +371,18 @@ function buildBanner(
         };
     }
 
-    // Character banner — select correct template (element-filtered or full)
+    // Character banner — select correct template (full permanent for most, element-filtered for 1705-1710)
     const poolKey5 = String(row[16] || "");
     const element = detectElement(poolKey5);
+    const isLastSixAttr = parseInt(gachaId, 10) >= 1705 && parseInt(gachaId, 10) <= 1710;
     let poolTemplate = fullPoolTemplate;
     let tierNonUpBasis = fullPoolTemplate; // for UP odds calculation
-    if (element !== null) {
-        // Element pickup: use element-filtered template
-        if (!elementTemplateCache[element]) {
-            elementTemplateCache[element] = buildPoolTemplate(charTable, cdnChars, element, startDate, CN_FLOOR);
-        }
-        poolTemplate = elementTemplateCache[element];
-        tierNonUpBasis = elementTemplateCache[element];
+    if (element !== null && isLastSixAttr) {
+        // 1705-1710: use element-filtered template (no cache — each may have different startDate)
+        poolTemplate = buildPoolTemplate(charTable, cdnChars, element, startDate);
+        tierNonUpBasis = poolTemplate;
     }
+    // else: element pools use FULL permanent template (all elements), no element filtering
 
     const pool: Record<string, PoolItem[]> = {};
     for (const pk of ["1", "2", "3"] as const) {
@@ -396,6 +391,22 @@ function buildBanner(
 
     // Extract UP characters
     const upCodes = extractUpChars(gachaId, cdnGacha, cdnFeature, cdnChars);
+
+    // Filter UP characters by element for attribute pools, clear for 1705-1710
+    if (element !== null) {
+        if (isLastSixAttr) {
+            upCodes.clear(); // 1705-1710: no UP characters
+        } else {
+            // Keep only UP characters matching the banner's element
+            const filteredUps = new Set<string>();
+            for (const code of upCodes) {
+                const charElement = getCharElement(code, cdnChars);
+                if (charElement === element) filteredUps.add(code);
+            }
+            upCodes.clear();
+            for (const code of filteredUps) upCodes.add(code);
+        }
+    }
 
     // Count UP per tier
     const upByTier: Record<string, Set<string>> = { "1": new Set(), "2": new Set(), "3": new Set() };
@@ -756,7 +767,7 @@ function main() {
     console.log(`  old gacha.json (comparison): ${oldGacha ? Object.keys(oldGacha).length + " banners" : "N/A"}`);
 
     // ── Build pool template
-    const template = buildPoolTemplate(charTable, cdnChars, undefined, undefined, CN_FLOOR);
+    const template = buildPoolTemplate(charTable, cdnChars, undefined, undefined);
     console.log(`\nTemplate pool: ★5=${template["1"].length} ★4=${template["2"].length} ★3=${template["3"].length}` +
         ` total=${template["1"].length + template["2"].length + template["3"].length}`);
 
@@ -785,19 +796,33 @@ function main() {
         if (!banner) { skipped++; continue; }
 
         output[gid] = banner;
-        upCache[gid] = extractUpChars(gid, cdnGacha, cdnFeature, cdnChars);
 
-        // Detect banner type for L2 validation
+        // Compute UP cache with element filtering (must match buildBanner logic)
+        const rawUp = extractUpChars(gid, cdnGacha, cdnFeature, cdnChars);
         const cdnRow = cdnGacha[gid]?.[0];
         const pk5 = cdnRow && Array.isArray(cdnRow) ? String(cdnRow[16] || "") : "";
+        const startDate = cdnRow && Array.isArray(cdnRow) ? String(cdnRow[29] || "") : "";
+        const elem = detectElement(pk5);
+        const isLastSix = parseInt(gid, 10) >= 1705 && parseInt(gid, 10) <= 1710;
+
         fesCache[gid] = pk5.startsWith("new_character_pickup_") || pk5.startsWith("revival_fes_");
 
-        // Expected template for element banners
-        const elem = detectElement(pk5);
-        if (elem !== null && elementTemplateCache[elem]) {
-            expectedTemplateCache[gid] = elementTemplateCache[elem];
+        // Filter UP characters by element for attribute pools (matches buildBanner)
+        if (elem !== null && isLastSix) {
+            upCache[gid] = new Set(); // 1705-1710: no UP
+            expectedTemplateCache[gid] = buildPoolTemplate(charTable, cdnChars, elem, startDate);
+        } else if (elem !== null) {
+            // Regular element pools: filter UP by element, full template
+            const filteredUps = new Set<string>();
+            for (const code of rawUp) {
+                const charElement = getCharElement(code, cdnChars);
+                if (charElement === elem) filteredUps.add(code);
+            }
+            upCache[gid] = filteredUps;
+            expectedTemplateCache[gid] = template;
         } else {
-            expectedTemplateCache[gid] = template; // full template for non-element banners
+            upCache[gid] = rawUp;
+            expectedTemplateCache[gid] = template;
         }
 
         // Revival Fes: inject known UP characters for L2 validation
@@ -916,6 +941,75 @@ function main() {
         }
     } else {
         console.log("  Global gacha.json not found, skipped.");
+    }
+
+    // ── L6: Python version comparison ──────────────────────────
+    console.log("\n--- L6: Python version comparison ---");
+    if (fs.existsSync(PYTHON_GACHA_PATH)) {
+        const pyGacha: Record<string, GachaBanner> = JSON.parse(
+            fs.readFileSync(PYTHON_GACHA_PATH, "utf-8")
+        );
+        const tsKeys = Object.keys(output).filter(k => output[k].type === 0);
+        const pyKeys = Object.keys(pyGacha).filter(k => pyGacha[k].type === 0);
+        const commonKeys = tsKeys.filter(k => pyKeys.includes(k));
+        const tsOnly = tsKeys.filter(k => !pyKeys.includes(k));
+        const pyOnly = pyKeys.filter(k => !tsKeys.includes(k));
+
+        console.log(`  TS character banners: ${tsKeys.length}`);
+        console.log(`  PY character banners: ${pyKeys.length}`);
+        console.log(`  Common: ${commonKeys.length}, TS-only: ${tsOnly.length}, PY-only: ${pyOnly.length}`);
+
+        if (tsOnly.length > 0) {
+            console.log(`  TS-only banners (${tsOnly.length}):`);
+            for (const gid of tsOnly.slice(0, 10)) {
+                console.log(`    ${gid}: "${output[gid].name}"`);
+            }
+        }
+        if (pyOnly.length > 0) {
+            console.log(`  PY-only banners (${pyOnly.length}):`);
+            for (const gid of pyOnly.slice(0, 10)) {
+                console.log(`    ${gid}: "${pyGacha[gid].name}"`);
+            }
+        }
+
+        // Per-banner pool comparison
+        let diffBanners = 0;
+        let totalDiffs = 0;
+        for (const gid of commonKeys) {
+            const ts = output[gid], py = pyGacha[gid];
+            const diffs: string[] = [];
+            for (const pk of ["1", "2", "3"] as const) {
+                const tsIds = new Set((ts.pool[pk] || []).map(i => i.id));
+                const pyIds = new Set((py.pool[pk] || []).map(i => i.id));
+                const tsOnly2 = [...tsIds].filter(id => !pyIds.has(id));
+                const pyOnly2 = [...pyIds].filter(id => !tsIds.has(id));
+                if (tsIds.size !== pyIds.size || tsOnly2.length > 0 || pyOnly2.length > 0) {
+                    diffs.push(`tier${pk}: ${tsIds.size}vs${pyIds.size}` +
+                        (tsOnly2.length ? ` TSextra=${tsOnly2.length}` : "") +
+                        (pyOnly2.length ? ` PYextra=${pyOnly2.length}` : ""));
+                    totalDiffs++;
+                }
+            }
+            if (diffs.length > 0) {
+                diffBanners++;
+                if (diffBanners <= 20) {
+                    console.log(`  DIFF gid=${gid} "${ts.name}": ${diffs.join(" | ")}`);
+                    // Show sample IDs
+                    for (const pk of ["1", "2", "3"] as const) {
+                        const tsIds = new Set((ts.pool[pk] || []).map(i => i.id));
+                        const pyIds = new Set((py.pool[pk] || []).map(i => i.id));
+                        const tsOnly2 = [...tsIds].filter(id => !pyIds.has(id));
+                        const pyOnly2 = [...pyIds].filter(id => !tsIds.has(id));
+                        if (tsOnly2.length > 0) console.log(`    TS extra: [${tsOnly2.join(",")}]`);
+                        if (pyOnly2.length > 0) console.log(`    PY extra: [${pyOnly2.join(",")}]`);
+                    }
+                }
+            }
+        }
+        console.log(`\n  Banners with pool differences: ${diffBanners}/${commonKeys.length} (${totalDiffs} tier-diffs)`);
+    } else {
+        console.log(`  Python gacha.json not found at ${PYTHON_GACHA_PATH}`);
+        console.log(`  Generate it with: git show 96c65aa^:assets/gacha.json > ${PYTHON_GACHA_PATH}`);
     }
 
     // ── Write output

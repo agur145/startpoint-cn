@@ -107,18 +107,59 @@ function main() {
     }
 
     // Assign available_from to each permanent character
+    // Build code_number groups for guessing dates of no-UP characters
+    const codeGroups: Record<string, CharEntry[]> = {};
+    for (const char of charTable) {
+        if (char.source !== "常驻卡池") continue;
+        const code = String(char.code_number);
+        const groupKey = code.substring(0, 2);
+        if (!codeGroups[groupKey]) codeGroups[groupKey] = [];
+        codeGroups[groupKey].push(char);
+    }
+    for (const key of Object.keys(codeGroups)) {
+        codeGroups[key].sort((a, b) => parseInt(a.code_number) - parseInt(b.code_number));
+    }
+
+    // Helper: find the best date for a no-UP character
+    function getGroupBestDate(char: CharEntry): string {
+        const code = String(char.code_number);
+        const groupKey = code.substring(0, 2);
+        const group = codeGroups[groupKey];
+        if (!group) return JP_LAUNCH;
+        const targetSeq = parseInt(code.substring(2));
+        
+        // Find the FIRST character after this one that has a real date (from UP record)
+        for (const g of group) {
+            const gSeq = parseInt(String(g.code_number).substring(2));
+            if (gSeq <= targetSeq) continue;
+            if (g.available_from && g.available_from !== JP_LAUNCH) {
+                return g.available_from;
+            }
+        }
+        
+        // Fallback: use latest predecessor's date
+        let bestDate = JP_LAUNCH;
+        for (const g of group) {
+            const gSeq = parseInt(String(g.code_number).substring(2));
+            if (gSeq >= targetSeq) break;
+            if (g.available_from && g.available_from > bestDate) {
+                bestDate = g.available_from;
+            }
+        }
+        return bestDate;
+    }
+
     let assigned = 0;
     let fromLaunchSet = 0;
     let fromUP = 0;
-    let fromNoUP = 0;
     let badDates = 0;
 
+    // First pass: assign dates for launch set and UP-record characters
     for (const char of charTable) {
         if (char.source !== "常驻卡池") continue;
         const code = parseInt(String(char.code_number));
 
         if (JP_LAUNCH_IDS.has(code)) {
-            // Anchor: verified JP launch character
             char.available_from = JP_LAUNCH;
             fromLaunchSet++;
         } else {
@@ -138,19 +179,35 @@ function main() {
                 char.available_from = date;
                 fromUP++;
             } else {
-                // No UP record → launch window character
-                char.available_from = JP_LAUNCH;
-                fromNoUP++;
+                // Clear stale date from previous run — will be filled in second pass
+                delete (char as any).available_from;
             }
         }
         assigned++;
     }
 
+    // Second pass: assign dates for no-UP characters using group predecessor
+    let noUpCount = 0;
+    let fromGroupPred = 0;
+    for (const char of charTable) {
+        if (char.source !== "常驻卡池") continue;
+        const code = parseInt(String(char.code_number));
+        if (JP_LAUNCH_IDS.has(code)) continue;
+        if (char.available_from) continue;
+
+        noUpCount++;
+        const predDate = getGroupBestDate(char);
+        char.available_from = predDate;
+        fromGroupPred++;
+        if (noUpCount <= 5) console.log(`  [groupPred] ${char.code_number} ${char.name} → ${predDate}`);
+    }
+    console.log(`  No-UP chars with group pred: ${fromGroupPred}/${noUpCount}`);
+
     // Stats
     console.log(`Permanent characters: ${assigned}`);
     console.log(`  From JP launch set (91): ${fromLaunchSet}`);
     console.log(`  From UP banner (endDate+1): ${fromUP}`);
-    console.log(`  No UP record (→ JP launch): ${fromNoUP}`);
+    console.log(`  From group predecessor: ${fromGroupPred}`);
     console.log(`  Bad dates (fallback): ${badDates}`);
     console.log(`  Total UP banners referenced: ${Object.keys(charFirstUpBanner).length}`);
 
