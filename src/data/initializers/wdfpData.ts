@@ -155,6 +155,9 @@ export default function init(
     // migration: device_bindings.name for admin panel identification
     try { database.prepare(`ALTER TABLE device_bindings ADD COLUMN name TEXT DEFAULT NULL`).run(); } catch { /* column already exists */ }
 
+    // migration: add awake_level for character awakening system
+    try { database.prepare(`ALTER TABLE players_characters_mana_nodes ADD COLUMN awake_level INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_options (
         key TEXT NOT NULL,
         value INTEGER NOT NULL,
@@ -262,6 +265,7 @@ export default function init(
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_characters_mana_nodes (
         value INTEGER NOT NULL,
+        awake_level INTEGER NOT NULL DEFAULT 0,
         character_id INTEGER NOT NULL,
         player_id INTEGER NOT NULL,
         PRIMARY KEY (value, character_id, player_id),

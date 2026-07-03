@@ -135,6 +135,7 @@ export interface PlayerCharacter {
 
 export interface RawPlayerCharacterManaNode {
     value: number,
+    awake_level: number,
     character_id: number
 }
 

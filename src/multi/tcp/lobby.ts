@@ -292,8 +292,8 @@ function handleBye(_socket: net.Socket, client: SessionClient, _data: any[]): vo
         }
     }
     const hostClient = findHostClient(client.roomNumber)
-    sessionManager.broadcastToRoom(client.roomNumber, [1, [1, hostClient?.mates ?? []]])
     sessionManager.removeClient(client)
+    sessionManager.broadcastToRoom(client.roomNumber, [1, [1, hostClient?.mates ?? []]])
     try { client.socket.destroy(); } catch (e) {}
     console.log(`[LOBBY] client ${client.viewerId} left room ${client.roomNumber}`)
 }
