@@ -310,7 +310,8 @@ function handleChangeParty(_socket: net.Socket, client: SessionClient, data: any
     if (mate) {
         if (client.playerId && pd.currentPartyId !== undefined) { try { const up = require("../../data/wdfpData").updatePlayerSync; up({ id: client.playerId, partySlot: pd.currentPartyId }); } catch(e) {} }
         const room = getRoom(client.roomNumber); if (room) { room.host_party_id = pd.currentPartyId; }
-        sessionManager.broadcastToRoom(client.roomNumber, [1, [1, client.mates]])
+        const hostClient = findHostClient(client.roomNumber)
+        sessionManager.broadcastToRoom(client.roomNumber, [1, [1, hostClient?.mates ?? client.mates]])
     }
     console.log(`[LOBBY] client ${client.viewerId} changed party`)
 }
