@@ -26,6 +26,8 @@ import singleBattleQuestApiPlugin from "./routes/api/singleBattleQuest";
 import { multiBattleRoutes } from "./multi";
 import attentionApiPlugin from "./routes/api/attention";
 import characterApiPlugin from "./routes/api/character";
+import characterManaPlugin from "./routes/api/character/mana";
+import characterBondPlugin from "./routes/api/character/bond";
 import partyGroupApiPlugin from "./routes/api/partyGroup";
 import equipmentApiPlugin from "./routes/api/equipment";
 import sellApiPlugin from "./routes/api/sell";
@@ -475,6 +477,8 @@ fastify.register(singleBattleQuestApiPlugin, { prefix: `${apiPrefix}/single_batt
 fastify.register(multiBattleRoutes, { prefix: `${apiPrefix}/multi_battle_quest` });
 fastify.register(attentionApiPlugin, { prefix: `${apiPrefix}/attention` });
 fastify.register(characterApiPlugin, { prefix: `${apiPrefix}/character` });
+fastify.register(characterManaPlugin, { prefix: `${apiPrefix}/character` });
+fastify.register(characterBondPlugin, { prefix: `${apiPrefix}/character` });
 fastify.register(partyGroupApiPlugin, { prefix: `${apiPrefix}/party_group` });
 fastify.register(equipmentApiPlugin, { prefix: `${apiPrefix}/equipment` });
 fastify.register(sellApiPlugin, { prefix: `${apiPrefix}/equipment` });
